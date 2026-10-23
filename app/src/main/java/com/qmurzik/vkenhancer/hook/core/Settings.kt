@@ -102,6 +102,7 @@ class Settings(private val prefs: SharedPreferences?) {
             disableStories = bool(Keys.STORIES_DISABLE),
             promoChats = bool(Keys.ADS_PROMO_CHATS),
             videoAds = bool(Keys.ADS_VIDEO),
+            recommendedPosts = bool(Keys.FEED_RECOMMENDATIONS),
         )
     }
 

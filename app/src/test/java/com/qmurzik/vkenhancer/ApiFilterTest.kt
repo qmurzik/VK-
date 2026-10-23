@@ -109,6 +109,21 @@ class ApiFilterTest {
         assertEquals("post", blocks.getJSONObject(0).getString("type"))
     }
 
+    @Test fun removesRecommendedPostsFromUnsubscribed() {
+        val body = feed(
+            """{"type":"post","text":"my sub","source_id":10}""",
+            """{"type":"post","text":"reco","source_id":-20,"recommendation_info":{"track_code":"x"}}""",
+            """{"type":"post","text":"discover","feed_source":{"type":"from_discover"}}""",
+        )
+        val out = ApiFilter.filter("newsfeed.getFeed", body, FilterRules(recommendedPosts = true))!!
+        assertEquals(1, itemsOf(out).size)
+    }
+
+    @Test fun keepsNormalPostsWhenRecommendationsOff() {
+        val body = feed("""{"type":"post","recommendation_info":{"track_code":"x"}}""")
+        assertNull(ApiFilter.filter("newsfeed.getFeed", body, FilterRules(recommendedPosts = false)))
+    }
+
     @Test fun keepsUnrelatedArrays() {
         // profiles/groups arrays must be untouched by the recursive filter.
         val body = """{"response":{"items":[{"type":"ads","ad_data":{}}],"profiles":[{"id":1},{"id":2}],"groups":[{"id":3}]}}"""

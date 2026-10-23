@@ -38,7 +38,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         category("Лента") {
-            switch(Keys.FEED_RECOMMENDATIONS, "Рекомендации", "«Вам может быть интересно», рекомендации друзей и групп")
+            switch(Keys.FEED_RECOMMENDATIONS, "Рекомендации", "Посты от неподписанных сообществ, «вам может быть интересно», рекомендации друзей и групп")
             switch(Keys.FEED_CLIPS, "Клипы", "Блоки клипов в ленте")
             switch(Keys.FEED_GAMES, "Игры и мини-приложения", "Карусели игр и мини-приложений")
             switch(Keys.FEED_MUSIC, "Музыкальные блоки", "«Для вас» плейлисты, артисты")

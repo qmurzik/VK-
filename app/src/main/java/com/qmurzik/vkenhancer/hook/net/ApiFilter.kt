@@ -33,10 +33,12 @@ data class FilterRules(
     val promoChats: Boolean = false,
     /** Drop pre-roll advertising descriptors attached to videos. */
     val videoAds: Boolean = false,
+    /** Drop recommended feed posts (от неподписанных сообществ): those carrying recommendation_info. */
+    val recommendedPosts: Boolean = false,
 ) {
     val isEmpty: Boolean
         get() = feedTypes.isEmpty() && feedTypePrefixes.isEmpty() && !adTypes && !markedAds && !reposts &&
-            keywords.isEmpty() && !storyAds && !disableStories && !promoChats && !videoAds
+            keywords.isEmpty() && !storyAds && !disableStories && !promoChats && !videoAds && !recommendedPosts
 }
 
 object ApiFilter {
@@ -87,7 +89,7 @@ object ApiFilter {
         val m = method.lowercase(Locale.ROOT)
         if (rules.disableStories && m.startsWith("stories.")) return true
         if (isFeedMethod(m) && (rules.feedTypes.isNotEmpty() || rules.feedTypePrefixes.isNotEmpty() ||
-                rules.reposts || rules.keywords.isNotEmpty())
+                rules.reposts || rules.keywords.isNotEmpty() || rules.recommendedPosts)
         ) return true
         // Covers both the old ads_post/ads_site types and the modern type:"ads" block with ad_data.
         if (rules.adTypes && (body.contains("\"ads_") || body.contains("\"ads\"") || body.contains("\"ad_data\""))) return true
@@ -187,6 +189,11 @@ object ApiFilter {
             if (rules.feedTypePrefixes.any { type.startsWith(it) }) return true
         }
         val isPost = type.isEmpty() || type == "post" || type == "wall_photo"
+        // Recommended posts (shown from communities the user doesn't follow) carry recommendation_info
+        // or a "from_discover" feed-reason marker; both are absent on subscription posts.
+        if (rules.recommendedPosts && isPost &&
+            (item.has("recommendation_info") || containsFromDiscover(item))
+        ) return true
         if (rules.reposts && isPost) {
             val history = item.optJSONArray("copy_history")
             if (history != null && history.length() > 0) return true
@@ -203,6 +210,16 @@ object ApiFilter {
         if (text.isEmpty()) return false
         val lower = text.toString().lowercase(Locale.ROOT)
         return keywords.any { it.isNotEmpty() && lower.contains(it) }
+    }
+
+    /** True if the post carries a "from_discover" feed-reason marker (a nested {type:"from_discover"}). */
+    private fun containsFromDiscover(item: JSONObject): Boolean {
+        for (key in listOf("feed_source", "caption", "header", "type_feed_source")) {
+            val v = item.opt(key)
+            if (v is JSONObject && v.optString("type") == "from_discover") return true
+        }
+        return item.optString("feed_source") == "from_discover" ||
+            item.optString("type_feed_source") == "from_discover"
     }
 
     private fun isTruthy(v: Any?): Boolean = when (v) {
