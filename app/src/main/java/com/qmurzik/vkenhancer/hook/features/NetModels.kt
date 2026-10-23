@@ -57,7 +57,10 @@ object ResponseRewriter {
     private var bodyField: Field? = null
     private var contentTypeMethod: Method? = null
     private var stringMethod: Method? = null
+    private var bytesMethod: Method? = null
     private var createMethod: Method? = null
+    private var createBytesMethod: Method? = null
+    private var bytesFirst = true
 
     private fun ensureResolved(response: Any) {
         if (resolved) return
@@ -78,6 +81,15 @@ object ResponseRewriter {
             it.name == "create" && java.lang.reflect.Modifier.isStatic(it.modifiers) &&
                 it.parameterTypes.size == 2 && it.parameterTypes[0] == String::class.java
         } ?: return
+        // For msgpack we round-trip raw bytes: ResponseBody.bytes() and a static create(byte[], MediaType)
+        // (argument order varies across OkHttp versions, so remember which side the byte[] is on).
+        bytesMethod = bodyCls.methods.firstOrNull { it.name == "bytes" && it.parameterTypes.isEmpty() }
+        val createBytes = bodyCls.methods.firstOrNull {
+            it.name == "create" && java.lang.reflect.Modifier.isStatic(it.modifiers) &&
+                it.parameterTypes.size == 2 && it.parameterTypes.any { p -> p == ByteArray::class.java }
+        }
+        if (createBytes != null) bytesFirst = createBytes.parameterTypes[0] == ByteArray::class.java
+        createBytesMethod = createBytes
         bodyField = bf; contentTypeMethod = ct; stringMethod = str; createMethod = create
         usable = true
     }
@@ -91,8 +103,9 @@ object ResponseRewriter {
 
         val body = bodyField?.get(response) ?: run { if (feedish) L.d { "rewrite $method: no body" }; return null }
         val contentType = runCatching { contentTypeMethod?.invoke(body) }.getOrNull()
+        val ctStr = contentType?.toString()?.lowercase(Locale.ROOT) ?: ""
+        if (ctStr.contains("msgpack")) return rewriteMsgpack(method, feedish, response, body, contentType)
         if (contentType != null) {
-            val ctStr = contentType.toString().lowercase(Locale.ROOT)
             if (!ctStr.contains("json") && !ctStr.contains("javascript") && !ctStr.contains("text/")) {
                 if (feedish) L.d { "rewrite $method: skip content-type=$ctStr" }
                 return null
@@ -119,5 +132,37 @@ object ResponseRewriter {
             bodyField?.set(response, newBody)
             response
         }.onFailure { L.w("install body failed", it) }.getOrNull()
+    }
+
+    /**
+     * Filters a MessagePack response: decode to JSON, run [ApiFilter], and only when something was
+     * removed re-encode to msgpack and install a fresh body (keeping the x-msgpack content type).
+     */
+    private fun rewriteMsgpack(method: String, feedish: Boolean, response: Any, body: Any, contentType: Any?): Any? {
+        val createBytes = createBytesMethod ?: run { if (feedish) L.d { "rewrite $method: no create(byte[])" }; return null }
+        val raw = runCatching { bytesMethod?.invoke(body) as? ByteArray }.getOrNull()
+            ?: run { if (feedish) L.d { "rewrite $method: msgpack bytes read failed" }; return null }
+        val json = com.qmurzik.vkenhancer.hook.net.MsgpackCodec.toJson(raw)
+            ?: run { if (feedish) L.d { "rewrite $method: msgpack decode failed (${raw.size} b)" }; return reinstallBytes(response, contentType, raw, createBytes) }
+        if (feedish) L.d { "rewrite $method: msgpack decoded ${raw.size} b -> json ${json.length}" }
+
+        val filtered = runCatching { ApiFilter.filter(method, json, Env.settings.filterRules) }
+            .onFailure { L.w("filter($method) failed", it) }.getOrNull()
+        if (filtered == null) {
+            if (feedish) { L.d { "rewrite $method: nothing matched (msgpack)" }; Diag.toast("seen-$method", "ответ $method без изменений (msgpack)") }
+            return reinstallBytes(response, contentType, raw, createBytes) // body was consumed; restore it
+        }
+        val repacked = com.qmurzik.vkenhancer.hook.net.MsgpackCodec.fromJson(filtered)
+            ?: run { L.w("msgpack re-encode failed for $method"); return reinstallBytes(response, contentType, raw, createBytes) }
+        L.d { "filtered $method (msgpack): json ${json.length} -> ${filtered.length}, bytes ${raw.size} -> ${repacked.size}" }
+        Diag.toast("filter", "вырезано в $method (msgpack)")
+        return reinstallBytes(response, contentType, repacked, createBytes)
+    }
+
+    private fun reinstallBytes(response: Any, contentType: Any?, bytes: ByteArray, createBytes: Method): Any? {
+        val args: Array<Any?> = if (bytesFirst) arrayOf(bytes, contentType) else arrayOf(contentType, bytes)
+        val newBody = runCatching { createBytes.invoke(null, *args) }.getOrNull() ?: return null
+        return runCatching { bodyField?.set(response, newBody); response }
+            .onFailure { L.w("install msgpack body failed", it) }.getOrNull()
     }
 }

@@ -145,9 +145,20 @@ object NetworkHook {
                     throw IOException("VKEnhancer blocked request ($reason)")
                 }
             }
-            val response = proceedMethod.invoke(chainObj, request)
+            // proceed() legitimately throws IOException (timeouts, connection resets). Reflection wraps
+            // it in InvocationTargetException; rethrow the real cause so OkHttp retries/handles it as
+            // usual. Not unwrapping turned a normal network error into a fatal UndeclaredThrowableException.
+            val response = try {
+                proceedMethod.invoke(chainObj, request)
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                throw e.cause ?: e
+            }
             if (url == null || response == null) return response
-            return ResponseRewriter.rewrite(url, response) ?: response
+            return try {
+                ResponseRewriter.rewrite(url, response) ?: response
+            } catch (t: Throwable) {
+                L.w("rewrite threw, passing original response", t); response
+            }
         }
     }
 }

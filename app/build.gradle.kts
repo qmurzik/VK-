@@ -14,8 +14,8 @@ android {
         applicationId = "com.qmurzik.vkenhancer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.0.8"
+        versionCode = 10
+        versionName = "1.0.9"
     }
 
     buildTypes {
@@ -57,6 +57,7 @@ dependencies {
     compileOnly("io.github.libxposed:api:102.0.0")
     implementation("io.github.libxposed:service:102.0.0")
     implementation("org.luckypray:dexkit:2.3.0")
+    implementation("org.msgpack:msgpack-core:0.9.12")
 
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
