@@ -43,20 +43,22 @@ object NetworkHook {
 
     private fun findInterceptorInterface(): Class<*>? {
         runCatching { Class.forName("okhttp3.Interceptor", false, Env.classLoader) }.getOrNull()?.let { return it }
-        // Shaded fallback: the Chain carries OkHttp's unique assertion string.
-        val chain = DexFinder.findClass("okhttp_chain", "must call proceed() exactly once") ?: return null
+        // Shaded fallback: the Chain carries OkHttp's unique assertion string (okhttp3 package only,
+        // so an ad SDK's bundled OkHttp is never picked up).
+        val chain = DexFinder.findClass("okhttp_chain", "must call proceed() exactly once", packages = listOf("okhttp3")) ?: return null
         return chain.enclosingClass ?: chain.interfaces.firstOrNull { it.isInterface }
     }
 
     private fun findBuilder(interceptorIface: Class<*>): Class<*>? {
         runCatching { Class.forName("okhttp3.OkHttpClient\$Builder", false, Env.classLoader) }.getOrNull()?.let { return it }
-        // A builder is the class that keeps a mutable List and an addInterceptor(Interceptor): Builder method.
-        val candidate = DexFinder.findClass("okhttp_builder", "Null interceptor: ", "Null network interceptor: ")
-        if (candidate != null) return candidate
-        // Last resort: locate it from the interceptor interface usage by shape.
-        return interceptorIface.classes.firstOrNull { c ->
-            c.declaredMethods.any { it.parameterTypes.contentEquals(arrayOf(interceptorIface)) && it.returnType == c }
-        }
+        // VK obfuscates OkHttpClient/Builder (okhttp3.o / okhttp3.o$a). Find the Builder as the
+        // okhttp3 class with a fluent addInterceptor(okhttp3.Interceptor): Builder method. Restricting
+        // to the okhttp3 package is essential: ad SDKs (e.g. Mbridge) ship their own shaded OkHttp,
+        // and matching one of those would install the interceptor on the wrong HTTP stack.
+        val builder = DexFinder.findClassWithFluentParam("okhttp_builder", interceptorIface.name, listOf("okhttp3"))
+        if (builder != null && builder.name.startsWith("okhttp3.")) return builder
+        if (builder != null) L.w("ignoring non-okhttp3 builder candidate ${builder.name}")
+        return null
     }
 
     /** Appends [interceptor] to the builder's first application-interceptor list after every construction. */

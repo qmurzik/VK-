@@ -79,6 +79,29 @@ object DexFinder {
         return hit?.let { runCatching { it.getInstance(Env.classLoader) }.getOrNull() }
     }
 
+    /**
+     * Finds a class that declares a method taking exactly [paramType] and returning its own type —
+     * i.e. a fluent `addX(T): Self`. Restricted to [packages] so a shaded copy in another package
+     * (e.g. an ad SDK's bundled OkHttp) is never matched.
+     */
+    fun findClassWithFluentParam(key: String, paramType: String, packages: List<String>): Class<*>? {
+        val cached = cache.getProperty("c.$key")
+        if (cached != null) {
+            return if (cached == NOT_FOUND) null else runCatching { DexClass(cached).getInstance(Env.classLoader) }
+                .onFailure { L.w("cached class $cached for $key is invalid", it) }.getOrNull()
+        }
+        val methods = runCatching {
+            bridge()?.findMethod {
+                searchPackages(packages)
+                matcher { paramTypes(paramType) }
+            }
+        }.onFailure { L.e("findClassWithFluentParam($key) failed", it) }.getOrNull().orEmpty()
+        val hit = methods.firstOrNull { it.declaredClassName == it.returnTypeName && it.declaredClassName.startsWith(packages.first()) }
+        val declared = hit?.declaredClass
+        put("c.$key", declared?.descriptor)
+        return declared?.let { runCatching { it.getInstance(Env.classLoader) }.getOrNull() }
+    }
+
     /** Finds the single method whose code references all of [strings]. */
     fun findMethod(
         key: String,
