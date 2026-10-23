@@ -211,4 +211,31 @@ object ApiFilter {
     /** Test hook: evaluates [shouldDrop] for an arbitrary method. */
     internal fun dropFor(method: String, item: JSONObject, rules: FilterRules): Boolean =
         shouldDrop(item, Context(method.lowercase(Locale.ROOT), rules))
+
+    /**
+     * Diagnostic: summarises the item `type` values (and ad-flag markers) present in a response, so a
+     * feed that "nothing matched" can reveal how its ads are actually labelled. Returns a short string.
+     */
+    fun describe(body: String): String {
+        val root = runCatching { JSONTokener(body).nextValue() as? JSONObject }.getOrNull() ?: return "not-an-object"
+        val types = LinkedHashMap<String, Int>()
+        val flags = HashSet<String>()
+        fun scan(node: Any?, depth: Int) {
+            if (depth > MAX_DEPTH) return
+            when (node) {
+                is JSONArray -> for (i in 0 until node.length()) scan(node.opt(i), depth + 1)
+                is JSONObject -> {
+                    node.optString("type", "").takeIf { it.isNotEmpty() }?.let { types[it] = (types[it] ?: 0) + 1 }
+                    for (k in listOf("marked_as_ads", "ad_data", "ads_info", "ad", "is_ads", "ad_type", "is_promo")) {
+                        if (node.has(k)) flags += k
+                    }
+                    val keys = node.keys()
+                    while (keys.hasNext()) scan(node.opt(keys.next()), depth + 1)
+                }
+            }
+        }
+        scan(root.opt("response") ?: root, 0)
+        val top = types.entries.sortedByDescending { it.value }.take(25).joinToString(",") { "${it.key}:${it.value}" }
+        return "types[$top] flags[${flags.joinToString(",")}]"
+    }
 }

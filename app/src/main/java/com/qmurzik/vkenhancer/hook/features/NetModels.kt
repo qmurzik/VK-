@@ -122,7 +122,7 @@ object ResponseRewriter {
             Diag.toast("filter", "вырезано в $method (${original.length}→${filtered.length} б)")
         } else if (feedish) {
             // Only report feed-bearing endpoints as "unchanged" to keep the diagnostics readable.
-            L.d { "rewrite $method: nothing matched in ${original.length} b" }
+            L.d { "rewrite $method: nothing matched; ${ApiFilter.describe(original)}" }
             Diag.toast("seen-$method", "ответ $method без изменений")
         }
 
@@ -149,7 +149,10 @@ object ResponseRewriter {
         val filtered = runCatching { ApiFilter.filter(method, json, Env.settings.filterRules) }
             .onFailure { L.w("filter($method) failed", it) }.getOrNull()
         if (filtered == null) {
-            if (feedish) { L.d { "rewrite $method: nothing matched (msgpack)" }; Diag.toast("seen-$method", "ответ $method без изменений (msgpack)") }
+            if (feedish) {
+                L.d { "rewrite $method: nothing matched (msgpack); ${com.qmurzik.vkenhancer.hook.net.ApiFilter.describe(json)}" }
+                Diag.toast("seen-$method", "ответ $method без изменений (msgpack)")
+            }
             return reinstallBytes(response, contentType, raw, createBytes) // body was consumed; restore it
         }
         val repacked = com.qmurzik.vkenhancer.hook.net.MsgpackCodec.fromJson(filtered)
