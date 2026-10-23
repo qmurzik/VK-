@@ -60,8 +60,8 @@ class HomeActivity : AppCompatActivity() {
         root.addView(buildAllSettingsCard())
 
         conn.observe { bound ->
-            statusText.text = if (bound) "✓ Модуль активен — изменения применяются сразу"
-            else "⚠ Не активирован в LSPosed. Включите модуль и выберите ВКонтакте, затем перезапустите приложение."
+            statusText.text = if (bound) "✓ Модуль активен (LSPosed) — изменения применяются сразу"
+            else "Настройки сохраняются. Если включён через LSPatch/Vector — перезапустите ВК, чтобы применить. Не меняется? Проверьте, что модуль включён и ВК в области действия."
             statusText.setTextColor(onAccent)
             statusText.alpha = if (bound) 0.95f else 1f
             masterSwitch.isEnabled = bound

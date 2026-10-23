@@ -51,10 +51,18 @@ class ModuleEntry : XposedModule {
     }
 
     private fun setUp(param: PackageReadyParam) {
-        val prefs = runCatching { getRemotePreferences(Keys.PREFS_GROUP) }
-            .onFailure { L.w("remote preferences unavailable, using defaults", it) }
+        val remote = runCatching { getRemotePreferences(Keys.PREFS_GROUP) }
+            .onFailure { L.w("remote preferences unavailable", it) }
             .getOrNull()
-        val settings = Settings(prefs)
+        // On rootless loaders the remote store never carries the user's choices, so prefer the
+        // settings app's ConfigProvider when it is reachable and fall back to remote prefs otherwise.
+        val provider = AppContext.get()?.let { ctx ->
+            runCatching { com.qmurzik.vkenhancer.hook.core.ProviderPrefs.tryOpen(ctx) }
+                .onFailure { L.w("config provider unreachable", it) }
+                .getOrNull()
+        }
+        L.i("config source: ${if (provider != null) "ConfigProvider" else if (remote != null) "remote prefs" else "defaults"}")
+        val settings = Settings(provider ?: remote)
         Env.bind(param.classLoader, param.applicationInfo, settings)
         AppContext.set(AppContext.get())
 

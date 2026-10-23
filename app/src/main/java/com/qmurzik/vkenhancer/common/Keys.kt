@@ -7,6 +7,16 @@ package com.qmurzik.vkenhancer.common
 object Keys {
     const val PREFS_GROUP = "vkenhancer"
 
+    /** Local SharedPreferences file name, mirrored to VK through [PROVIDER_AUTHORITY]. */
+    const val PREFS_LOCAL = "vkenhancer_local"
+
+    /**
+     * Authority of the module's config provider. On rootless loaders (LSPatch/Vector) the modern
+     * libxposed remote-preferences bridge is not reachable from the standalone settings app, so the
+     * VK-side hook pulls the user's settings from this provider instead.
+     */
+    const val PROVIDER_AUTHORITY = "com.qmurzik.vkenhancer.config"
+
     // Global
     const val MODULE_ENABLED = "module_enabled"
 

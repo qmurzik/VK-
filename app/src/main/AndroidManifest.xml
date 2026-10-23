@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Lets the settings app see the VK package (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.vkontakte.android" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -23,6 +28,13 @@
             android:exported="true"
             android:parentActivityName=".ui.HomeActivity"
             android:label="@string/app_name" />
+
+        <!-- Config bridge for rootless loaders. Exported so the injected VK hook can read the
+             module's own feature flags; no permission is required as the data is not sensitive. -->
+        <provider
+            android:name=".ui.ConfigProvider"
+            android:authorities="com.qmurzik.vkenhancer.config"
+            android:exported="true" />
 
         <!-- This is a modern libxposed (API 102) module. Its entry, scope and metadata live in
              META-INF/xposed/ (java_init.list, scope.list, module.prop). No legacy xposedmodule

@@ -16,13 +16,12 @@ import io.github.libxposed.service.XposedServiceHelper
  * works — marked read-only, because local writes would not reach VK.
  */
 class ServiceConn(context: Context) {
-    val store = RemoteStore(localPrefs(context)).apply { readOnly = true }
+    val store = RemoteStore(localPrefs(context))
 
     @Volatile var bound = false; private set
     private var service: XposedService? = null
     private val main = Handler(Looper.getMainLooper())
     private var onState: ((Boolean) -> Unit)? = null
-    private val appContext = context.applicationContext
 
     fun observe(listener: (bound: Boolean) -> Unit) {
         onState = listener
@@ -32,21 +31,17 @@ class ServiceConn(context: Context) {
                 service = s
                 val remote = runCatching { s.getRemotePreferences(Keys.PREFS_GROUP) }.getOrNull()
                 main.post {
-                    if (remote != null) {
-                        store.prefs = remote
-                        store.readOnly = false
-                        bound = true
-                    }
-                    onState?.invoke(bound)
+                    store.remote = remote
+                    bound = true
+                    onState?.invoke(true)
                 }
             }
 
             override fun onServiceDied(s: XposedService) {
                 main.post {
                     service = null
+                    store.remote = null
                     bound = false
-                    store.prefs = localPrefs(appContext)
-                    store.readOnly = true
                     onState?.invoke(false)
                 }
             }
@@ -56,5 +51,5 @@ class ServiceConn(context: Context) {
     val xposedService: XposedService? get() = service
 
     private fun localPrefs(context: Context): SharedPreferences =
-        context.getSharedPreferences(Keys.PREFS_GROUP + "_local", Context.MODE_PRIVATE)
+        context.getSharedPreferences(Keys.PREFS_LOCAL, Context.MODE_PRIVATE)
 }
