@@ -38,9 +38,13 @@ object NetworkHook {
             else throw UnsupportedOperationException(method.name)
         }
 
-        val builderCls = findBuilder(interceptorIface) ?: run { L.w("OkHttp builder not found"); return }
-        appendOnConstruction(builderCls, interceptorIface, interceptor)
-        L.i("OkHttp interceptor installed on ${builderCls.name}")
+        // Inject into the OkHttpClient directly. R8 inlines Builder.addInterceptor in VK, so the
+        // Builder cannot be found by method signature; the client class is found instead by the
+        // "Null interceptor: " literal in its constructor (which inlining cannot remove), restricted
+        // to the okhttp3 package so an ad SDK's shaded copy is never matched.
+        val clientCls = findClient() ?: run { L.w("OkHttp client not found"); return }
+        injectIntoClient(clientCls, interceptorIface, interceptor)
+        L.i("OkHttp interceptor installed on ${clientCls.name}")
     }
 
     private fun findInterceptorInterface(): Class<*>? {
@@ -51,37 +55,56 @@ object NetworkHook {
         return chain.enclosingClass ?: chain.interfaces.firstOrNull { it.isInterface }
     }
 
-    private fun findBuilder(interceptorIface: Class<*>): Class<*>? {
-        runCatching { Class.forName("okhttp3.OkHttpClient\$Builder", false, Env.classLoader) }.getOrNull()?.let { return it }
-        // VK obfuscates OkHttpClient/Builder (okhttp3.o / okhttp3.o$a). Find the Builder as the
-        // okhttp3 class with a fluent addInterceptor(okhttp3.Interceptor): Builder method. Restricting
-        // to the okhttp3 package is essential: ad SDKs (e.g. Mbridge) ship their own shaded OkHttp,
-        // and matching one of those would install the interceptor on the wrong HTTP stack.
-        val builder = DexFinder.findClassWithFluentParam("okhttp_builder", interceptorIface.name, listOf("okhttp3"))
-        if (builder != null && builder.name.startsWith("okhttp3.")) return builder
-        if (builder != null) L.w("ignoring non-okhttp3 builder candidate ${builder.name}")
-        return null
+    private fun findClient(): Class<*>? {
+        runCatching { Class.forName("okhttp3.OkHttpClient", false, Env.classLoader) }.getOrNull()?.let { return it }
+        val client = DexFinder.findClass("okhttp_client", "Null interceptor: ", packages = listOf("okhttp3"))
+        if (client != null && !client.name.startsWith("okhttp3.")) {
+            L.w("ignoring non-okhttp3 client candidate ${client.name}"); return null
+        }
+        return client
     }
 
-    /** Appends [interceptor] to the builder's first application-interceptor list after every construction. */
-    private fun appendOnConstruction(builderCls: Class<*>, interceptorIface: Class<*>, interceptor: Any) {
-        val listFields = builderCls.declaredFields.filter { java.util.List::class.java.isAssignableFrom(it.type) }
+    /**
+     * Prepends [interceptor] to the client's application-interceptor list on every construction.
+     *
+     * The client keeps several `List` fields (interceptors, networkInterceptors, protocols,
+     * connectionSpecs). The application-interceptor list is detected by its element type — the first
+     * `List` whose items are [interceptorIface] instances — which is robust against field reordering.
+     * Prepending makes our interceptor run first, so it sees the fully decompressed response body.
+     */
+    private fun injectIntoClient(clientCls: Class<*>, interceptorIface: Class<*>, interceptor: Any) {
+        val listFields = clientCls.declaredFields
+            .filter { java.util.List::class.java.isAssignableFrom(it.type) }
             .onEach { it.isAccessible = true }
-        if (listFields.isEmpty()) { L.w("no interceptor list field on ${builderCls.name}"); return }
-        // The first declared List is the application interceptors (runs once, sees the full body).
-        val target = listFields.first()
+        if (listFields.isEmpty()) { L.w("no List field on ${clientCls.name}"); return }
 
-        for (ctor in builderCls.declaredConstructors) {
+        for (ctor in clientCls.declaredConstructors) {
             Hooks.intercept(ctor) { chain ->
                 val r = chain.proceed()
-                runCatching {
-                    @Suppress("UNCHECKED_CAST")
-                    val list = target.get(chain.thisObject) as? MutableList<Any> ?: return@runCatching
-                    if (list.none { Proxy.isProxyClass(it.javaClass) && interceptorIface.isInstance(it) }) list.add(interceptor)
-                }.onFailure { L.w("append interceptor failed", it) }
+                runCatching { inject(chain.thisObject, listFields, interceptorIface, interceptor) }
+                    .onFailure { L.w("inject interceptor failed", it) }
                 r
             }
         }
+    }
+
+    private fun inject(client: Any, listFields: List<java.lang.reflect.Field>, interceptorIface: Class<*>, interceptor: Any) {
+        for (field in listFields) {
+            @Suppress("UNCHECKED_CAST")
+            val current = field.get(client) as? List<Any> ?: continue
+            // Identify the application-interceptor list by its element type; skip protocols/specs.
+            if (current.isNotEmpty() && !interceptorIface.isInstance(current[0])) continue
+            if (current.any { Proxy.isProxyClass(it.javaClass) && interceptorIface.isInstance(it) }) return
+            // An empty list can't be typed; still inject into the first List as a last resort only if
+            // no typed list was found — handled by ordering below.
+            if (current.isEmpty()) continue
+            val merged = ArrayList<Any>(current.size + 1).apply { add(interceptor); addAll(current) }
+            field.set(client, merged)
+            L.i("interceptor injected into ${client.javaClass.name}.${field.name} (was ${current.size})")
+            return
+        }
+        // No non-empty interceptor list — do nothing rather than risk injecting into protocols/specs.
+        L.w("no application-interceptor list found on ${client.javaClass.name}")
     }
 
     /** Reflectively drives one `Chain`: read request URL, block or rewrite as configured. */
