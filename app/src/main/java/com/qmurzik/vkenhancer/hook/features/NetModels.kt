@@ -86,23 +86,30 @@ object ResponseRewriter {
     fun rewrite(url: String, response: Any): Any? {
         val method = ApiFilter.methodFromUrl(url) ?: return null
         ensureResolved(response)
-        if (!usable) return null
+        val feedish = method.startsWith("execute") || method.contains("feed") || method.startsWith("newsfeed")
+        if (!usable) { if (feedish) L.d { "rewrite $method: model not usable" }; return null }
 
-        val body = bodyField?.get(response) ?: return null
+        val body = bodyField?.get(response) ?: run { if (feedish) L.d { "rewrite $method: no body" }; return null }
         val contentType = runCatching { contentTypeMethod?.invoke(body) }.getOrNull()
         if (contentType != null) {
             val ctStr = contentType.toString().lowercase(Locale.ROOT)
-            if (!ctStr.contains("json") && !ctStr.contains("javascript") && !ctStr.contains("text/")) return null
+            if (!ctStr.contains("json") && !ctStr.contains("javascript") && !ctStr.contains("text/")) {
+                if (feedish) L.d { "rewrite $method: skip content-type=$ctStr" }
+                return null
+            }
         }
 
-        val original = runCatching { stringMethod?.invoke(body) as? String }.getOrNull() ?: return null
+        val original = runCatching { stringMethod?.invoke(body) as? String }.getOrNull()
+            ?: run { if (feedish) L.d { "rewrite $method: body read failed" }; return null }
+        if (feedish) L.d { "rewrite $method: read ${original.length} b, ct=$contentType" }
         val filtered = runCatching { ApiFilter.filter(method, original, Env.settings.filterRules) }
             .onFailure { L.w("filter($method) failed", it) }.getOrNull()
         if (filtered != null) {
             L.d { "filtered $method: ${original.length} -> ${filtered.length}" }
             Diag.toast("filter", "вырезано в $method (${original.length}→${filtered.length} б)")
-        } else if (method.startsWith("execute") || method.contains("feed") || method.startsWith("newsfeed")) {
+        } else if (feedish) {
             // Only report feed-bearing endpoints as "unchanged" to keep the diagnostics readable.
+            L.d { "rewrite $method: nothing matched in ${original.length} b" }
             Diag.toast("seen-$method", "ответ $method без изменений")
         }
 
