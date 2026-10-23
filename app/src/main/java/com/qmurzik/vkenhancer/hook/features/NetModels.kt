@@ -118,7 +118,7 @@ object ResponseRewriter {
         val filtered = runCatching { ApiFilter.filter(method, original, Env.settings.filterRules) }
             .onFailure { L.w("filter($method) failed", it) }.getOrNull()
         if (filtered != null) {
-            L.d { "filtered $method: ${original.length} -> ${filtered.length}" }
+            L.d { "[v${com.qmurzik.vkenhancer.BuildConfig.VERSION_NAME}] filtered $method: ${original.length} -> ${filtered.length}" }
             Diag.toast("filter", "вырезано в $method (${original.length}→${filtered.length} б)")
         } else if (feedish) {
             // Only report feed-bearing endpoints as "unchanged" to keep the diagnostics readable.
@@ -150,7 +150,7 @@ object ResponseRewriter {
             .onFailure { L.w("filter($method) failed", it) }.getOrNull()
         if (filtered == null) {
             if (feedish) {
-                L.d { "rewrite $method: nothing matched (msgpack); ${com.qmurzik.vkenhancer.hook.net.ApiFilter.describe(json)}" }
+                L.d { "[v${com.qmurzik.vkenhancer.BuildConfig.VERSION_NAME}] rewrite $method: nothing matched (msgpack); ${com.qmurzik.vkenhancer.hook.net.ApiFilter.describe(json)}" }
                 if (method.startsWith("newsfeed.getFeed") && json.contains("ad_data")) {
                     L.d { "SKELETON $method: ${com.qmurzik.vkenhancer.hook.net.ApiFilter.skeleton(json)}" }
                 }
@@ -160,7 +160,7 @@ object ResponseRewriter {
         }
         val repacked = com.qmurzik.vkenhancer.hook.net.MsgpackCodec.fromJson(filtered)
             ?: run { L.w("msgpack re-encode failed for $method"); return reinstallBytes(response, contentType, raw, createBytes) }
-        L.d { "filtered $method (msgpack): json ${json.length} -> ${filtered.length}, bytes ${raw.size} -> ${repacked.size}" }
+        L.d { "[v${com.qmurzik.vkenhancer.BuildConfig.VERSION_NAME}] filtered $method (msgpack): json ${json.length} -> ${filtered.length}, bytes ${raw.size} -> ${repacked.size}" }
         Diag.toast("filter", "вырезано в $method (msgpack)")
         return reinstallBytes(response, contentType, repacked, createBytes)
     }
