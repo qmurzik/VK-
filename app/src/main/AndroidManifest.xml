@@ -18,20 +18,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Legacy marker kept so older LSPosed builds also list the module; the real entry is
-             declared through META-INF/xposed/* for the modern libxposed loader. -->
-        <meta-data
-            android:name="xposedmodule"
-            android:value="true" />
-        <meta-data
-            android:name="xposeddescription"
-            android:value="@string/module_description" />
-        <meta-data
-            android:name="xposedminversion"
-            android:value="100" />
-        <meta-data
-            android:name="xposedscope"
-            android:resource="@array/xposed_scope" />
+        <!-- This is a modern libxposed (API 102) module. Its entry, scope and metadata live in
+             META-INF/xposed/ (java_init.list, scope.list, module.prop). No legacy xposedmodule
+             meta-data is declared on purpose: it can make LSPosed mis-detect the module as a legacy
+             Xposed module and then ignore the modern entry, so no hooks would run. -->
     </application>
 
 </manifest>

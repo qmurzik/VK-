@@ -24,7 +24,17 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
  * shadeable OkHttp/VKUI *shapes*, never to a specific VK build.
  */
 @Suppress("unused")
-class ModuleEntry : XposedModule() {
+class ModuleEntry : XposedModule {
+
+    /** No-arg instantiation (framework calls attachFramework() afterwards). */
+    constructor() : super()
+
+    /**
+     * Some libxposed loaders instantiate the entry via (base, param). The superclass exposes only a
+     * no-arg constructor and the framework still attaches itself via attachFramework(), so this just
+     * delegates — accepting either loader style without doing forbidden early init.
+     */
+    constructor(@Suppress("UNUSED_PARAMETER") base: XposedInterface, @Suppress("UNUSED_PARAMETER") param: ModuleLoadedParam) : this()
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         Env.attach(this, param.processName)
@@ -63,8 +73,22 @@ class ModuleEntry : XposedModule() {
         if (Env.isMainProcess) {
             safe("ui") { UiHook.install() }
             safe("font") { FontHook.install() }
+            if (settings.debug) confirmToast()
         }
         DexFinder.finish()
+    }
+
+    /** A one-off visible confirmation that the module injected into VK (enable "Подробный лог"). */
+    private fun confirmToast() = runCatching {
+        val ctx = AppContext.get() ?: return@runCatching
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            runCatching {
+                android.widget.Toast.makeText(
+                    ctx, "VK Enhancer v${com.qmurzik.vkenhancer.BuildConfig.VERSION_NAME} активен",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     private inline fun safe(name: String, block: () -> Unit) =

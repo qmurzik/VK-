@@ -37,13 +37,25 @@ object Env {
 }
 
 object L {
-    fun i(msg: String) = Env.module.log(Log.INFO, Env.TAG, msg)
-    fun w(msg: String, t: Throwable? = null) = Env.module.log(Log.WARN, Env.TAG, msg, t)
-    fun e(msg: String, t: Throwable? = null) = Env.module.log(Log.ERROR, Env.TAG, msg, t)
+    // Messages go to the LSPosed module log (via the framework) AND to logcat, so they can be read
+    // with `logcat -s VKEnhancer:V` from the VK process without opening the LSPosed manager.
+    fun i(msg: String) {
+        Log.i(Env.TAG, msg); runCatching { Env.module.log(Log.INFO, Env.TAG, msg) }
+    }
+
+    fun w(msg: String, t: Throwable? = null) {
+        Log.w(Env.TAG, msg, t); runCatching { Env.module.log(Log.WARN, Env.TAG, msg, t) }
+    }
+
+    fun e(msg: String, t: Throwable? = null) {
+        Log.e(Env.TAG, msg, t); runCatching { Env.module.log(Log.ERROR, Env.TAG, msg, t) }
+    }
 
     /** Verbose logging, only when the user enabled it in the module settings. */
     inline fun d(msg: () -> String) {
-        if (Env.settings.debug) Env.module.log(Log.DEBUG, Env.TAG, msg())
+        if (Env.settings.debug) {
+            val m = msg(); Log.d(Env.TAG, m); runCatching { Env.module.log(Log.DEBUG, Env.TAG, m) }
+        }
     }
 }
 
