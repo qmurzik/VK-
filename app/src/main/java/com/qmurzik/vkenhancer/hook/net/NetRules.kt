@@ -13,10 +13,12 @@ data class BlockRules(
     val storiesIncognito: Boolean = false,
     val customMethods: Set<String> = emptySet(),
     val customHosts: List<String> = emptyList(),
+    /** Method-name prefixes from the feature catalog (lower-case), matched with startsWith. */
+    val methodPrefixes: List<String> = emptyList(),
 ) {
     val isEmpty: Boolean
         get() = !adHosts && !trackerHosts && !analyticsMethods && !noRead && !noTyping && !offline &&
-            !storiesIncognito && customMethods.isEmpty() && customHosts.isEmpty()
+            !storiesIncognito && customMethods.isEmpty() && customHosts.isEmpty() && methodPrefixes.isEmpty()
 }
 
 object NetRules {
@@ -74,6 +76,7 @@ object NetRules {
         if (rules.offline && method in ONLINE_METHODS) return "online"
         if (rules.storiesIncognito && method in STORY_SEEN_METHODS) return "story-seen"
         if (method in rules.customMethods) return "custom-method"
+        if (rules.methodPrefixes.any { method.startsWith(it) }) return "catalog-method"
         return null
     }
 

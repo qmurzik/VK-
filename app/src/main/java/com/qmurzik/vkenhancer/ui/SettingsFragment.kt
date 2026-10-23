@@ -16,18 +16,25 @@ import com.qmurzik.vkenhancer.common.Keys
 class SettingsFragment : PreferenceFragmentCompat() {
 
     private val store get() = (requireActivity() as SettingsActivity).store()
+    private var header: Preference? = null
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = store
         val screen = preferenceManager.createPreferenceScreen(requireContext())
         preferenceScreen = screen
+        header = Preference(requireContext()).apply {
+            key = "__status"; isSelectable = true; isIconSpaceReserved = false
+            title = "VK Enhancer"
+        }
+        screen.addPreference(header!!)
         build(screen)
+        updateHeader()
     }
 
     private fun build(screen: PreferenceScreen) = with(Ui(this, screen)) {
         switch(Keys.MODULE_ENABLED, "Модуль включён", "Главный выключатель всех функций")
 
-        category("Реклама") {
+        category("🛑 Реклама") {
             switch(Keys.ADS_FEED, "Реклама в ленте", "Скрывать рекламные посты (ads_*)")
             switch(Keys.ADS_MARKED, "Помеченные «реклама»", "Посты с пометкой marked_as_ads")
             switch(Keys.ADS_PROMO, "Промо-блоки", "Кнопки продвижения, Ozon, Юла, маркет")
@@ -37,7 +44,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             switch(Keys.ADS_NETWORK, "Блокировать рекламные серверы", "myTarget, Yandex Ads, AppLovin и прочие")
         }
 
-        category("Лента") {
+        category("📰 Лента") {
             switch(Keys.FEED_RECOMMENDATIONS, "Блоки рекомендаций", "Карусели «вам может быть интересно», рекомендации друзей, групп, авторов")
             switch(Keys.FEED_RECO_POSTS, "Рекомендованные посты", "Скрывать отдельные посты от неподписанных сообществ. Внимание: лента ВК почти вся алгоритмическая — это может сильно её урезать")
             switch(Keys.FEED_CLIPS, "Клипы", "Блоки клипов в ленте")
@@ -53,7 +60,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
             edit(Keys.FEED_CUSTOM_TYPES, "Свои типы постов", "Доп. значения type для скрытия")
         }
 
-        category("Приватность") {
+        category("🧹 Лента: что ещё скрыть") {
+            for (t in com.qmurzik.vkenhancer.common.Features.FEED) switch(t.key, t.title, t.summary)
+        }
+
+        category("🔒 Приватность") {
             switch(Keys.PRIV_NO_READ, "Не отправлять «прочитано»", "Читайте сообщения незаметно")
             switch(Keys.PRIV_NO_TYPING, "Скрыть «печатает…»", "Не показывать набор текста")
             switch(Keys.PRIV_OFFLINE, "Невидимый онлайн", "Не отправлять setOnline")
@@ -65,13 +76,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
             edit(Keys.PRIV_BLOCKED_HOSTS, "Блок. хосты", "Доп. домены для блокировки")
         }
 
-        category("Интерфейс") {
+        category("📡 Приватность: сеть и телеметрия") {
+            for (t in com.qmurzik.vkenhancer.common.Features.METHODS) switch(t.key, t.title, t.summary)
+        }
+
+        category("🎛 Интерфейс") {
             tabs(Keys.UI_HIDE_TABS, "Скрыть вкладки меню", "Выберите разделы нижней панели")
             switch(Keys.UI_KEEP_SCREEN_ON, "Не гасить экран", "Держать экран включённым в ВК")
             edit(Keys.UI_HIDE_IDS, "Скрыть элементы по id", "Имена ресурсов id через запятую")
         }
 
-        sub("theme", "Оформление и цвета", "Темы, акценты, AMOLED") {
+        category("🙈 Интерфейс: скрыть элементы") {
+            for (t in com.qmurzik.vkenhancer.common.Features.VIEWS) switch(t.key, t.title, t.summary)
+        }
+
+        sub("theme", "🎨 Оформление и цвета", "Темы, акценты, AMOLED") {
             switch(Keys.THEME_ENABLED, "Включить кастомизацию", "Применять тему и цвета к ВК")
             presetList()
             switch(Keys.THEME_AMOLED, "AMOLED-чёрный", "Чистый чёрный фон в тёмной теме")
@@ -83,7 +102,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             colorSection()
         }
 
-        sub("fonts", "Шрифты", "Семейство и размер текста") {
+        sub("fonts", "🔤 Шрифты", "Семейство и размер текста") {
             listPref(
                 Keys.FONT_FAMILY, "Шрифт", Defaults.FONT_FAMILY,
                 entries = listOf("Системный" to "default", "Без засечек" to "sans", "С засечками" to "serif",
@@ -92,12 +111,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
             slider(Keys.FONT_SCALE, "Размер шрифта, %", Defaults.FONT_SCALE, 50, 200, 5)
         }
 
-        category("Дополнительно") {
-            switch(Keys.DEBUG_LOG, "Подробный лог", "Писать отладочные сообщения в Xposed-лог")
+        category("⚙️ Дополнительно") {
+            switch(Keys.DEBUG_LOG, "Подробный лог", "Писать отладочные сообщения и всплывающие подсказки в ВК")
             action("Сбросить кэш сигнатур", "Пересканировать классы ВК после обновления") {
                 store.putLong(Keys.CACHE_STAMP, System.currentTimeMillis())
                 true
             }
+            action("О модуле", "Версия, возможности, автор") { AboutDialog.show(requireContext()); true }
         }
     }
 
@@ -105,13 +125,63 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onResume() {
         super.onResume()
         applyMasterState(preferenceScreen)
+        updateHeader()
     }
 
     private fun applyMasterState(screen: PreferenceScreen) {
         val enabled = store.getBoolean(Keys.MODULE_ENABLED, true)
         for (i in 0 until screen.preferenceCount) {
             val p = screen.getPreference(i)
-            if (p.key != Keys.MODULE_ENABLED) p.isEnabled = enabled
+            if (p.key != Keys.MODULE_ENABLED && p.key != "__status") p.isEnabled = enabled
+        }
+    }
+
+    private fun countActive(): Int {
+        var n = 0
+        forEachLeaf(preferenceScreen) { p ->
+            if (p is SwitchPreferenceCompat && p.key != null && p.key != Keys.MODULE_ENABLED && p.isChecked) n++
+        }
+        return n
+    }
+
+    private fun updateHeader() {
+        header?.summary = "Активно функций: ${countActive()} · нажмите для информации"
+        header?.onPreferenceClickListener = Preference.OnPreferenceClickListener { AboutDialog.show(requireContext()); true }
+    }
+
+    /** Search: shows only preferences whose title/summary contain [query]; empty query shows all. */
+    fun filter(query: String) {
+        val q = query.trim().lowercase()
+        val screen = preferenceScreen ?: return
+        for (i in 0 until screen.preferenceCount) {
+            val group = screen.getPreference(i)
+            if (group.key == "__status") { group.isVisible = q.isEmpty(); continue }
+            if (group is PreferenceCategory) {
+                var anyVisible = false
+                for (j in 0 until group.preferenceCount) {
+                    val child = group.getPreference(j)
+                    val match = q.isEmpty() || matches(child, q)
+                    child.isVisible = match
+                    if (match) anyVisible = true
+                }
+                group.isVisible = anyVisible
+            } else {
+                // Leaf on the root screen (master switch, sub-screens).
+                group.isVisible = q.isEmpty() || matches(group, q)
+            }
+        }
+    }
+
+    private fun matches(p: Preference, q: String): Boolean {
+        val t = (p.title ?: "").toString().lowercase()
+        val s = (p.summary ?: "").toString().lowercase()
+        return t.contains(q) || s.contains(q)
+    }
+
+    private fun forEachLeaf(group: androidx.preference.PreferenceGroup, action: (Preference) -> Unit) {
+        for (i in 0 until group.preferenceCount) {
+            val p = group.getPreference(i)
+            if (p is androidx.preference.PreferenceGroup) forEachLeaf(p, action) else action(p)
         }
     }
 }

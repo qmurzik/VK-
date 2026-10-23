@@ -14,8 +14,8 @@ android {
         applicationId = "com.qmurzik.vkenhancer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.0.15"
+        versionCode = 17
+        versionName = "1.1.0"
     }
 
     buildTypes {

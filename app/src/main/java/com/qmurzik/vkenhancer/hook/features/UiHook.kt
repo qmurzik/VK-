@@ -82,9 +82,10 @@ object UiHook {
         val hiddenTabs = Env.settings.stringSet(Keys.UI_HIDE_TABS)
         hiddenMenuIds = hiddenTabs.mapNotNull { hiddenMenuByTab[it] }.map(::id).filter { it != 0 }.toSet()
 
-        val custom = com.qmurzik.vkenhancer.hook.net.NetRules.parseList(Env.settings.string(Keys.UI_HIDE_IDS))
+        // Catalog view-toggles + the user's custom id list.
+        val catalog = Env.settings.viewHideIds()
         val ads = if (Env.settings.bool(Keys.ADS_FEED)) adViewIds else emptyList()
-        hiddenAdIds = (ads + custom).map(::id).filter { it != 0 }.toSet()
+        hiddenAdIds = (ads + catalog).map(::id).filter { it != 0 }.toSet()
     }
 
     /** Collapses views with a hidden id right after they are laid out. */

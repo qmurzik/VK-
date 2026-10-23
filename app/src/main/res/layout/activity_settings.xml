@@ -24,6 +24,28 @@
         android:visibility="gone"
         tools:ignore="HardcodedText" />
 
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/search_layout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="8dp"
+        app:startIconDrawable="@android:drawable/ic_menu_search"
+        app:boxBackgroundMode="outline">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Поиск по настройкам"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            tools:ignore="HardcodedText" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
     <FrameLayout
         android:id="@+id/settings_container"
         android:layout_width="match_parent"

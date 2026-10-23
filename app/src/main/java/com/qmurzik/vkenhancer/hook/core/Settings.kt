@@ -89,6 +89,10 @@ class Settings(private val prefs: SharedPreferences?) {
         if (bool(Keys.FEED_STORIES)) {
             types += listOf("stories", "stories_interesting_block")
         }
+        // Data-driven extra feed toggles from the feature catalog.
+        for (t in com.qmurzik.vkenhancer.common.Features.FEED) {
+            if (bool(t.key)) { types += t.types; prefixes += t.prefixes }
+        }
         if (enabled) types += NetRules.parseList(string(Keys.FEED_CUSTOM_TYPES))
 
         return FilterRules(
@@ -108,6 +112,8 @@ class Settings(private val prefs: SharedPreferences?) {
 
     private fun buildBlockRules(): BlockRules {
         val noAnalytics = bool(Keys.PRIV_NO_ANALYTICS)
+        val prefixes = ArrayList<String>()
+        for (m in com.qmurzik.vkenhancer.common.Features.METHODS) if (bool(m.key)) prefixes += m.methods
         return BlockRules(
             adHosts = bool(Keys.ADS_NETWORK),
             trackerHosts = noAnalytics,
@@ -118,6 +124,16 @@ class Settings(private val prefs: SharedPreferences?) {
             storiesIncognito = bool(Keys.PRIV_STORIES_INCOGNITO),
             customMethods = if (enabled) NetRules.parseList(string(Keys.PRIV_BLOCKED_METHODS)).toSet() else emptySet(),
             customHosts = if (enabled) NetRules.parseList(string(Keys.PRIV_BLOCKED_HOSTS)) else emptyList(),
+            methodPrefixes = if (enabled) prefixes else emptyList(),
         )
+    }
+
+    /** Resource-id names to hide, unioned from enabled catalog view-toggles plus the user list. */
+    fun viewHideIds(): List<String> {
+        if (!enabled) return emptyList()
+        val ids = ArrayList<String>()
+        for (v in com.qmurzik.vkenhancer.common.Features.VIEWS) if (bool(v.key)) ids += v.ids
+        ids += NetRules.parseList(string(Keys.UI_HIDE_IDS))
+        return ids
     }
 }

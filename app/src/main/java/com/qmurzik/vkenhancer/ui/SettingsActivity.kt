@@ -32,6 +32,15 @@ class SettingsActivity : AppCompatActivity() {
                 .replace(R.id.settings_container, SettingsFragment())
                 .commit()
         }
+
+        findViewById<android.widget.EditText>(R.id.search).addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                (supportFragmentManager.findFragmentById(R.id.settings_container) as? SettingsFragment)
+                    ?.filter(s?.toString().orEmpty())
+            }
+            override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
+            override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
+        })
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

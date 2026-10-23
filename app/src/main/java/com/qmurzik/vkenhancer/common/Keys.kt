@@ -91,7 +91,9 @@ object Defaults {
         Keys.THEME_BARS,
     )
 
-    fun bool(key: String): Boolean = key in TRUE_BY_DEFAULT
+    private val catalogDefaults by lazy { Features.defaultsOn() }
+
+    fun bool(key: String): Boolean = key in TRUE_BY_DEFAULT || key in catalogDefaults
 
     const val THEME_PRESET = "none"
     const val FONT_FAMILY = "default"
