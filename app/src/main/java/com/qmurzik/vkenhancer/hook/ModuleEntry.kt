@@ -9,6 +9,7 @@ import com.qmurzik.vkenhancer.hook.features.AppContext
 import com.qmurzik.vkenhancer.hook.features.FontHook
 import com.qmurzik.vkenhancer.hook.features.NetworkHook
 import com.qmurzik.vkenhancer.hook.features.ThemeHook
+import com.qmurzik.vkenhancer.hook.features.VpnHook
 import com.qmurzik.vkenhancer.hook.features.UiHook
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -55,6 +56,7 @@ class ModuleEntry : XposedModule() {
 
         DexFinder.init()
         // Cheap framework-level hooks run in every VK process so blocking/theming is global.
+        safe("vpn") { VpnHook.install() }
         safe("theme") { ThemeHook.install() }
         safe("network") { NetworkHook.install() }
         // Heavier, screen-facing tweaks only matter in the UI process.

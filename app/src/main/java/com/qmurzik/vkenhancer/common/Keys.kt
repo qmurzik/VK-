@@ -43,6 +43,7 @@ object Keys {
     const val PRIV_SCREENSHOTS = "priv_screenshots"
     const val PRIV_BLOCKED_METHODS = "priv_blocked_methods"
     const val PRIV_BLOCKED_HOSTS = "priv_blocked_hosts"
+    const val NET_HIDE_VPN = "net_hide_vpn"
 
     // Interface
     const val UI_HIDE_TABS = "ui_hide_tabs"
@@ -85,6 +86,7 @@ object Defaults {
         Keys.ADS_NETWORK, Keys.ADS_VIEWS, Keys.ADS_PROMO_CHATS,
         Keys.FEED_RECOMMENDATIONS, Keys.FEED_GAMES, Keys.FEED_POLLS,
         Keys.PRIV_NO_ANALYTICS,
+        Keys.NET_HIDE_VPN,
         Keys.THEME_BARS,
     )
 

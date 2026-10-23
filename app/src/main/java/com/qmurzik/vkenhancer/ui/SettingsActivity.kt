@@ -14,8 +14,10 @@ class SettingsActivity : AppCompatActivity() {
         private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        // Must exist before super.onCreate(): on recreation the FragmentManager restores
+        // SettingsFragment inside super.onCreate() and immediately reads store() -> conn.
         conn = ServiceConn(this)
+        super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
         setSupportActionBar(findViewById(R.id.toolbar))
 

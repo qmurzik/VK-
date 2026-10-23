@@ -58,6 +58,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             switch(Keys.PRIV_OFFLINE, "Невидимый онлайн", "Не отправлять setOnline")
             switch(Keys.PRIV_STORIES_INCOGNITO, "Истории инкогнито", "Не отмечать истории просмотренными")
             switch(Keys.PRIV_NO_ANALYTICS, "Блокировать аналитику", "myTracker, AppMetrica, Crashlytics, stats.*")
+            switch(Keys.NET_HIDE_VPN, "Скрывать VPN от ВК", "Не давать приложению блокироваться при включённом VPN")
             switch(Keys.PRIV_SCREENSHOTS, "Разрешить скриншоты", "Снимать защищённые экраны (чаты, истории)")
             edit(Keys.PRIV_BLOCKED_METHODS, "Блок. методы API", "Напр. account.setonline (через запятую)")
             edit(Keys.PRIV_BLOCKED_HOSTS, "Блок. хосты", "Доп. домены для блокировки")
