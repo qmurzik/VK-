@@ -19,6 +19,8 @@ import java.lang.reflect.Proxy
  * mechanism survives obfuscation and app updates.
  */
 object NetworkHook {
+    @Volatile private var everFired = false
+
     fun install() {
         if (Env.settings.blockRules.isEmpty && Env.settings.filterRules.isEmpty) return
 
@@ -105,7 +107,14 @@ object NetworkHook {
         fun handle(chainObj: Any): Any? {
             val request = requestMethod.invoke(chainObj)
             val url = request?.let { RequestModel.url(it) }
+            if (!everFired) {
+                everFired = true
+                // One INFO line proving the interceptor is on VK's live HTTP client.
+                L.i("OkHttp interceptor is LIVE; first request host=${url?.let { com.qmurzik.vkenhancer.hook.net.NetRules.hostOf(it) }}")
+            }
             if (url != null) {
+                val method = com.qmurzik.vkenhancer.hook.net.ApiFilter.methodFromUrl(url)
+                if (method != null) L.d { "api $method" }
                 ApiFilterBridge.blockReason(url)?.let { reason ->
                     L.d { "blocked [$reason] $url" }
                     throw IOException("VKEnhancer blocked request ($reason)")
