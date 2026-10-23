@@ -238,4 +238,36 @@ object ApiFilter {
         val top = types.entries.sortedByDescending { it.value }.take(25).joinToString(",") { "${it.key}:${it.value}" }
         return "types[$top] flags[${flags.joinToString(",")}]"
     }
+
+    /**
+     * Deep diagnostic for the new typed feed format: prints the response's top-level keys, the arrays
+     * it holds (name, length, the first element's keys), and a window of raw JSON around the first
+     * `ad_data` / `"type":"ads"` occurrence, so the exact ad-node shape can be matched.
+     */
+    fun skeleton(body: String): String {
+        val sb = StringBuilder()
+        val resp = runCatching { (JSONTokener(body).nextValue() as? JSONObject)?.opt("response") }.getOrNull()
+        if (resp is JSONObject) {
+            sb.append("respKeys=").append(resp.keys().asSequence().toList().take(30)).append(' ')
+            for (k in resp.keys().asSequence().toList()) {
+                val v = resp.opt(k)
+                if (v is JSONArray && v.length() > 0) {
+                    val first = v.opt(0)
+                    val keys = (first as? JSONObject)?.keys()?.asSequence()?.toList()?.take(20)
+                    sb.append("arr:$k[${v.length()}]")
+                    if (keys != null) sb.append("first.keys=$keys type=${(first).optString("type", "?")}")
+                    sb.append(' ')
+                }
+            }
+        }
+        for (needle in listOf("\"ad_data\"", "\"type\":\"ads\"", "\"type\": \"ads\"")) {
+            val i = body.indexOf(needle)
+            if (i >= 0) {
+                sb.append("\n@").append(needle).append(": ")
+                    .append(body.substring((i - 200).coerceAtLeast(0), (i + 400).coerceAtMost(body.length)))
+                break
+            }
+        }
+        return sb.toString().take(1400)
+    }
 }

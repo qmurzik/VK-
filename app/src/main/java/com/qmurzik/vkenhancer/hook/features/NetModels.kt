@@ -151,6 +151,9 @@ object ResponseRewriter {
         if (filtered == null) {
             if (feedish) {
                 L.d { "rewrite $method: nothing matched (msgpack); ${com.qmurzik.vkenhancer.hook.net.ApiFilter.describe(json)}" }
+                if (method.startsWith("newsfeed.getFeed") && json.contains("ad_data")) {
+                    L.d { "SKELETON $method: ${com.qmurzik.vkenhancer.hook.net.ApiFilter.skeleton(json)}" }
+                }
                 Diag.toast("seen-$method", "ответ $method без изменений (msgpack)")
             }
             return reinstallBytes(response, contentType, raw, createBytes) // body was consumed; restore it
