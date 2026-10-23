@@ -1,0 +1,7 @@
+id=com.qmurzik.vkenhancer
+name=VK Enhancer
+author=qmurzik
+description=Скрытие рекламы, приватность и кастомизация ВКонтакте. Без привязки к версии.
+minApiVersion=100
+targetApiVersion=102
+staticScope=false

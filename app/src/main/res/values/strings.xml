@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VK Enhancer</string>
+    <string name="module_description">Скрытие рекламы, приватность и кастомизация ВКонтакте. Без привязки к версии.</string>
+    <string name="status_inactive">Модуль не активирован в LSPosed. Включите его и выберите ВКонтакте в области действия, затем перезапустите приложение. Изменения здесь пока не применяются.</string>
+    <string name="action_about">О модуле</string>
+    <string-array name="xposed_scope">
+        <item>com.vkontakte.android</item>
+    </string-array>
+</resources>
