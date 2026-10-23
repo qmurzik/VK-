@@ -109,8 +109,10 @@ object NetworkHook {
             val url = request?.let { RequestModel.url(it) }
             if (!everFired) {
                 everFired = true
+                val host = url?.let { com.qmurzik.vkenhancer.hook.net.NetRules.hostOf(it) }
                 // One INFO line proving the interceptor is on VK's live HTTP client.
-                L.i("OkHttp interceptor is LIVE; first request host=${url?.let { com.qmurzik.vkenhancer.hook.net.NetRules.hostOf(it) }}")
+                L.i("OkHttp interceptor is LIVE; first request host=$host")
+                Diag.toast("live", "перехватчик активен ($host)")
             }
             if (url != null) {
                 val method = com.qmurzik.vkenhancer.hook.net.ApiFilter.methodFromUrl(url)

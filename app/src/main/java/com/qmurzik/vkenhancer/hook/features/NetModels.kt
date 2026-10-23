@@ -98,7 +98,13 @@ object ResponseRewriter {
         val original = runCatching { stringMethod?.invoke(body) as? String }.getOrNull() ?: return null
         val filtered = runCatching { ApiFilter.filter(method, original, Env.settings.filterRules) }
             .onFailure { L.w("filter($method) failed", it) }.getOrNull()
-        if (filtered != null) L.d { "filtered $method: ${original.length} -> ${filtered.length}" }
+        if (filtered != null) {
+            L.d { "filtered $method: ${original.length} -> ${filtered.length}" }
+            Diag.toast("filter", "вырезано в $method (${original.length}→${filtered.length} б)")
+        } else if (method.startsWith("execute") || method.contains("feed") || method.startsWith("newsfeed")) {
+            // Only report feed-bearing endpoints as "unchanged" to keep the diagnostics readable.
+            Diag.toast("seen-$method", "ответ $method без изменений")
+        }
 
         val payload = filtered ?: original
         val newBody = runCatching { createMethod?.invoke(null, payload, contentType) }.getOrNull() ?: return null
