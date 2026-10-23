@@ -52,6 +52,7 @@ object Keys {
     const val UI_HIDE_IDS = "ui_hide_ids"
     const val UI_INSPECTOR = "ui_inspector"
     const val UI_KEEP_SCREEN_ON = "ui_keep_screen_on"
+    const val UI_NO_HAPTICS = "ui_no_haptics"
 
     // Theme
     const val THEME_ENABLED = "theme_enabled"

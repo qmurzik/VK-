@@ -42,8 +42,25 @@ object UiHook {
 
     fun install() {
         installWindowFlags()
+        installHaptics()
         prepareHiddenIds()
         if (hiddenMenuIds.isNotEmpty() || hiddenAdIds.isNotEmpty()) installViewHiding()
+    }
+
+    /**
+     * Swallows every [android.os.Vibrator.vibrate] call so VK can't buzz on taps/pull-to-refresh.
+     * Hooks by method name (all overloads across API levels) rather than a fixed signature, so it
+     * survives platform changes without binding to any VK symbol.
+     */
+    private fun installHaptics() {
+        if (!Env.settings.bool(Keys.UI_NO_HAPTICS)) return
+        val vibrator = runCatching { Class.forName("android.os.Vibrator") }.getOrNull() ?: return
+        val swallowed = vibrator.declaredMethods.filter { it.name == "vibrate" || it.name == "vibratePattern" }
+        for (m in swallowed) {
+            runCatching { m.isAccessible = true }
+            Hooks.before(m) { Hooks.Result(null) }
+        }
+        L.d { "haptics disabled: muted ${swallowed.size} vibrate() overloads" }
     }
 
     private fun installWindowFlags() {

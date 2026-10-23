@@ -18,6 +18,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private val store get() = (requireActivity() as SettingsActivity).store()
     private var header: Preference? = null
 
+    companion object {
+        /** Builds a fragment optionally scoped to a [com.qmurzik.vkenhancer.common.Sections] id. */
+        fun forSection(id: String?) = SettingsFragment().apply {
+            if (id != null) arguments = Bundle().apply { putString(SettingsActivity.EXTRA_SECTION, id) }
+        }
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = store
         val screen = preferenceManager.createPreferenceScreen(requireContext())
@@ -29,6 +36,26 @@ class SettingsFragment : PreferenceFragmentCompat() {
         screen.addPreference(header!!)
         build(screen)
         updateHeader()
+        arguments?.getString(SettingsActivity.EXTRA_SECTION)?.let { showSection(it) }
+    }
+
+    /**
+     * Scopes the screen to one dashboard section: hides the master switch, status row and every
+     * top-level group except the one whose title starts with the section emoji. A section that is
+     * its own sub-page (Theme/Fonts) is opened directly.
+     */
+    private fun showSection(id: String) {
+        val sec = com.qmurzik.vkenhancer.common.Sections.byId(id) ?: return
+        val screen = preferenceScreen ?: return
+        var target: Preference? = null
+        for (i in 0 until screen.preferenceCount) {
+            val p = screen.getPreference(i)
+            if (p.key == "__status" || p.key == Keys.MODULE_ENABLED) { p.isVisible = false; continue }
+            val match = (p.title ?: "").toString().startsWith(sec.emoji)
+            p.isVisible = match
+            if (match) target = p
+        }
+        (target as? PreferenceScreen)?.let { preferenceScreen = it }
     }
 
     private fun build(screen: PreferenceScreen) = with(Ui(this, screen)) {
@@ -83,6 +110,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         category("🎛 Интерфейс") {
             tabs(Keys.UI_HIDE_TABS, "Скрыть вкладки меню", "Выберите разделы нижней панели")
             switch(Keys.UI_KEEP_SCREEN_ON, "Не гасить экран", "Держать экран включённым в ВК")
+            switch(Keys.UI_NO_HAPTICS, "Отключить вибрацию", "Глушить тактильный отклик (вибрацию) ВК")
             edit(Keys.UI_HIDE_IDS, "Скрыть элементы по id", "Имена ресурсов id через запятую")
         }
 
