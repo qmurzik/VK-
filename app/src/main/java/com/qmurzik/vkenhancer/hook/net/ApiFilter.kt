@@ -89,7 +89,8 @@ object ApiFilter {
         if (isFeedMethod(m) && (rules.feedTypes.isNotEmpty() || rules.feedTypePrefixes.isNotEmpty() ||
                 rules.reposts || rules.keywords.isNotEmpty())
         ) return true
-        if (rules.adTypes && body.contains("\"ads_")) return true
+        // Covers both the old ads_post/ads_site types and the modern type:"ads" block with ad_data.
+        if (rules.adTypes && (body.contains("\"ads_") || body.contains("\"ads\"") || body.contains("\"ad_data\""))) return true
         if (rules.markedAds && (body.contains("\"marked_as_ads\"") || body.contains("\"ad_data\""))) return true
         if (rules.storyAds && (m.startsWith("stories.") || m.startsWith("execute")) && body.contains("\"ads")) return true
         if (rules.promoChats && body.contains("\"is_promo\"")) return true
@@ -123,20 +124,21 @@ object ApiFilter {
         for (key in keys) {
             val value = obj.opt(key)
             if (value is JSONArray) {
-                when {
-                    rules.disableStories && ctx.method.startsWith("stories.get") &&
-                        (key == "items" || key == "stories") && value.length() > 0 -> {
-                        obj.put(key, JSONArray())
-                        ctx.changed = true
-                        continue
-                    }
-                    key == "items" || key == "feed" || key == "news" -> filterArray(value, ctx)?.let {
-                        obj.put(key, it)
-                        ctx.changed = true
-                    }
+                if (rules.disableStories && ctx.method.startsWith("stories.get") &&
+                    (key == "items" || key == "stories") && value.length() > 0
+                ) {
+                    obj.put(key, JSONArray()); ctx.changed = true; continue
                 }
+                // The modern feed is a typed-node graph, so ad/recommendation blocks can sit in any
+                // array, not only items/feed/news. Filter every array; shouldDrop only removes
+                // genuine ad/recommendation entries, so unrelated arrays (profiles, groups, ...) are safe.
+                val filtered = filterArray(value, ctx)
+                val arr = filtered ?: value
+                if (filtered != null) { obj.put(key, filtered); ctx.changed = true }
+                for (i in 0 until arr.length()) walk(arr.opt(i), ctx, depth + 1)
+            } else {
+                walk(value, ctx, depth + 1)
             }
-            walk(obj.opt(key), ctx, depth + 1)
         }
     }
 
@@ -170,8 +172,10 @@ object ApiFilter {
         val rules = c.rules
         val type = item.optString("type", "")
 
-        if (rules.adTypes && type.startsWith("ads_") && type != "ads_disabled") return true
-        if (rules.markedAds && (isTruthy(item.opt("marked_as_ads")) || item.optJSONObject("ad_data") != null)) return true
+        // Modern feed labels a promoted block as type "ads" (with a nested ad_data/mob_sdk payload);
+        // older feeds use ads_post/ads_site/... Both are covered here.
+        if (rules.adTypes && (type == "ads" || (type.startsWith("ads_") && type != "ads_disabled"))) return true
+        if (rules.markedAds && (isTruthy(item.opt("marked_as_ads")) || item.has("ad_data"))) return true
         if (rules.promoChats) {
             val conv = item.optJSONObject("conversation")
             if (conv != null && isTruthy(conv.opt("is_promo"))) return true

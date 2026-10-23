@@ -99,6 +99,26 @@ class ApiFilterTest {
         assertNull(ApiFilter.filter("newsfeed.getFeed", "<html>nope</html>", FilterRules(adTypes = true)))
     }
 
+    @Test fun removesModernTypedAdBlock() {
+        // New feed format: ad is a block with type "ads" and an ad_data payload, nested in an
+        // arbitrarily-named array rather than "items".
+        val body = """{"response":{"blocks":[{"type":"post","text":"hi"},{"type":"ads","ad_data":{"mob_sdk":{}}}]}}"""
+        val out = ApiFilter.filter("newsfeed.getFeed", body, FilterRules(adTypes = true, markedAds = true))!!
+        val blocks = JSONObject(out).getJSONObject("response").getJSONArray("blocks")
+        assertEquals(1, blocks.length())
+        assertEquals("post", blocks.getJSONObject(0).getString("type"))
+    }
+
+    @Test fun keepsUnrelatedArrays() {
+        // profiles/groups arrays must be untouched by the recursive filter.
+        val body = """{"response":{"items":[{"type":"ads","ad_data":{}}],"profiles":[{"id":1},{"id":2}],"groups":[{"id":3}]}}"""
+        val out = ApiFilter.filter("newsfeed.getFeed", body, FilterRules(adTypes = true))!!
+        val resp = JSONObject(out).getJSONObject("response")
+        assertEquals(0, resp.getJSONArray("items").length())
+        assertEquals(2, resp.getJSONArray("profiles").length())
+        assertEquals(1, resp.getJSONArray("groups").length())
+    }
+
     @Test fun keepsAdsDisabledSignal() {
         // ads_disabled is a server flag item, not an ad; adTypes must not drop it.
         val body = feed("""{"type":"ads_disabled"}""", """{"type":"ads_post"}""")
