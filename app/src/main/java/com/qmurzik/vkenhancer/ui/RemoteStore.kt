@@ -35,8 +35,9 @@ class RemoteStore(@Volatile var prefs: SharedPreferences?) : PreferenceDataStore
     }
 
     override fun getString(key: String, defValue: String?): String? = prefs?.getString(key, defValue) ?: defValue
-    override fun getStringSet(key: String, defValues: MutableSet<String>?): MutableSet<String>? =
-        prefs?.getStringSet(key, defValues) ?: defValues
+    override fun getStringSet(key: String, defValues: MutableSet<String>?): MutableSet<String> =
+        // Never null: MultiSelectListPreference.setValues() calls addAll() and would NPE on null.
+        (prefs?.getStringSet(key, defValues) ?: defValues)?.toMutableSet() ?: mutableSetOf()
     override fun getInt(key: String, defValue: Int): Int = prefs?.getInt(key, defValue) ?: defValue
     override fun getLong(key: String, defValue: Long): Long = prefs?.getLong(key, defValue) ?: defValue
     override fun getBoolean(key: String, defValue: Boolean): Boolean =

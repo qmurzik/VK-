@@ -76,6 +76,8 @@ class Ui(private val fragment: PreferenceFragmentCompat, private val group: Pref
             this.key = key; this.title = title; dialogTitle = title; this.summary = summary
             entries = TAB_OPTIONS.map { it.first }.toTypedArray()
             entryValues = TAB_OPTIONS.map { it.second }.toTypedArray()
+            // Without an explicit default the initial value resolves to null and setValues() NPEs.
+            setDefaultValue(emptySet<String>())
         }
     )
 
