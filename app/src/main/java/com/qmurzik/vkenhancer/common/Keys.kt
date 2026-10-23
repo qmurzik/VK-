@@ -22,6 +22,7 @@ object Keys {
 
     // Feed
     const val FEED_RECOMMENDATIONS = "feed_recommendations"
+    const val FEED_RECO_POSTS = "feed_reco_posts"
     const val FEED_CLIPS = "feed_clips"
     const val FEED_GAMES = "feed_games"
     const val FEED_MUSIC = "feed_music"
