@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_label">TokSkip — пропуск рекламы</string>
+    <string name="a11y_description">Работает только в TikTok. Читает описание и субтитры текущего ролика, чтобы найти рекламные вставки, и перематывает их жестом по полосе прогресса. Ничего не отправляет в сеть и не собирает данные.</string>
+</resources>

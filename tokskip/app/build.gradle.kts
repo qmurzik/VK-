@@ -50,6 +50,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":accessibility"))
     implementation(project(":xposed"))
+    implementation("io.github.libxposed:service:102.0.0")
 
     val bom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(bom)

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- No INTERNET permission: TokSkip works fully offline. -->
+
+    <!-- Package visibility for TikTok: open it from the app and check it is installed. -->
+    <queries>
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.ss.android.ugc.trill" />
+    </queries>
+
+    <application
+        android:name=".TokSkipApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TokSkip">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Link to the LSPosed hook inside TikTok. Exported without a permission so the TikTok
+             process can reach it; writes are accepted only from TikTok and this app. -->
+        <provider
+            android:name=".TokSkipProvider"
+            android:authorities="com.qmurzik.tokskip.provider"
+            android:exported="true" />
+    </application>
+</manifest>
