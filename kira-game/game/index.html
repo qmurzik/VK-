@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KIRA — QVK</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="hud" class="hidden">
+    <div id="daylabel"></div>
+    <div id="objectives"></div>
+    <div id="affection" title="Привязанность Киры">
+      <div class="heart">♥</div>
+      <div class="bar"><div class="fill"></div></div>
+      <div class="lvl"></div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="prompt"></div>
+    <div id="clickhint">Кликни, чтобы управлять · WASD — ходить · E / ЛКМ — действие · Esc — пауза</div>
+    <div id="camframe" class="hidden"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="rec">● REC</div><div class="camhint">ЛКМ — снимок</div></div>
+  </div>
+
+  <div id="dialog" class="hidden">
+    <div class="portrait-wrap"><img class="portrait" src="assets/kira.png" alt=""><div class="emote"></div></div>
+    <div class="box">
+      <div class="name"></div>
+      <div class="text"></div>
+      <div class="next">▼</div>
+    </div>
+  </div>
+  <div id="choices" class="hidden"></div>
+  <div id="toasts"></div>
+  <div id="fade"></div>
+  <div id="titlecard" class="hidden"><div class="t1"></div><div class="t2"></div></div>
+  <canvas id="glitch" class="hidden"></canvas>
+  <div id="vignette"></div>
+
+  <div id="mg" class="hidden">
+    <div class="mg-frame">
+      <div class="mg-head"><span class="mg-title"></span><span class="mg-score"></span></div>
+      <canvas id="mgc" width="960" height="560"></canvas>
+      <div class="mg-foot"></div>
+      <div class="mg-bubble hidden"><img src="assets/kira.png" alt=""><span></span></div>
+    </div>
+  </div>
+
+  <div id="photo" class="hidden"><div class="polaroid"><img alt=""><div class="cap"></div></div></div>
+
+  <div id="menu" class="hidden">
+    <div class="menu-left">
+      <div class="logo">KIRA<span>♥</span></div>
+      <div class="sub">QVK · виртуальная жизнь вдвоём</div>
+      <div class="btns">
+        <button data-act="continue" class="hidden">Продолжить</button>
+        <button data-act="new">Новая игра</button>
+        <button data-act="gallery">Альбом</button>
+        <button data-act="settings">Настройки</button>
+        <button data-act="quit">Выход</button>
+      </div>
+      <div class="ver">v1.0 · сделано с любовью</div>
+    </div>
+    <img class="menu-art" src="assets/kira_sticker.png" alt="">
+  </div>
+
+  <div id="pause" class="hidden">
+    <div class="panel">
+      <h2>Пауза</h2>
+      <button data-act="resume">Продолжить</button>
+      <button data-act="settings">Настройки</button>
+      <button data-act="tomenu">В главное меню</button>
+      <div class="controls">
+        <b>Управление</b><br>
+        WASD / стрелки — ходить · Shift — бег<br>
+        Мышь — осматриваться · E / ЛКМ — действие<br>
+        Пробел / Enter / клик — дальше в диалоге<br>
+        1–4 — выбор ответа · Esc — пауза
+      </div>
+    </div>
+  </div>
+
+  <div id="settings" class="hidden">
+    <div class="panel">
+      <h2>Настройки</h2>
+      <label>Громкость <input type="range" min="0" max="100" data-k="master"></label>
+      <label>Музыка <input type="range" min="0" max="100" data-k="music"></label>
+      <label>Эффекты <input type="range" min="0" max="100" data-k="sfx"></label>
+      <label>Голос Киры <input type="range" min="0" max="100" data-k="voice"></label>
+      <label>Скорость текста <input type="range" min="10" max="100" data-k="text"></label>
+      <label>Чувствительность мыши <input type="range" min="20" max="300" data-k="sens"></label>
+      <label>Качество графики
+        <select data-k="quality"><option value="high">Высокое</option><option value="low">Низкое</option></select>
+      </label>
+      <button data-act="close">Готово</button>
+    </div>
+  </div>
+
+  <div id="gallery" class="hidden">
+    <div class="panel wide">
+      <h2>Альбом воспоминаний</h2>
+      <div class="grid"></div>
+      <button data-act="close">Закрыть</button>
+    </div>
+  </div>
+
+  <div id="nameinput" class="hidden">
+    <div class="panel">
+      <h2>Как тебя зовут?</h2>
+      <input maxlength="16" placeholder="Твоё имя">
+      <button data-act="ok">Готово</button>
+    </div>
+  </div>
+
+  <div id="loading">Загрузка…</div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

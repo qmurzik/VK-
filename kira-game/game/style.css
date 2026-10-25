@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+:root {
+  --purple: #8c4dff;
+  --purple-l: #c9a8ff;
+  --pink: #ff8fc0;
+  --dark: #15121c;
+  --panel: rgba(21, 18, 28, 0.92);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: 'Nunito', 'Segoe UI', Arial, sans-serif; color: #fff; user-select: none; }
+#app { position: fixed; inset: 0; }
+#app > canvas.three { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+
+/* ---------- HUD ---------- */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#daylabel { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-weight: 900; letter-spacing: 2px; font-size: 14px; color: var(--purple-l); text-shadow: 0 0 8px #000; opacity: 0.85; }
+#objectives { position: absolute; top: 18px; left: 18px; min-width: 260px; max-width: 360px; }
+#objectives .head { font-size: 13px; letter-spacing: 3px; color: var(--purple-l); font-weight: 900; margin-bottom: 6px; text-shadow: 0 0 6px #000; }
+#objectives .obj { background: linear-gradient(90deg, rgba(21,18,28,0.85), rgba(21,18,28,0)); border-left: 3px solid var(--purple); padding: 6px 12px; margin-bottom: 5px; font-size: 15px; transition: all .4s; }
+#objectives .obj.done { opacity: 0.45; text-decoration: line-through; border-color: #5ad48a; }
+#affection { position: absolute; top: 18px; right: 18px; display: flex; align-items: center; gap: 8px; background: rgba(21,18,28,0.7); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(201,168,255,0.3); }
+#affection .heart { color: var(--pink); font-size: 22px; animation: beat 1.3s infinite; }
+#affection .bar { width: 140px; height: 8px; background: #2a2733; border-radius: 4px; overflow: hidden; }
+#affection .fill { height: 100%; width: 30%; background: linear-gradient(90deg, var(--purple), var(--pink)); transition: width .8s; }
+#affection .lvl { font-weight: 900; font-size: 13px; color: var(--purple-l); min-width: 70px; }
+@keyframes beat { 0%,100% { transform: scale(1) } 15% { transform: scale(1.25) } 30% { transform: scale(1) } 45% { transform: scale(1.15) } }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: rgba(255,255,255,0.8); box-shadow: 0 0 4px #000; transition: all .15s; }
+#crosshair.active { width: 14px; height: 14px; margin: -7px; background: transparent; border: 2px solid var(--pink); }
+#prompt { position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%); background: rgba(21,18,28,0.85); padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 15px; display: none; white-space: nowrap; border: 1px solid rgba(201,168,255,0.35); }
+#prompt b { color: var(--pink); }
+#clickhint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(21,18,28,0.8); padding: 8px 16px; border-radius: 10px; display: none; }
+#camframe { position: absolute; inset: 8%; }
+#camframe .corner { position: absolute; width: 40px; height: 40px; border: 3px solid #fff; }
+#camframe .tl { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+#camframe .tr { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+#camframe .bl { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+#camframe .br { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+#camframe .rec { position: absolute; top: 10px; right: 56px; color: #ff4a6a; font-weight: 900; animation: blink 1s infinite; }
+#camframe .camhint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-weight: 700; }
+@keyframes blink { 50% { opacity: 0.2 } }
+
+/* ---------- Диалог ---------- */
+#dialog { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); width: min(1100px, 94vw); height: 190px; pointer-events: auto; cursor: pointer; }
+#dialog .box { position: absolute; left: 190px; right: 0; bottom: 0; top: 30px; background: var(--panel); border: 2px solid rgba(140,77,255,0.6); border-radius: 18px; padding: 34px 32px 20px; box-shadow: 0 0 30px rgba(140,77,255,0.25), inset 0 0 40px rgba(140,77,255,0.08); }
+#dialog.noportrait .box { left: 0; }
+#dialog .name { position: absolute; top: -18px; left: 24px; background: linear-gradient(90deg, var(--purple), #b06bff); padding: 5px 20px; border-radius: 12px; font-weight: 900; font-size: 18px; letter-spacing: 1px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+#dialog .name:empty { display: none; }
+#dialog.player .name { background: linear-gradient(90deg, #3a6ad8, #5a8aff); }
+#dialog.glitchy .name { background: linear-gradient(90deg, #ff2a5a, #8c0a3a); }
+#dialog .text { font-size: 21px; line-height: 1.45; min-height: 60px; }
+#dialog.narr .text { font-style: italic; color: #d8d0e8; }
+#dialog.player .text { color: #dfe8ff; }
+#dialog .next { position: absolute; right: 22px; bottom: 12px; color: var(--pink); animation: bob .8s infinite; display: none; }
+#dialog.done .next { display: block; }
+@keyframes bob { 50% { transform: translateY(4px) } }
+#dialog .portrait-wrap { position: absolute; left: -40px; bottom: -26px; width: 250px; height: 272px; pointer-events: none; }
+#dialog.noportrait .portrait-wrap { display: none; }
+#dialog .portrait { width: 100%; height: 100%; object-fit: contain; object-position: bottom; filter: drop-shadow(0 0 12px rgba(140,77,255,0.5)); transform-origin: bottom center; transition: filter .3s; }
+#dialog.talking .portrait { animation: talk .35s infinite; }
+@keyframes talk { 50% { transform: scale(1.012) translateY(-2px) } }
+#dialog .portrait.sad { filter: grayscale(0.45) brightness(0.8) drop-shadow(0 0 12px rgba(80,80,140,0.5)); }
+#dialog .portrait.shake { animation: shake .3s 2; }
+#dialog .portrait.hop { animation: hop .45s 1; }
+#dialog .portrait.glitch { animation: gl .15s infinite; filter: hue-rotate(120deg) saturate(2) drop-shadow(4px 0 0 #f0a) drop-shadow(-4px 0 0 #0ff); }
+@keyframes shake { 25% { transform: translateX(-6px) } 75% { transform: translateX(6px) } }
+@keyframes hop { 40% { transform: translateY(-16px) } }
+@keyframes gl { 0% { transform: translate(0,0) } 25% { transform: translate(-5px,2px) skewX(5deg) } 50% { transform: translate(4px,-2px) } 75% { transform: translate(-2px,0) skewX(-8deg) } }
+#dialog .emote { position: absolute; top: 20px; right: 20px; font-size: 40px; text-shadow: 0 0 10px rgba(0,0,0,.6); animation: pop .4s; }
+@keyframes pop { 0% { transform: scale(0) } 70% { transform: scale(1.3) } 100% { transform: scale(1) } }
+
+#choices { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -60%); display: flex; flex-direction: column; gap: 10px; width: min(620px, 90vw); }
+#choices button { font: inherit; font-size: 18px; font-weight: 700; color: #fff; background: rgba(21,18,28,0.92); border: 2px solid rgba(140,77,255,0.55); border-radius: 14px; padding: 13px 20px; text-align: left; cursor: pointer; transition: all .15s; }
+#choices button:hover, #choices button.sel { background: rgba(140,77,255,0.35); border-color: var(--pink); transform: translateX(6px); }
+#choices button .k { display: inline-block; width: 26px; color: var(--pink); }
+
+#toasts { position: absolute; top: 70px; right: 18px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
+.toast { background: rgba(21,18,28,0.9); border: 1px solid rgba(201,168,255,0.4); border-radius: 12px; padding: 8px 16px; font-weight: 700; animation: tin .4s, tout .5s 2.6s forwards; }
+.toast.love { border-color: var(--pink); color: #ffd0e6; }
+.toast.sad { border-color: #6a7ab8; color: #b8c8ff; }
+@keyframes tin { from { transform: translateX(40px); opacity: 0 } }
+@keyframes tout { to { transform: translateX(40px); opacity: 0 } }
+
+#fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 1s; }
+#titlecard { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+#titlecard .t1 { font-size: 22px; letter-spacing: 8px; color: var(--purple-l); font-weight: 700; animation: fin 1.2s; }
+#titlecard .t2 { font-size: 56px; font-weight: 900; margin-top: 10px; text-shadow: 0 0 30px var(--purple); animation: fin 1.6s; }
+@keyframes fin { from { opacity: 0; transform: translateY(10px) } }
+#glitch { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
+#vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 160px rgba(0,0,0,0.55); }
+#vignette.love { box-shadow: inset 0 0 200px rgba(255,100,170,0.45); transition: box-shadow 1.5s; }
+#vignette.red { box-shadow: inset 0 0 220px rgba(255,20,80,0.55); }
+
+/* ---------- Мини-игры ---------- */
+#mg { position: absolute; inset: 0; background: rgba(8,6,14,0.75); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+.mg-frame { position: relative; background: #15121c; border: 3px solid var(--purple); border-radius: 20px; padding: 12px; box-shadow: 0 0 60px rgba(140,77,255,0.45); }
+.mg-head { display: flex; justify-content: space-between; padding: 2px 10px 10px; font-weight: 900; font-size: 20px; }
+.mg-score { color: var(--pink); }
+#mgc { display: block; width: min(960px, 92vw); height: auto; border-radius: 12px; background: #0e0b16; cursor: crosshair; }
+.mg-foot { padding: 10px 10px 2px; color: #bfb4d8; font-size: 15px; text-align: center; }
+.mg-bubble { position: absolute; right: -40px; bottom: -30px; display: flex; align-items: flex-end; gap: 4px; pointer-events: none; }
+.mg-bubble img { width: 150px; height: 163px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(140,77,255,0.6)); }
+.mg-bubble span { position: absolute; right: 140px; bottom: 100px; background: #fff; color: #222; font-weight: 800; padding: 8px 14px; border-radius: 14px; white-space: nowrap; font-size: 16px; animation: pop .3s; }
+
+#photo { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+.polaroid { background: #fff; padding: 14px 14px 46px; transform: rotate(-3deg); box-shadow: 0 10px 40px rgba(0,0,0,0.6); animation: pop .4s; position: relative; }
+.polaroid img { width: min(520px, 70vw); display: block; }
+.polaroid .cap { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; color: #333; font-size: 20px; font-weight: 700; font-style: italic; }
+
+/* ---------- Меню ---------- */
+#menu { position: absolute; inset: 0; display: flex; align-items: center; background: radial-gradient(ellipse at 70% 50%, rgba(140,77,255,0.25), rgba(10,8,16,0.85) 70%); }
+.menu-left { padding-left: 8vw; z-index: 2; }
+.logo { font-size: 120px; font-weight: 900; letter-spacing: 6px; line-height: 1; text-shadow: 0 0 40px var(--purple), 0 6px 0 #4a2a8a; }
+.logo span { color: var(--pink); font-size: 80px; animation: beat 1.3s infinite; display: inline-block; }
+.sub { color: var(--purple-l); letter-spacing: 3px; margin: 8px 0 40px; font-weight: 700; }
+.btns { display: flex; flex-direction: column; gap: 12px; width: 300px; }
+button { font-family: inherit; }
+.btns button, .panel button { font-size: 20px; font-weight: 800; color: #fff; background: rgba(21,18,28,0.85); border: 2px solid rgba(140,77,255,0.6); padding: 12px 20px; border-radius: 14px; cursor: pointer; text-align: left; transition: all .15s; }
+.btns button:hover, .panel button:hover { background: rgba(140,77,255,0.4); border-color: var(--pink); transform: translateX(8px); }
+.ver { margin-top: 40px; opacity: 0.4; font-size: 13px; }
+.menu-art { position: absolute; right: 4vw; bottom: 0; height: 92vh; filter: drop-shadow(0 0 30px rgba(140,77,255,0.6)); animation: float 4s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-14px) } }
+
+#pause, #settings, #gallery, #nameinput { position: absolute; inset: 0; background: rgba(8,6,14,0.7); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px); }
+.panel { background: var(--panel); border: 2px solid var(--purple); border-radius: 20px; padding: 28px 34px; min-width: 380px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 0 50px rgba(140,77,255,0.35); }
+.panel.wide { width: min(1000px, 92vw); max-height: 88vh; }
+.panel h2 { margin: 0 0 8px; font-size: 30px; color: var(--purple-l); }
+.panel label { display: flex; justify-content: space-between; align-items: center; gap: 20px; font-weight: 700; }
+.panel input[type=range] { width: 200px; accent-color: var(--purple); }
+.panel select { font: inherit; background: #2a2733; color: #fff; border: 1px solid var(--purple); border-radius: 8px; padding: 4px 8px; }
+.panel .controls { margin-top: 10px; font-size: 14px; color: #bfb4d8; line-height: 1.6; }
+#nameinput input { font: inherit; font-size: 24px; padding: 10px 14px; border-radius: 12px; border: 2px solid var(--purple); background: #1d1b24; color: #fff; outline: none; }
+#gallery .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; overflow-y: auto; max-height: 64vh; padding: 4px; }
+#gallery .grid .ph { background: #fff; padding: 8px 8px 30px; position: relative; transform: rotate(-1.5deg); }
+#gallery .grid .ph:nth-child(2n) { transform: rotate(1.5deg); }
+#gallery .grid .ph img { width: 100%; display: block; }
+#gallery .grid .ph div { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; color: #333; font-size: 14px; font-style: italic; }
+#gallery .empty { color: #bfb4d8; }
+
+#loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: var(--purple-l); background: #0a0810; }
+
+/* Финальные титры */
+#credits { position: absolute; inset: 0; background: #000; overflow: hidden; }
+#credits .roll { position: absolute; left: 0; right: 0; text-align: center; font-size: 22px; line-height: 1.8; }
+#credits .roll h1 { font-size: 64px; color: var(--purple-l); text-shadow: 0 0 30px var(--purple); }
+#credits .roll img.ph { width: 340px; border: 10px solid #fff; border-bottom-width: 36px; margin: 20px; transform: rotate(-2deg); }
+
+/* слои */
+#hud { z-index: 2; }
+#vignette { z-index: 3; }
+#glitch { z-index: 4; }
+#fade { z-index: 5; }
+#dialog, #choices { z-index: 10; }
+#titlecard { z-index: 11; }
+#toasts { z-index: 12; }
+#photo { z-index: 15; }
+#mg { z-index: 20; }
+#menu { z-index: 25; }
+#pause, #settings, #gallery, #nameinput { z-index: 30; }
+#credits { z-index: 40; }
+#loading { z-index: 50; }

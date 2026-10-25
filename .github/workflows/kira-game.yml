@@ -1,0 +1,55 @@
+name: KIRA game (Windows build)
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - "kira-game/**"
+      - ".github/workflows/kira-game.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kira-game
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: kira-game/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows portable .exe and .zip
+        run: npm run dist:win
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KIRA-windows
+          path: |
+            kira-game/dist/*.exe
+            kira-game/dist/*.zip
+
+      - name: Publish release "kira-latest"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kira-latest
+          name: "KIRA — последняя сборка"
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: |
+            Скачай `KIRA-1.0.0-portable.exe` — это готовая игра, установка не нужна.
+            Или `KIRA-1.0.0-win.zip` — распакуй и запусти `KIRA.exe`.
+          files: |
+            kira-game/dist/*.exe
+            kira-game/dist/*.zip
