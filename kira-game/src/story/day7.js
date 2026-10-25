@@ -218,9 +218,11 @@ async function credits(g) {
   document.querySelector('#app').appendChild(el);
   const roll = el.querySelector('.roll');
   let y = innerHeight;
+  let last = performance.now();
   await new Promise((res) => {
-    const step = () => {
-      y -= 0.9;
+    const step = (now = performance.now()) => {
+      y -= Math.min(0.1, (now - last) / 1000) * 55;
+      last = now;
       roll.style.top = y + 'px';
       if (y < -roll.offsetHeight + innerHeight * 0.4) return res();
       if (!el.isConnected) return res();
