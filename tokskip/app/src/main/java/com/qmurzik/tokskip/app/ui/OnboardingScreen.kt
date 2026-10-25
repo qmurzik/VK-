@@ -71,6 +71,8 @@ fun OnboardingScreen(app: TokSkip) {
                             "Служба получает события только от TikTok.")
                         Text(if (a11y) "✅ Служба включена" else "⛔ Служба выключена")
                         OutlinedButton({ Env.openA11ySettings(ctx) }, Modifier.fillMaxWidth()) { Text("Открыть настройки доступности") }
+                        Hint("Android 13+: если переключатель серый («Ограниченная настройка»), откройте " +
+                            "О приложении TokSkip → ⋮ → «Разрешить ограниченные настройки» и включите службу снова.")
                         Hint("Служба также нужна в root-режиме для плавающих кнопок ручной разметки и дампа UI.")
                     } else {
                         Text("Включите модуль в LSPosed", style = MaterialTheme.typography.titleMedium)
