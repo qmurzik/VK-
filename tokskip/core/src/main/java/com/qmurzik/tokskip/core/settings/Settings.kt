@@ -19,6 +19,8 @@ data class Settings(
     val onboardingDone: Boolean = false,
     /** Run the detector on text read from the screen / feed. */
     val autoDetect: Boolean = true,
+    /** Rootless mode: OCR of the video frames (burned-in subtitles, ad banners). Android 11+. */
+    val screenOcr: Boolean = true,
     /** Seek over timed segments. */
     val skipSegments: Boolean = true,
     /** Action when a timed segment exists but seeking is impossible. */
@@ -48,6 +50,7 @@ data class Settings(
         put("mode", mode.name)
         put("onboardingDone", onboardingDone)
         put("autoDetect", autoDetect)
+        put("screenOcr", screenOcr)
         put("skipSegments", skipSegments)
         put("fallbackAction", fallbackAction.name)
         put("unknownSegmentAction", unknownSegmentAction.name)
@@ -72,6 +75,7 @@ data class Settings(
                 mode = enumOr(o.optString("mode"), d.mode),
                 onboardingDone = o.optBoolean("onboardingDone", d.onboardingDone),
                 autoDetect = o.optBoolean("autoDetect", d.autoDetect),
+                screenOcr = o.optBoolean("screenOcr", d.screenOcr),
                 skipSegments = o.optBoolean("skipSegments", d.skipSegments),
                 fallbackAction = enumOr(o.optString("fallbackAction"), d.fallbackAction),
                 unknownSegmentAction = enumOr(o.optString("unknownSegmentAction"), d.unknownSegmentAction),

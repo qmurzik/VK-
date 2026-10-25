@@ -26,6 +26,7 @@ class AdDetector(
     private val signals: List<AdSignal> = listOf(
         DisclosureSignal(),
         TriggerPhraseSignal(),
+        ProductSignal(),
         ContextSignal(),
         ReturnToTopicSignal(),
         ListSignal("brand", HitKind.BRAND, config.brands, 0.5f),

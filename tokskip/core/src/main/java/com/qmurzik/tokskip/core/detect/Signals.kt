@@ -46,6 +46,23 @@ class TriggerPhraseSignal : RegexSignal(
         "${L}(кэшбэк|кешбэк|кэшбек|кешбек|cashback)" to 0.4f,
         "${L}(бесплатн\\p{L}*) (пробн|месяц|период|доставк)" to 0.4f,
         "${L}(регистрир|зарегистрир)\\p{L}*" to 0.3f,
+        // Services sold through messengers: "Telegram bot", "@something_bot", "сервис в Telegram".
+        "${L}(telegram|телеграм\\p{L}*|тг) ?-? ?(бот\\p{L}*|bot)$R" to 0.7f,
+        "${L}(бот\\p{L}*|bot) (в|in) (telegram|телеграм\\p{L}*|тг)$R" to 0.7f,
+        "@[\\p{L}\\p{N}_]{2,}_?bot$R" to 0.8f,
+        "${L}(сервис|канал|приложение) (в|in) (telegram|телеграм\\p{L}*)$R" to 0.6f,
+        "${L}(telegram|телеграм\\p{L}*)$R" to 0.3f,
+    )
+)
+
+/**
+ * Product categories that are mostly mentioned when sold (VPNs). A separate signal from the sales
+ * phrases, so "VPN" + "Telegram" on one banner add up instead of only the stronger one counting.
+ */
+class ProductSignal : RegexSignal(
+    "product", HitKind.TRIGGER, listOf(
+        "${L}vpn$R" to 0.5f,
+        "${L}впн$R" to 0.5f,
     )
 )
 
@@ -72,8 +89,9 @@ class ReturnToTopicSignal : RegexSignal(
 )
 
 /**
- * User-editable phrases and brands, matched from a word start on normalized text. Cyrillic words
- * longer than three letters match any ending, so «лавка ромашка» also finds «в лавке ромашка».
+ * User-editable phrases and brands, matched from a word start on normalized text. Cyrillic words of
+ * five letters or more match any ending, so «лавка ромашка» also finds «в лавке ромашка»; shorter
+ * ones («пари», «озон») must match whole, or they would catch «парк» and the like.
  */
 class ListSignal(
     override val id: String,
@@ -92,7 +110,7 @@ class ListSignal(
         val cyrillic = Regex("\\p{IsCyrillic}")
 
         fun stem(word: String): String =
-            if (word.length > 3 && cyrillic.containsMatchIn(word)) Regex.escape(word.dropLast(1)) + "\\p{L}{0,3}"
-            else Regex.escape(word)
+            if (word.length >= 5 && cyrillic.containsMatchIn(word)) Regex.escape(word.dropLast(1)) + "\\p{L}{0,3}"
+            else Regex.escape(word) + R
     }
 }

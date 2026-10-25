@@ -23,6 +23,8 @@ data class ScreenState(
     val positionMs: Long?,
     val durationMs: Long?,
     val screen: Rect,
+    /** TikTok's own UI (text and buttons) to blank out before OCR of the video frame. */
+    val uiBounds: List<Rect> = emptyList(),
 )
 
 /**
@@ -45,10 +47,17 @@ class ScreenReader(private val settings: () -> Settings) {
         var seekbar: SeekbarInfo? = null
         var position: Long? = null
         var duration: Long? = null
+        val ui = ArrayList<Rect>()
+        val screenArea = screen.width().toLong() * screen.height()
 
         walk(root, 0) { node ->
             if (!node.isVisibleToUser) return@walk
             val text = node.text?.toString()?.trim().orEmpty()
+            if (text.isNotEmpty() || !node.contentDescription.isNullOrBlank() || node.isClickable) {
+                val b = Rect().also { node.getBoundsInScreen(it) }
+                // Full-screen containers (the video pager itself) are clickable too; keep the frame.
+                if (b.width().toLong() * b.height() < screenArea * 0.3) ui += b
+            }
             val id = node.viewIdResourceName.orEmpty()
             val range = node.rangeInfo
             if (seekbar == null && (range != null || node.className?.contains("SeekBar") == true)) {
@@ -79,7 +88,7 @@ class ScreenReader(private val settings: () -> Settings) {
         val captions = texts.filter { matchesId(it.id, s.idCaption) || CAPTION_HINTS.any { h -> h in it.id.substringAfter(":id/") } }
             .map { it.text }.distinct()
 
-        return ScreenState(author.removePrefix("@"), description, captions, seekbar, position, duration, screen)
+        return ScreenState(author.removePrefix("@"), description, captions, seekbar, position, duration, screen, ui)
     }
 
     private data class TextNode(val text: String, val id: String, val bounds: Rect, val clickable: Boolean)

@@ -21,5 +21,8 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    // Offline OCR of the video frames (burned-in subtitles, ad banners). Russian + English
+    // tessdata_fast models are bundled in assets; nothing is downloaded at runtime.
+    implementation("com.github.adaptech-cz.Tesseract4Android:tesseract4android-openmp:4.8.0")
     testImplementation("junit:junit:4.13.2")
 }

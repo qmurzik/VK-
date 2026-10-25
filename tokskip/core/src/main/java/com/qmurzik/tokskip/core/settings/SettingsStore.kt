@@ -31,9 +31,9 @@ class SettingsStore(context: Context) {
     }
 
     @Synchronized
-    fun addSkip(ms: Long) {
+    fun addSkip(ms: Long, newVideo: Boolean = true) {
         val s = _stats.value
-        val next = s.copy(skippedVideos = s.skippedVideos + 1, skippedMs = s.skippedMs + ms.coerceAtLeast(0))
+        val next = s.copy(skippedVideos = s.skippedVideos + if (newVideo) 1 else 0, skippedMs = s.skippedMs + ms.coerceAtLeast(0))
         prefs.edit().putLong("skippedVideos", next.skippedVideos).putLong("skippedMs", next.skippedMs).apply()
         _stats.value = next
     }

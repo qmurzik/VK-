@@ -3,7 +3,7 @@ package com.qmurzik.tokskip.core.detect
 import java.util.Locale
 
 internal object Text {
-    private val junk = Regex("[^\\p{L}\\p{N}#@%\\-]+")
+    private val junk = Regex("[^\\p{L}\\p{N}#@%_\\-]+")
     private val spaces = Regex("\\s+")
 
     /** Lowercases, folds ё→е and collapses punctuation so patterns stay simple. */

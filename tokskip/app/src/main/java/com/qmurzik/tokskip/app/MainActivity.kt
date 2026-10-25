@@ -7,10 +7,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -36,9 +36,9 @@ import com.qmurzik.tokskip.core.TokSkip
 
 enum class Tab(val title: String, val icon: ImageVector) {
     HOME("Главная", Icons.Filled.Home),
-    DB("База", Icons.Filled.Storage),
+    DB("База", Icons.Filled.Edit),
     SETTINGS("Настройки", Icons.Filled.Settings),
-    STATS("Статистика", Icons.Filled.BarChart),
+    STATS("Статистика", Icons.Filled.Star),
     LOGS("Логи", Icons.AutoMirrored.Filled.List),
 }
 

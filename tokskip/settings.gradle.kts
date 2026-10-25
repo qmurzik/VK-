@@ -14,6 +14,11 @@ dependencyResolutionManagement {
         google()
         maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
         mavenCentral()
+        // Tesseract4Android (offline OCR) is published only on JitPack.
+        maven {
+            url = uri("https://jitpack.io")
+            content { includeGroupByRegex("com\\.github\\.adaptech-cz.*") }
+        }
     }
 }
 

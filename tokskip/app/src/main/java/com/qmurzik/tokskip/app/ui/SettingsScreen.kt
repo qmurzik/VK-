@@ -65,6 +65,8 @@ fun SettingsScreen(app: TokSkip, modifier: Modifier) {
 
         Section("Детектор") {
             Toggle("Автоопределение рекламы", s.autoDetect) { v -> update { it.copy(autoDetect = v) } }
+            Toggle("Анализ экрана (OCR)", s.screenOcr) { v -> update { it.copy(screenOcr = v) } }
+            Hint("Раз в секунду распознаёт текст внутри видео — вшитые субтитры и рекламные баннеры — и пропускает рекламу прямо во время просмотра. Работает на телефоне, Android 11+, режим без root.")
             Text("Порог уверенности: ${(s.threshold * 100).roundToInt()}%")
             Slider(s.threshold, { v -> update { it.copy(threshold = (v * 20).roundToInt() / 20f) } }, valueRange = 0.3f..0.95f)
             Hint("Ниже — больше находок и ложных срабатываний, выше — только явные интеграции.")
