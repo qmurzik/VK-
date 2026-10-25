@@ -1,11 +1,13 @@
 // Квартира Киры: геометрия, свет, коллизии, интерактивные предметы, навигация.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { T } from './textures.js';
 
 const H = 2.8; // высота потолка
 const WT = 0.16; // толщина стен
 
-const lam = (color, map, extra = {}) => new THREE.MeshLambertMaterial(map ? { color, map, ...extra } : { color, ...extra });
+// Физически корректный материал (с отражениями окружения). Имя осталось от Lambert.
+const lam = (color, map, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...(map ? { map } : {}), ...extra });
 
 export class World {
   constructor(scene) {
@@ -26,7 +28,11 @@ export class World {
 
   // Бокс по min/max координатам
   box(x0, y0, z0, x1, y1, z1, mat, collide = false, parent = this.group) {
-    const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    const minD = Math.min(x1 - x0, y1 - y0, z1 - z0);
+    const rounded = this.round && minD > 0.015;
+    const g = rounded
+      ? new RoundedBoxGeometry(x1 - x0, y1 - y0, z1 - z0, 3, Math.min(0.035, minD * 0.3))
+      : new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
     const m = new THREE.Mesh(g, mat);
     m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     m.receiveShadow = true;
@@ -34,7 +40,7 @@ export class World {
     parent.add(m);
     if (collide) this.colliders.push({ x0, z0, x1, z1, mesh: m });
     // корректируем UV под размер, чтобы текстуры не растягивались
-    if (mat.map && mat.map.wrapS === THREE.RepeatWrapping) {
+    if (!rounded && mat.map && mat.map.wrapS === THREE.RepeatWrapping) {
       const uv = g.attributes.uv;
       const sx = x1 - x0, sy = y1 - y0, sz = z1 - z0;
       const dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]];
@@ -121,13 +127,13 @@ export class World {
 
   build() {
     const M = this.mats;
-    M.floor = lam(0xffffff, T.wood([1, 1]));
+    M.floor = lam(0xffffff, T.wood([1, 1]), { roughness: 0.48 });
     M.floor.map.repeat.set(0.5, 0.5);
     M.wall = lam(0xffffff, T.wallpaper([1, 1]));
     M.wall.map.repeat.set(1.2, 1.2);
     M.wallBed = lam(0xffffff, T.wallpaper([1, 1], 290));
     M.wallBed.map.repeat.set(1.2, 1.2);
-    M.tile = lam(0xffffff, T.tiles([1, 1]));
+    M.tile = lam(0xffffff, T.tiles([1, 1], '#e9e3ef', '#b9b0c6'));
     M.tile.map.repeat.set(1, 1);
     M.tileBlue = lam(0xffffff, T.tiles([1, 1], '#dfeaf7', '#a9b8cc', 6));
     M.checker = lam(0xffffff, T.checker([1, 1]));
@@ -141,10 +147,10 @@ export class World {
     M.pink = lam(0xf3a6c8);
     M.woodDark = lam(0x6b4a33);
     M.woodLight = lam(0xc9a27a);
-    M.metal = lam(0xb8bcc8);
+    M.metal = lam(0xc8ccd8, null, { metalness: 0.85, roughness: 0.28 });
     M.green = lam(0x4f9a5a);
     M.pot = lam(0xc8734f);
-    M.glass = new THREE.MeshLambertMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.18, depthWrite: false });
+    M.glass = new THREE.MeshStandardMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.16, roughness: 0.02, metalness: 0.2, depthWrite: false });
     M.sofa = lam(0x6f6487, T.fabric('#6f6487', [2, 2]));
 
     // ---------- пол и потолок ----------
@@ -204,14 +210,27 @@ export class World {
 
     // шторы
     const curtainMat = lam(0x9b7fd4, T.fabric('#9b7fd4', [1, 1]));
-    const curtain = (x, z, w, rotY, h = 2.4) => {
-      const g = new THREE.Group();
-      for (let i = 0; i < 5; i++) {
-        const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, h, 8), curtainMat);
-        c.position.set(i * (w / 5), h / 2, 0);
-        c.castShadow = true;
-        g.add(c);
+    curtainMat.side = THREE.DoubleSide;
+    const curtain = (x, z, w, rotY, h = 2.45) => {
+      // полотно со складками: волна по ширине, лёгкий изгиб внизу
+      const width = w + 0.25;
+      const geo = new THREE.PlaneGeometry(width, h, 40, 12);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const px = pos.getX(i), py = pos.getY(i);
+        const fold = Math.sin((px / width) * Math.PI * 9) * 0.035 + Math.sin((px / width) * Math.PI * 3.3) * 0.012;
+        pos.setZ(i, fold * (1.05 - (py / h + 0.5) * 0.25));
       }
+      geo.computeVertexNormals();
+      const g = new THREE.Group();
+      const m = new THREE.Mesh(geo, curtainMat);
+      m.position.set(width / 2 - 0.12, h / 2, 0);
+      m.castShadow = true;
+      g.add(m);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, width + 0.1, 8), this.mats.metal);
+      rod.rotation.z = Math.PI / 2;
+      rod.position.set(width / 2 - 0.12, h + 0.03, 0);
+      g.add(rod);
       g.position.set(x, 0.3, z);
       g.rotation.y = rotY;
       this.group.add(g);
@@ -224,6 +243,7 @@ export class World {
     this.bedCurtain = curtain(2.3, 9.85, 0.35, 0);
     curtain(3.95, 9.85, 0.35, 0);
 
+    this.round = true;
     // ---------- ГОСТИНАЯ ----------
     // ТВ-тумба и телевизор (на западной стене)
     this.box(0.1, 0, 2.1, 0.6, 0.5, 3.9, M.woodDark, true);
@@ -454,6 +474,39 @@ export class World {
     this.addInteract('wardrobe', wardrobe, 'Шкаф');
     this.plane(0.5, 0.7, lam(0xffffff, T.poster('X', 'qvk', '#1d1b24', '#9f6bff')), 0.09, 1.7, 7.0, Math.PI / 2);
 
+    // ---------- Декор ----------
+    // фрукты на обеденном столе
+    const bowl = this.cyl(9.2, 0.76, 3.0, 0.14, 0.08, 0.07, lam(0xf4f1f8, null, { roughness: 0.3 }));
+    bowl.castShadow = true;
+    [[0xff5a5a, 0.04, 0.02], [0xffb03a, -0.05, 0.01], [0x9be36a, 0.0, -0.05], [0xff5a5a, -0.02, 0.05]].forEach(([c, dx, dz]) => this.sphere(9.2 + dx, 0.87, 3.0 + dz, 0.042, lam(c, null, { roughness: 0.4 })));
+    // ковёр в спальне
+    const rug2 = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), lam(0xffffff, T.fabric('#c9a8ff', [3, 2])));
+    rug2.rotation.x = -Math.PI / 2;
+    rug2.position.set(2.8, 0.006, 8.4);
+    rug2.receiveShadow = true;
+    this.group.add(rug2);
+    // настенная полка с игрушками в спальне
+    this.box(0.09, 1.0, 6.6, 0.32, 1.03, 7.6, M.woodLight);
+    this.sphere(0.2, 1.11, 6.8, 0.07, M.pink);
+    this.sphere(0.2, 1.2, 6.8, 0.05, M.pink);
+    this.cyl(0.2, 1.03, 7.15, 0.05, 0.05, 0.2, M.purple);
+    this.sphere(0.2, 1.1, 7.45, 0.07, lam(0xfff1c8));
+    // рамки с фото над диваном
+    const frame = (x, y, z, w, h, c1, c2, ry) => {
+      const g = new THREE.Group();
+      this.box(-w / 2, -h / 2, -0.015, w / 2, h / 2, 0.015, M.woodDark, false, g);
+      this.plane(w - 0.06, h - 0.06, lam(0xffffff, T.poster('', '', c1, c2)), 0, 0, 0.017, 0, g);
+      g.position.set(x, y, z);
+      g.rotation.y = ry;
+      this.group.add(g);
+    };
+    frame(3.5, 1.55, 5.9, 0.32, 0.42, '#ffb3d1', '#b48cff', Math.PI);
+    frame(3.95, 1.65, 5.9, 0.4, 0.3, '#7ab8ff', '#c9a8ff', Math.PI);
+    frame(4.4, 1.5, 5.9, 0.28, 0.36, '#ffd27a', '#ff8fc0', Math.PI);
+    // растение на подоконнике кухни
+    this.cyl(11.75, 1.27, 2.5, 0.08, 0.06, 0.12, M.pot);
+    for (let i = 0; i < 5; i++) this.sphere(11.75 + Math.cos(i * 1.3) * 0.05, 1.45 + (i % 2) * 0.05, 2.5 + Math.sin(i * 1.3) * 0.05, 0.06, M.green, 1, 1.4, 0.6);
+
     // ---------- ВАННАЯ ----------
     const tub = new THREE.Group();
     this.group.add(tub);
@@ -465,7 +518,7 @@ export class World {
     this.group.add(sink);
     this.box(11.45, 0, 7.15, 11.95, 0.85, 8.05, M.white, true, sink);
     this.box(11.5, 0.82, 7.3, 11.85, 0.86, 7.9, M.metal, false, sink);
-    this.mirrorMat = new THREE.MeshBasicMaterial({ color: 0x9fb6cc });
+    this.mirrorMat = new THREE.MeshStandardMaterial({ color: 0xdfe8f2, metalness: 1, roughness: 0.04 });
     const mirror = this.box(11.9, 1.15, 7.2, 11.94, 1.95, 8.0, this.mirrorMat, false, sink);
     this.addInteract('mirror', mirror, 'Зеркало');
     // унитаз
@@ -617,6 +670,7 @@ export class World {
         const fx = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.08, 20), lam(0xfff5e8, null, { emissive: 0xffe8c8, emissiveIntensity: 0.6 }));
         fx.position.set(x, H - 0.04, z);
         this.group.add(fx);
+        (this.fixtures = this.fixtures || []).push(fx);
       }
     }
     this.scene.fog = new THREE.Fog(0xbfd8ff, 30, 160);
@@ -722,8 +776,8 @@ export class World {
   setPhase(p) {
     this.phase = p;
     const cfg = {
-      morning: { sky: 'morning', hemi: [0xfff0f5, 0x9a8aa8, 1.1], sun: [0xffd0b0, 1.3, [14, 6, -16]], lamps: 0, fog: 0xffd6e8, cityGlow: 0.1 },
-      day: { sky: 'day', hemi: [0xffffff, 0x9a8aa8, 1.25], sun: [0xfff4e8, 1.6, [10, 14, -14]], lamps: 0, fog: 0xbfd8ff, cityGlow: 0 },
+      morning: { sky: 'morning', hemi: [0xfff0f5, 0x8a7a98, 0.8], sun: [0xffd0b0, 1.25, [14, 6, -16]], lamps: 0, fog: 0xffd6e8, cityGlow: 0.1 },
+      day: { sky: 'day', hemi: [0xfffaf4, 0x8a7a98, 0.85], sun: [0xfff4e8, 1.4, [10, 14, -14]], lamps: 0, fog: 0xbfd8ff, cityGlow: 0 },
       evening: { sky: 'evening', hemi: [0xffd0c0, 0x5a4a6a, 0.75], sun: [0xff9a6a, 0.9, [-14, 4, -12]], lamps: 1.1, fog: 0xff9a9a, cityGlow: 0.6 },
       night: { sky: 'night', hemi: [0x8a7ac0, 0x2a2238, 0.45], sun: [0x8a9aff, 0.25, [-6, 14, -10]], lamps: 1.6, fog: 0x151035, cityGlow: 1.2 },
       glitch: { sky: 'glitch', hemi: [0xff8ab0, 0x2a0a20, 0.55], sun: [0xff4a8a, 0.4, [-6, 14, -10]], lamps: 1.0, fog: 0x4a0a3a, cityGlow: 0.3 },
@@ -741,6 +795,8 @@ export class World {
     this.scene.fog.color.setHex(cfg.fog);
     this.cityMat.emissiveIntensity = cfg.cityGlow;
     this.fairy.visible = p === 'evening' || p === 'night' || p === 'glitch';
+    for (const f of this.fixtures || []) f.material.emissiveIntensity = cfg.lamps > 0 ? 3 : 0.15;
+    this.scene.environmentIntensity = { morning: 0.3, day: 0.32, evening: 0.24, night: 0.14, glitch: 0.18 }[p];
   }
 
   setClock(text) {

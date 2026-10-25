@@ -209,6 +209,7 @@ async function credits(g) {
     <p><b>Мистер Байт</b><br>хранитель одного секрета</p>
     <br>${photos}<br>
     <p>Сценарий, код, музыка и блинчики<br>сделаны с любовью</p>
+    <p><b>3D-модель Киры</b><br>основа — «Seed-san» © VirtualCast, Inc.<br>VRM Public License 1.0 · vrm.dev/licenses/1.0</p>
     <p>Спасибо, что провёл эту неделю с Кирой.</p>
     <br><br>
     <p style="font-size:30px">${ending === 'C' ? 'Она всё ещё ждёт.' : 'Она тебя любит.'}</p>

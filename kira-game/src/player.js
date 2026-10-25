@@ -49,7 +49,7 @@ export class Player {
 
   // Плавно повернуть камеру на точку
   lookAt(target, dur = 0.6) {
-    const eye = new THREE.Vector3(this.pos.x, this.eye, this.pos.z);
+    const eye = new THREE.Vector3(this.pos.x, this.eyeTarget || this.eye, this.pos.z);
     const d = target.clone().sub(eye);
     let yaw = Math.atan2(-d.x, -d.z);
     const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
@@ -62,6 +62,20 @@ export class Player {
     this.seated = true;
     this.teleport(x, z, yaw, -0.1);
     this.eyeTarget = 1.15;
+    this.eye = 1.15;
+  }
+
+  // Плавно держать взгляд на точке (для диалогов)
+  track(target, dt) {
+    const eye = new THREE.Vector3(this.pos.x, this.eyeTarget || this.eye, this.pos.z);
+    const d = target.clone().sub(eye);
+    let yaw = Math.atan2(-d.x, -d.z);
+    const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+    while (yaw - this.yaw > Math.PI) yaw -= Math.PI * 2;
+    while (yaw - this.yaw < -Math.PI) yaw += Math.PI * 2;
+    const k = Math.min(1, dt * 4);
+    this.yaw += (yaw - this.yaw) * k;
+    this.pitch += (pitch - this.pitch) * k;
   }
   stand() {
     this.seated = false;

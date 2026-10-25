@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { World } from './world.js';
 import { Kira } from './kira.js';
 import { Player } from './player.js';
@@ -53,12 +59,20 @@ class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.95;
     this.renderer.domElement.className = 'three';
     $('#app').prepend(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
+    // мягкие отражения окружения для всех материалов
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.5;
     this.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 400);
+    // мягкий заполняющий свет от камеры — лицо Киры не уходит в тень в диалогах
+    this.fill = new THREE.PointLight(0xfff0f4, 0.9, 4, 1.6);
+    this.camera.add(this.fill);
+    this.scene.add(this.camera);
     this.world = new World(this.scene);
     this.kira = new Kira(this.scene);
     this.player = new Player(this.camera, this.renderer.domElement, this.world);
@@ -73,11 +87,13 @@ class Game {
     this.glitchAmp = 0;
     this.glitchBase = 0;
     this.applySettings();
+    this.setQuality(this.settings.quality || 'high');
 
     addEventListener('resize', () => {
       this.camera.aspect = innerWidth / innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(innerWidth, innerHeight);
+      if (this.composer) this.composer.setSize(innerWidth, innerHeight);
       const gc = $('#glitch'); gc.width = innerWidth / 3; gc.height = innerHeight / 3;
     });
     const gc = $('#glitch'); gc.width = innerWidth / 3; gc.height = innerHeight / 3;
@@ -85,7 +101,10 @@ class Game {
 
     this.renderer.domElement.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
-      if (!document.querySelector('#dialog').classList.contains('hidden') && !this.ui.choiceState) { this.ui.advance(); return; }
+      // клик продолжает диалог только если реплика действительно ждёт клика
+      if (this.ui.waiting || this.ui.typing) { this.ui.advance(); return; }
+      if (this.ui.choiceState) return;
+      this.ui.hideDialog();
       if (this.photoMode) { if (this.player.locked) this.photoMode.snap(); else this.player.lock(); return; }
       if (!this.roaming && !this.freeLook) return;
       if (!this.player.locked) { this.player.lock(); return; }
@@ -108,6 +127,38 @@ class Game {
     this.clock = new THREE.Clock();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+  }
+
+  // Графика: high — AO + свечение + MSAA, medium — свечение + MSAA, low — без пост-обработки
+  setQuality(q) {
+    this.quality = q;
+    const r = this.renderer;
+    r.setPixelRatio(q === 'low' ? 1 : Math.min(2, devicePixelRatio));
+    r.shadowMap.enabled = q !== 'low';
+    r.shadowMap.needsUpdate = true;
+    this.scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => (m.needsUpdate = true)); });
+    if (this.composer) { this.composer.dispose(); this.composer = null; }
+    if (q === 'low') return;
+    const size = r.getDrawingBufferSize(new THREE.Vector2());
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+    const c = new EffectComposer(r, rt);
+    c.setPixelRatio(r.getPixelRatio());
+    c.setSize(innerWidth, innerHeight);
+    c.addPass(new RenderPass(this.scene, this.camera));
+    if (q === 'high') {
+      const ao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
+      ao.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.5, thickness: 1.5, scale: 1.2, samples: 12 });
+      ao.blendIntensity = 0.85;
+      c.addPass(ao);
+    }
+    c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.32, 0.55, 0.88));
+    c.addPass(new OutputPass());
+    this.composer = c;
+  }
+
+  renderFrame() {
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   freshState() {
@@ -151,7 +202,7 @@ class Game {
       el.addEventListener('input', () => {
         this.settings[k] = el.tagName === 'SELECT' ? el.value : +el.value;
         this.applySettings();
-        if (k === 'quality') this.ui.toast('Качество применится после перезапуска');
+        if (k === 'quality') this.setQuality(el.value);
       });
     });
     st.querySelector('[data-act=close]').addEventListener('click', () => st.classList.add('hidden'));
@@ -182,6 +233,7 @@ class Game {
   }
 
   showMenu() {
+    if (this.started) return;
     $('#loading').classList.add('hidden');
     $('#menu').classList.remove('hidden');
     const has = !!localStorage.getItem(SAVE_KEY);
@@ -215,6 +267,9 @@ class Game {
   }
 
   async start() {
+    this.started = true;
+    $('#menu').classList.add('hidden');
+    $('#loading').classList.add('hidden');
     this.audio.init();
     $('#hud').classList.remove('hidden');
     this.ui.setAffection(this.state.aff);
@@ -312,12 +367,13 @@ class Game {
   playerPlace(x, z, yaw = 0) { this.player.stand(); this.player.teleport(x, z, yaw); }
   playerSit(spot) { const s = SPOTS[spot]; this.player.sit(s.x, s.z, s.yaw); }
   lookKira(dur = 0.6) {
+    this.focusKira = true;
     const h = new THREE.Vector3();
     this.kira.head.getWorldPosition(h);
     h.y += 0.08;
     this.player.lookAt(h, dur);
   }
-  lookAtPoint(x, y, z, dur = 0.6) { this.player.lookAt(new THREE.Vector3(x, y, z), dur); }
+  lookAtPoint(x, y, z, dur = 0.6) { this.focusKira = false; this.player.lookAt(new THREE.Vector3(x, y, z), dur); }
 
   // Подходит ли Кира к игроку
   async kiraToPlayer(dist = 1.1) {
@@ -373,6 +429,7 @@ class Game {
   roam({ tasks = [], extra = {}, talk = null, title, doneWhen, kiraLabel } = {}) {
     this.ui.hideDialog();
     this.audio.setDuck(false);
+    this.focusKira = false;
     return new Promise((resolve) => {
       this.roaming = true;
       this.busy = false;
@@ -506,7 +563,7 @@ class Game {
           const flash = $('#fade');
           flash.style.background = '#fff'; flash.style.transitionDuration = '0s'; flash.style.opacity = 0.8;
           setTimeout(() => { flash.style.transitionDuration = '0.4s'; flash.style.opacity = 0; setTimeout(() => (flash.style.background = '#000'), 450); }, 60);
-          this.renderer.render(this.scene, this.camera);
+          this.renderFrame();
           const img = this.capture();
           this.photoBusy = true;
           (async () => {
@@ -557,7 +614,9 @@ class Game {
     this.audio.setDuck(false);
     const prev = this.audio.trackName;
     this.audio.play(name === 'Rhythm' ? 'dance' : name === 'Stars' ? 'love' : name === 'Pipes' ? 'glitch' : 'game');
-    const r = await new MG[name](this, ...args).run();
+    this.activeMG = new MG[name](this, ...args);
+    const r = await this.activeMG.run();
+    this.activeMG = null;
     this.audio.play(prev);
     return r;
   }
@@ -596,6 +655,13 @@ class Game {
         this.camera.lookAt(3.0, 1.2, 2.2);
         this.kira.lookTarget = this.camera.position;
       } else {
+        // во время разговоров камера мягко держит лицо Киры в кадре
+        if (this.focusKira && (this.busy || !this.roaming) && !this.photoMode && !this.player.lookAnim && this.kira.vrm) {
+          const h = new THREE.Vector3();
+          this.kira.head.getWorldPosition(h);
+          h.y += 0.07;
+          this.player.track(h, dt);
+        }
         const moving = this.player.update(dt);
         if (moving && Math.floor(this.player.stepT * 2.2) !== this.lastStep) { this.lastStep = Math.floor(this.player.stepT * 2.2); this.audio.sfx('step'); }
         this.updateHover();
@@ -605,12 +671,12 @@ class Game {
       this.world.update(dt);
     }
     this.drawGlitch(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.renderFrame();
   }
 }
 
 window.addEventListener('load', () => {
   const g = new Game();
   window.game = g;
-  setTimeout(() => g.showMenu(), 300);
+  g.kira.ready.then(() => g.showMenu()).catch((e) => { console.error(e); document.querySelector('#loading').textContent = 'Ошибка загрузки модели: ' + e.message; });
 });

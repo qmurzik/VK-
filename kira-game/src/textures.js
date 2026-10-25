@@ -20,45 +20,63 @@ function tex(w, h, draw, repeat) {
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 export const T = {
-  wood: (r) => tex(512, 512, (x, w, h) => {
-    const rows = 6;
+  wood: (r) => tex(1024, 1024, (x, w, h) => {
+    const rows = 8;
+    const ph = h / rows;
     for (let i = 0; i < rows; i++) {
-      const y = (i * h) / rows;
-      let off = (i % 2) * 180;
+      const y = i * ph;
+      const off = ((i * 377) % 5) * 90;
       for (let j = -1; j < 3; j++) {
-        const l = 0.62 + Math.random() * 0.1;
-        x.fillStyle = `hsl(${26 + rnd(-3, 3)},${42 + rnd(-6, 6)}%,${l * 52}%)`;
-        x.fillRect(j * 300 + off, y, 300, h / rows);
-        x.strokeStyle = 'rgba(60,30,10,0.12)';
-        for (let g = 0; g < 7; g++) {
+        const px = j * 460 + off;
+        const hue = 24 + rnd(-4, 4), sat = 40 + rnd(-8, 6), lit = 34 + rnd(-6, 6);
+        const g = x.createLinearGradient(px, y, px + 460, y + ph);
+        g.addColorStop(0, `hsl(${hue},${sat}%,${lit}%)`);
+        g.addColorStop(1, `hsl(${hue + 2},${sat - 4}%,${lit - 4}%)`);
+        x.fillStyle = g;
+        x.fillRect(px, y, 460, ph);
+        // волокна
+        for (let k = 0; k < 40; k++) {
+          x.strokeStyle = `rgba(${Math.random() < 0.5 ? '40,20,5' : '255,220,180'},${rnd(0.03, 0.09)})`;
+          x.lineWidth = rnd(0.6, 2.2);
           x.beginPath();
-          const gy = y + rnd(4, h / rows - 4);
-          x.moveTo(j * 300 + off, gy);
-          x.bezierCurveTo(j * 300 + off + 100, gy + rnd(-4, 4), j * 300 + off + 200, gy + rnd(-4, 4), j * 300 + off + 300, gy);
+          const gy = y + rnd(2, ph - 2);
+          x.moveTo(px, gy);
+          x.bezierCurveTo(px + 150, gy + rnd(-6, 6), px + 300, gy + rnd(-6, 6), px + 460, gy + rnd(-3, 3));
           x.stroke();
         }
-        x.fillStyle = 'rgba(40,20,5,0.5)';
-        x.fillRect(j * 300 + off, y, 2, h / rows);
+        // сучок
+        if (Math.random() < 0.35) {
+          const kx = px + rnd(60, 400), ky = y + rnd(20, ph - 20);
+          for (let r2 = 14; r2 > 2; r2 -= 3) { x.strokeStyle = `rgba(50,25,8,${0.12})`; x.lineWidth = 1.5; x.beginPath(); x.ellipse(kx, ky, r2 * 2.2, r2 * 0.7, 0, 0, Math.PI * 2); x.stroke(); }
+        }
+        x.fillStyle = 'rgba(25,12,3,0.55)';
+        x.fillRect(px, y, 3, ph);
       }
-      x.fillStyle = 'rgba(40,20,5,0.45)';
-      x.fillRect(0, y, w, 2);
+      x.fillStyle = 'rgba(25,12,3,0.5)';
+      x.fillRect(0, y, w, 3);
+      x.fillStyle = 'rgba(255,230,200,0.08)';
+      x.fillRect(0, y + 3, w, 2);
     }
   }, r),
 
-  wallpaper: (r, hue = 265) => tex(256, 256, (x, w, h) => {
-    x.fillStyle = `hsl(${hue},28%,86%)`;
+  wallpaper: (r, hue = 265) => tex(512, 512, (x, w, h) => {
+    x.fillStyle = `hsl(${hue},24%,86%)`;
     x.fillRect(0, 0, w, h);
-    x.fillStyle = `hsla(${hue},40%,70%,0.35)`;
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-      const cx = i * 64 + (j % 2) * 32 + 16, cy = j * 64 + 32;
+    // мягкие вертикальные полосы
+    for (let i = 0; i < w; i += 64) { x.fillStyle = `hsla(${hue},30%,70%,0.10)`; x.fillRect(i, 0, 24, h); }
+    // мелкие сердечки и точки
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+      const cx = i * 64 + (j % 2) * 32 + 44, cy = j * 64 + 32;
+      x.fillStyle = `hsla(${hue},45%,62%,0.28)`;
       x.beginPath();
-      x.moveTo(cx, cy + 6);
-      x.bezierCurveTo(cx - 10, cy - 2, cx - 4, cy - 10, cx, cy - 4);
-      x.bezierCurveTo(cx + 4, cy - 10, cx + 10, cy - 2, cx, cy + 6);
+      x.moveTo(cx, cy + 5);
+      x.bezierCurveTo(cx - 8, cy - 1, cx - 3, cy - 8, cx, cy - 3);
+      x.bezierCurveTo(cx + 3, cy - 8, cx + 8, cy - 1, cx, cy + 5);
       x.fill();
     }
-    x.fillStyle = `hsla(${hue},30%,60%,0.08)`;
-    for (let i = 0; i < 256; i += 8) x.fillRect(i, 0, 2, h);
+    x.globalAlpha = 0.05;
+    for (let i = 0; i < 4000; i++) { x.fillStyle = Math.random() > 0.5 ? '#fff' : '#000'; x.fillRect(rnd(0, w), rnd(0, h), 1, 1); }
+    x.globalAlpha = 1;
   }, r),
 
   tiles: (r, color = '#f4f2f8', grout = '#c8c4d4', n = 8) => tex(256, 256, (x, w, h) => {
@@ -125,10 +143,15 @@ export const T = {
     }
   }),
 
-  fabric: (color, r) => tex(128, 128, (x, w, h) => {
+  fabric: (color, r) => tex(256, 256, (x, w, h) => {
     x.fillStyle = color; x.fillRect(0, 0, w, h);
-    x.globalAlpha = 0.06;
-    for (let i = 0; i < 400; i++) { x.fillStyle = Math.random() > 0.5 ? '#fff' : '#000'; x.fillRect(rnd(0, w), rnd(0, h), 2, 2); }
+    // плетение
+    for (let i = 0; i < w; i += 4) {
+      x.fillStyle = `rgba(255,255,255,${i % 8 ? 0.04 : 0.07})`; x.fillRect(i, 0, 2, h);
+      x.fillStyle = `rgba(0,0,0,${i % 8 ? 0.05 : 0.08})`; x.fillRect(0, i, w, 2);
+    }
+    x.globalAlpha = 0.07;
+    for (let i = 0; i < 1500; i++) { x.fillStyle = Math.random() > 0.5 ? '#fff' : '#000'; x.fillRect(rnd(0, w), rnd(0, h), 1.5, 1.5); }
     x.globalAlpha = 1;
   }, r),
 

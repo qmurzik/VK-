@@ -17,6 +17,7 @@ export class UI {
     this.waiting = null;
     this.typing = false;
     this.choiceState = null;
+    this.seq = 0;
 
     this.dlg.addEventListener('mousedown', (e) => { e.stopPropagation(); this.advance(); });
     addEventListener('keydown', (e) => {
@@ -48,6 +49,8 @@ export class UI {
   // who: k — Кира, p — игрок, n — рассказчик, g — «система»/глюк
   async say(who, text, opts = {}) {
     const g = this.g;
+    const seq = ++this.seq;
+    clearTimeout(this.hideT);
     text = text.replace(/\{p\}/g, g.state.name || 'Ты');
     this.dlg.classList.remove('hidden', 'player', 'narr', 'glitchy', 'done', 'noportrait');
     const names = { k: 'Кира', p: g.state.name || 'Ты', n: '', g: '???' };
@@ -80,7 +83,7 @@ export class UI {
       const tick = (now) => {
         acc += ((now - last) / 1000) * cps;
         last = now;
-        if (this.skipType) { i = text.length; }
+        if (this.skipType || this.instant) { i = text.length; }
         while (acc >= 1 && i < text.length) {
           const ch = text[i++];
           acc -= 1;
@@ -103,6 +106,9 @@ export class UI {
     if (opts.auto) { await new Promise((r) => setTimeout(r, opts.auto)); return; }
     if (opts.noWait) return;
     await new Promise((res) => { this.waiting = res; });
+    // Если следом не началась новая реплика — прячем окно, чтобы оно не «висело»
+    // поверх игры (фотосессия, прогулка, ожидание и т.п.)
+    this.hideT = setTimeout(() => { if (this.seq === seq && !this.waiting && !this.typing) this.hideDialog(); }, 120);
   }
 
   hideDialog() {
