@@ -10,3 +10,4 @@ local.properties
 .cxx
 *.keystore
 !debug.keystore
+*.apk
