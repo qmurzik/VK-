@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Outline;
 import android.graphics.Typeface;
-import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -35,7 +34,7 @@ public final class ViewTweaks {
     private static volatile boolean noHaptics, selectText, anyFont;
     private static volatile String avatarShape = "circle";
     private static volatile Typeface fontBase;
-    private static final SparseArray<String> NAMES = new SparseArray<>();
+    private static final java.util.HashMap<Integer, String> NAMES = new java.util.HashMap<>();
 
     private static void refresh() {
         int v = Prefs.version();
@@ -47,6 +46,7 @@ public final class ViewTweaks {
             if (Registry.isOn("hide_stories")) {
                 ids.add("stories_block_title"); ids.add("story_block"); ids.add("stories_fake_block"); ids.add("news_interesting_stories_block");
             }
+            if (Registry.isOn("hide_ad_labels")) { ids.add("ad_label"); ids.add("ads_title"); ids.add("ad_disclaimer"); }
             hideIds = ids;
             noHaptics = Registry.isOn("no_haptics");
             selectText = Registry.isOn("select_text");

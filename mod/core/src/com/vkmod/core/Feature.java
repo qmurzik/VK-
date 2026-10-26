@@ -27,11 +27,12 @@ public final class Feature {
     public final String[] optionLabels;
     public final int min, max, defInt;  // INT
     public final String defString;      // CHOICE/TEXT default
+    public final boolean aux;           // helper row that belongs to another feature (not counted separately)
 
     private Feature(Builder b) {
         id = b.id; number = b.number; title = b.title; description = b.desc; category = b.cat;
         status = b.status; partialNote = b.note; kind = b.kind; defaultOn = b.defOn;
-        options = b.options; optionLabels = b.labels; min = b.min; max = b.max; defInt = b.defInt; defString = b.defStr;
+        options = b.options; optionLabels = b.labels; min = b.min; max = b.max; defInt = b.defInt; defString = b.defStr; aux = b.aux;
     }
 
     public String enabledKey() { return "f." + id; }
@@ -45,11 +46,13 @@ public final class Feature {
         private Status status = Status.OK; private Kind kind = Kind.TOGGLE; private boolean defOn;
         private String[] options = new String[0], labels = new String[0];
         private int min, max = 100, defInt;
+        private boolean aux;
 
         private Builder(String id, int number, String title, Category cat) { this.id = id; this.number = number; this.title = title; this.cat = cat; }
 
         public Builder desc(String d) { desc = d; return this; }
         public Builder on() { defOn = true; return this; }
+        public Builder aux() { aux = true; return this; }
         public Builder partial(String why) { status = Status.PARTIAL; note = why; return this; }
         public Builder choice(String def, String... idLabelPairs) {
             kind = Kind.CHOICE; defStr = def;

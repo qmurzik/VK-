@@ -22,7 +22,7 @@ run_tests() {
   local cp="$OUT/classes:$LIBS/junit-4.13.2.jar:$LIBS/hamcrest-core-1.3.jar:$LIBS/json-20240303.jar"
   # org.json comes from the JVM jar for tests (android.jar stubs would throw); android.jar only for linking
   javac -nowarn -source 8 -target 8 -cp "$cp:$AJ" -d "$OUT/test" $(find "$HERE/core/test" -name "*.java") 2>&1 | grep -v '^Note\|warning: \[options\]\|^Picked' || true
-  java -cp "$OUT/test:$cp:$AJ" org.junit.runner.JUnitCore com.vkmod.NetLogicTest com.vkmod.ThemeLogicTest com.vkmod.MediaExtractTest com.vkmod.NetHookTest
+  java -cp "$OUT/test:$cp:$AJ" org.junit.runner.JUnitCore com.vkmod.NetLogicTest com.vkmod.ThemeLogicTest com.vkmod.MediaExtractTest com.vkmod.NetHookTest com.vkmod.ThemeEngineTest
 }
 
 make_dex() {
@@ -32,7 +32,13 @@ make_dex() {
   echo "core.dex: $(stat -c %s "$OUT/core.dex") bytes"
 }
 
+make_status() {
+  local cp="$OUT/test:$OUT/classes:$LIBS/json-20240303.jar:$AJ"
+  java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -cp "$cp" com.vkmod.StatusDump "${2:-$WORK/patch_report.json}"
+}
+
 case "${1:-all}" in
+  status) compile; run_tests >/dev/null; make_status "$@" ;;
   test) compile; run_tests ;;
   dex) compile; make_dex ;;
   all) compile; run_tests; make_dex ;;

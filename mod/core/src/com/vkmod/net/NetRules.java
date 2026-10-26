@@ -11,11 +11,14 @@ public final class NetRules {
     public boolean adHosts, trackerHosts, analyticsMethods, noRead, noTyping, offline, storiesIncognito;
     public final Set<String> customMethods = new HashSet<>();
     public final List<String> customHosts = new ArrayList<>();
+    /** Fire-and-forget methods that get a fake success reply. */
     public final List<String> methodPrefixes = new ArrayList<>();
+    /** Fetch-style methods: the request is dropped (a fake body could not satisfy the caller's parser). */
+    public final List<String> dropPrefixes = new ArrayList<>();
 
     public boolean isEmpty() {
         return !adHosts && !trackerHosts && !analyticsMethods && !noRead && !noTyping && !offline
-                && !storiesIncognito && customMethods.isEmpty() && customHosts.isEmpty() && methodPrefixes.isEmpty();
+                && !storiesIncognito && customMethods.isEmpty() && customHosts.isEmpty() && methodPrefixes.isEmpty() && dropPrefixes.isEmpty();
     }
 
     public static final String[] AD_HOSTS = {
@@ -73,6 +76,7 @@ public final class NetRules {
         if (storiesIncognito && STORY_SEEN.contains(method)) return "story-seen";
         if (customMethods.contains(method)) return "custom-method";
         for (String p : methodPrefixes) if (method.startsWith(p)) return "catalog-method";
+        for (String p : dropPrefixes) if (method.startsWith(p)) return "dropped-method";
         return null;
     }
 

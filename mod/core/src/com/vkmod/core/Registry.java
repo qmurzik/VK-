@@ -54,7 +54,11 @@ public final class Registry {
 
     public static int countOn() {
         int n = 0;
-        for (Feature f : all()) if (f.kind != Feature.Kind.ACTION && isOn(f.id)) n++;
+        for (Feature f : all()) {
+            if (f.kind == Feature.Kind.ACTION) continue;
+            if (f.kind == Feature.Kind.CHOICE) { if (!str(f.id).equals(f.defString)) n++; continue; }
+            if (isOn(f.id)) n++;
+        }
         return n;
     }
 }

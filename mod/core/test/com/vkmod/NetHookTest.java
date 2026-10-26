@@ -131,4 +131,104 @@ public class NetHookTest {
         u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", FEED, "application/json", pr));
         assertEquals(3, new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").length());
     }
+
+    @Test public void realAdTypesOfVk8200AreRemoved() throws IOException {
+        String body = "{\"response\":{\"items\":[{\"type\":\"ads_post\"},{\"type\":\"ads_app_slider\"},{\"type\":\"promo_button\"},"
+                + "{\"type\":\"videos_promo\"},{\"type\":\"clips_ozon\"},{\"type\":\"ads_disabled\"},{\"type\":\"post\",\"text\":\"ok\"}]}}";
+        boolean[] pr = {false};
+        u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", body, "application/json", pr));
+        org.json.JSONArray it = new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items");
+        assertEquals(2, it.length());          // ads_disabled is a settings marker, not an ad
+        assertEquals("ads_disabled", it.getJSONObject(0).getString("type"));
+    }
+
+    @Test public void optionalFeedBlocksAreOffByDefaultAndWorkWhenOn() throws IOException {
+        String body = "{\"response\":{\"items\":[{\"type\":\"clips_block\"},{\"type\":\"games_carousel\"},{\"type\":\"dzen_block\"},{\"type\":\"digest\"},{\"type\":\"post\",\"text\":\"ok\"}]}}";
+        boolean[] pr = {false};
+        u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", body, "application/json", pr));
+        assertEquals(5, new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").length());
+        for (String f : new String[]{"feed_clips", "feed_games", "feed_dzen", "feed_misc"}) Registry.setOn(f, true);
+        u r2 = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", body, "application/json", new boolean[]{false}));
+        assertEquals(1, new JSONObject(r2.g.string()).getJSONObject("response").getJSONArray("items").length());
+    }
+
+    @Test public void hideStoriesRemovesFeedBlockToo() throws IOException {
+        Registry.setOn("hide_stories", true);
+        String body = "{\"response\":{\"items\":[{\"type\":\"stories\"},{\"type\":\"post\",\"text\":\"ok\"}]}}";
+        u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", body, "application/json", new boolean[]{false}));
+        assertEquals(1, new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").length());
+    }
+
+    @Test public void customBlocksSplitMethodsAndHosts() throws IOException {
+        Registry.setOn("custom_blocks", true);
+        com.vkmod.core.Prefs.putString("v.custom_blocks", "stats.fooBar, ads.example.com");
+        boolean[] pr = {false};
+        u r = interceptor.intercept(chain("https://api.vk.ru/method/stats.fooBar?x=1", "{}", "application/json", pr));
+        assertFalse(pr[0]);
+        assertEquals("{\"response\":1}", r.g.string());
+        try { interceptor.intercept(chain("https://ads.example.com/x", "{}", "application/json", new boolean[]{false})); fail(); }
+        catch (IOException expected) { }
+    }
+
+    @Test public void videoAdDescriptorsRemovedWhenEnabled() throws IOException {
+        String body = "{\"response\":{\"items\":[{\"id\":1,\"ads_info\":{\"preroll\":1},\"title\":\"t\"}]}}";
+        u r = interceptor.intercept(chain("https://api.vk.ru/method/video.get", body, "application/json", new boolean[]{false}));
+        JSONObject item = new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").getJSONObject(0);
+        assertFalse(item.has("ads_info"));
+        assertEquals("t", item.getString("title"));
+    }
+
+    private static final String MIXED = "{\"response\":{\"items\":[{\"type\":\"post\",\"source_id\":-5,\"text\":\"group\"},"
+            + "{\"type\":\"post\",\"source_id\":7,\"text\":\"person\"},"
+            + "{\"type\":\"post\",\"source_id\":8,\"text\":\"poll\",\"attachments\":[{\"type\":\"poll\"}]},"
+            + "{\"type\":\"friend\"},{\"type\":\"photo_tag\"},{\"type\":\"my_type\"}]}}";
+
+    private String texts(u r) throws IOException {
+        org.json.JSONArray it = new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < it.length(); i++) sb.append(it.getJSONObject(i).optString("text", it.getJSONObject(i).optString("type"))).append('|');
+        return sb.toString();
+    }
+
+    private u feed(String method) throws IOException {
+        return interceptor.intercept(chain("https://api.vk.ru/method/" + method, MIXED, "application/json", new boolean[]{false}));
+    }
+
+    @Test public void sourceFiltersSplitPeopleAndCommunities() throws IOException {
+        assertEquals("group|person|poll|friend|photo_tag|my_type|", texts(feed("newsfeed.get")));
+        Registry.setOn("feed_only_friends", true);
+        assertEquals("person|poll|friend|photo_tag|my_type|", texts(feed("newsfeed.get")));
+        assertEquals("group|person|poll|friend|photo_tag|my_type|", texts(feed("wall.get")).replace("friend|photo_tag|my_type|", "friend|photo_tag|my_type|"));
+        Registry.setOn("feed_only_friends", false);
+        Registry.setOn("feed_only_groups", true);
+        assertEquals("group|friend|photo_tag|my_type|", texts(feed("newsfeed.get")));
+    }
+
+    @Test public void pollsFriendEventsPhotoTagsAndCustomTypes() throws IOException {
+        Registry.setOn("feed_poll_posts", true);
+        Registry.setOn("feed_friend_events", true);
+        Registry.setOn("feed_photo_tags", true);
+        Registry.setOn("custom_feed_types", true);
+        com.vkmod.core.Prefs.putString("v.custom_feed_types", "my_type");
+        assertEquals("group|person|", texts(feed("newsfeed.get")));
+    }
+
+    @Test public void listenBroadcastAndVoiceListenedAreSwallowed() throws IOException {
+        Registry.setOn("no_listen_broadcast", true);
+        Registry.setOn("no_voice_listened", true);
+        for (String m : new String[]{"audio.setBroadcast", "messages.markAsListened"}) {
+            boolean[] pr = {false};
+            u r = interceptor.intercept(chain("https://api.vk.ru/method/" + m + "?x=1", "{}", "application/json", pr));
+            assertFalse(m, pr[0]);
+            assertEquals("{\"response\":1}", r.g.string());
+        }
+    }
+
+    @Test public void fetchStyleMethodsAreDroppedNotFaked() {
+        Registry.setOn("no_easter_eggs", true);
+        try { interceptor.intercept(chain("https://api.vk.ru/method/specials.getEasterEggs", "{}", "application/json", new boolean[]{false})); fail(); }
+        catch (IOException expected) { }
+        try { interceptor.intercept(chain("https://api.vk.ru/method/splashscreens.get", "{}", "application/json", new boolean[]{false})); fail(); }
+        catch (IOException expected) { }
+    }
 }

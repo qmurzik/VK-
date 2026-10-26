@@ -60,7 +60,7 @@ public final class ApiFilter {
         String m = method.toLowerCase(Locale.ROOT);
         if (r.disableStories && m.startsWith("stories.")) return true;
         if (isFeedMethod(m) && (!r.feedTypes.isEmpty() || !r.feedTypePrefixes.isEmpty() || r.reposts
-                || !r.keywords.isEmpty() || r.recommendedPosts)) return true;
+                || !r.keywords.isEmpty() || r.recommendedPosts || r.hideCommunityPosts || r.hideUserPosts || r.hidePollPosts)) return true;
         if (r.adTypes && (body.contains("\"ads_") || body.contains("\"ads\"") || body.contains("\"ad_data\""))) return true;
         if (r.markedAds && (body.contains("\"marked_as_ads\"") || body.contains("\"ad_data\""))) return true;
         if (r.storyAds && (m.startsWith("stories.") || m.startsWith("execute")) && body.contains("\"ads")) return true;
@@ -161,12 +161,28 @@ public final class ApiFilter {
             if (h != null && h.length() > 0) return true;
         }
         if (!rules.keywords.isEmpty() && isPost && containsKeyword(item, rules.keywords)) return true;
+        if (isPost && c.method.startsWith("newsfeed.") && item.has("source_id")) {
+            long src = item.optLong("source_id", 0);
+            if (rules.hideCommunityPosts && src < 0) return true;
+            if (rules.hideUserPosts && src > 0) return true;
+        }
+        if (rules.hidePollPosts && isPost && hasAttachment(item, "poll")) return true;
         return false;
     }
 
     /** Test hook. */
     public static boolean dropFor(String method, JSONObject item, FilterRules rules) {
         return shouldDrop(item, new Ctx(method.toLowerCase(Locale.ROOT), rules));
+    }
+
+    private static boolean hasAttachment(JSONObject post, String type) {
+        JSONArray a = post.optJSONArray("attachments");
+        if (a == null) return false;
+        for (int i = 0; i < a.length(); i++) {
+            JSONObject o = a.optJSONObject(i);
+            if (o != null && type.equals(o.optString("type"))) return true;
+        }
+        return false;
     }
 
     private static boolean containsKeyword(JSONObject post, List<String> keywords) {

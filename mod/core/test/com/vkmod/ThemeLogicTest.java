@@ -54,4 +54,16 @@ public class ThemeLogicTest {
         assertEquals(0x80112233, Palette.parse("80112233"));
         assertEquals("#FF112233", Palette.hex(0xFF112233));
     }
+
+    @Test public void exactDateFormatting() {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.set(2025, java.util.Calendar.MARCH, 5, 21, 40, 0);
+        long t = c.getTimeInMillis();
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        now.set(2025, java.util.Calendar.JUNE, 1, 10, 0, 0);
+        String s = com.vkmod.feat.ExactDate.format(t, java.util.Locale.ENGLISH, true, now.getTimeInMillis());
+        assertEquals("5 Mar, 21:40", s);
+        now.set(2026, java.util.Calendar.JUNE, 1, 10, 0, 0);
+        assertEquals("5 Mar 2025", com.vkmod.feat.ExactDate.format(t, java.util.Locale.ENGLISH, false, now.getTimeInMillis()));
+    }
 }

@@ -73,8 +73,24 @@ public final class Lifecycle implements Application.ActivityLifecycleCallbacks {
 
     // ---- features ----
 
+    private static boolean animWarned;
+
+    /** Animation speed: ValueAnimator's duration scale (hidden API, so strictly best-effort) and window animations. */
+    private static void applyAnimations(Activity a) {
+        if (!Registry.isOn("anim_speed")) return;
+        int pct = Registry.num("anim_speed");
+        try {
+            java.lang.reflect.Method m = android.animation.ValueAnimator.class.getMethod("setDurationScale", float.class);
+            m.invoke(null, pct / 100f);
+        } catch (Throwable t) {
+            if (!animWarned) { animWarned = true; ModLog.w("ValueAnimator.setDurationScale unavailable on this Android version", t); }
+        }
+        if (pct == 0) a.getWindow().setWindowAnimations(0);
+    }
+
     private static void applyWindow(Activity a) {
         if (a instanceof LockActivity) return;
+        Guard.run("anim_speed", () -> applyAnimations(a));
         Guard.run("allow_screenshots", () -> {
             if (Registry.isOn("allow_screenshots")) a.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
         });

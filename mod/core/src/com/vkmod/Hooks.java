@@ -48,6 +48,17 @@ public final class Hooks {
         }
     }
 
+    /** VK's shared relative-time formatter (TimeUtils): replaces "yesterday" / "2 hours ago" by an exact date. */
+    public static String exactDate(int ts, android.content.res.Resources res, boolean withTime, String orig) {
+        try {
+            if (!Registry.isOn("exact_dates")) return orig;
+            return com.vkmod.feat.ExactDate.format(ts, res, withTime);
+        } catch (Throwable t) {
+            Guard.fail("exact_dates", t);
+            return orig;
+        }
+    }
+
     /** VKLayoutInflater.inflate(int, ViewGroup, boolean) result. */
     public static View inflated(View v, int layoutRes, ViewGroup root, boolean attached) {
         try {

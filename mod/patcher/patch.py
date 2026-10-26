@@ -218,8 +218,40 @@ def patch_inflater(t):
     return ", ".join(done)
 
 
+def res_id(t, rtype, name):
+    pub = os.path.join(t.root, "res", "values", "public.xml")
+    m = re.search(r'<public type="%s" name="%s" id="(0x[0-9a-f]+)"' % (rtype, re.escape(name)), read(pub))
+    return m.group(1) if m else None
+
+
+def patch_exact_date(t):
+    """TimeUtils.h(int ts, Resources, boolean withTime): the shared relative-date formatter."""
+    rid = res_id(t, "string", "vk_date_ago_now")
+    if not rid:
+        raise NotFound("resource string/vk_date_ago_now not found in public.xml")
+    files = t.grep_files(rid)
+    done = []
+    for path in files:
+        src = read(path)
+        for m in methods(src):
+            if (m.group("args") == "ILandroid/content/res/Resources;Z" and m.group("ret") == "Ljava/lang/String;"
+                    and "static" in m.group("mods") and rid in m.group("body") and not m.group("name").endswith("$vkmod")):
+                def body(cls, orig, mods, args, ret):
+                    return ("    .locals 1\n"
+                            "    invoke-static {p0, p1, p2}, %s->%s(ILandroid/content/res/Resources;Z)Ljava/lang/String;\n    move-result-object v0\n"
+                            "    invoke-static {p0, p1, p2, v0}, %s->exactDate(ILandroid/content/res/Resources;ZLjava/lang/String;)Ljava/lang/String;\n"
+                            "    move-result-object v0\n    return-object v0\n" % (cls, orig, HOOKS))
+                src = wrap_method(src, m, body)
+                write(path, src)
+                done.append("%s.%s" % (class_name(src), m.group("name")))
+                break
+    if not done:
+        raise NotFound("no static (ILandroid/content/res/Resources;Z)Ljava/lang/String; formatter using vk_date_ago_now")
+    return ", ".join(done)
+
+
 MOD_ACTIVITIES = """
-        <activity android:exported="true" android:icon="@mipmap/mp_launcher" android:label="VK Mod" android:name="com.vkmod.ui.SettingsActivity" android:taskAffinity="com.vkmod.settings" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize">
+        <activity android:exported="true" android:icon="@mipmap/mp_launcher_constellation" android:label="VK Mod" android:name="com.vkmod.ui.SettingsActivity" android:taskAffinity="com.vkmod.settings" android:theme="@android:style/Theme.Material.NoActionBar" android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -276,6 +308,7 @@ PATCHES = [
                                       "hide_stories", "hide_reposts", "keywords", "custom_blocks", "no_read", "no_typing", "offline",
                                       "block_trackers", "dl_photo", "dl_video", "dl_clips", "dl_stories", "dl_voice"], patch_okhttp),
     ("inflater", "Пост-обработка XML-вёрстки", ["hide_view_ids", "no_haptics", "app_font", "select_text", "avatar_shape"], patch_inflater),
+    ("exact_date", "Форматтер относительных дат", ["exact_dates"], patch_exact_date),
     ("manifest", "Манифест: экраны мода", ["*"], patch_manifest),
 ]
 

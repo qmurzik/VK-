@@ -240,7 +240,7 @@ public class SettingsActivity extends Activity {
 
     private void runAction(Feature f) {
         switch (f.id) {
-            case "theme_editor": startActivity(new Intent(this, ThemeEditorActivity.class)); break;
+            case "theme_editor": case "chat_bg": case "bubble_style": startActivity(new Intent(this, ThemeEditorActivity.class)); break;
             case "theme_io": themeIo(); break;
             case "app_font_file": pick(REQ_FONT, "*/*"); break;
             case "app_icon": iconDialog(); break;

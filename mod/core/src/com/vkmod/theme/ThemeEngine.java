@@ -2,9 +2,7 @@ package com.vkmod.theme;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Color;
 import android.os.Build;
-import android.util.SparseArray;
 import android.util.TypedValue;
 
 import com.vkmod.core.ModLog;
@@ -35,7 +33,7 @@ public final class ThemeEngine {
             alpha = slot != null && ColorSlot.isAlphaVariant(name);
         }
     }
-    private static final SparseArray<Entry> ENTRIES = new SparseArray<>();
+    private static final java.util.HashMap<Integer, Entry> ENTRIES = new java.util.HashMap<>();
     private static final Map<Object, Boolean> DARK_BY_THEME = Collections.synchronizedMap(new WeakHashMap<>());
     private static final ThreadLocal<Boolean> REENTRY = new ThreadLocal<>();
 
@@ -54,9 +52,20 @@ public final class ThemeEngine {
         sync(ctx);
         if (!active) return orig;
         Entry e = entryOf(attrId, ctx);
+        if (e.slot == null) return orig;
+        return applyEntry(e, orig, isDark(ctx));
+    }
+
+    /** Same as [resolve] for a known attribute name and brightness (no Android context needed). */
+    public static int applyColor(String attrName, int orig, boolean dark) {
+        sync(null);
+        if (!active) return orig;
+        Entry e = new Entry(attrName);
+        return e.slot == null ? orig : applyEntry(e, orig, dark);
+    }
+
+    private static int applyEntry(Entry e, int orig, boolean isDark) {
         ColorSlot slot = e.slot;
-        if (slot == null) return orig;
-        boolean isDark = isDark(ctx);
         Palette p = isDark ? dark : light;
         Integer c = p.get(slot);
         int out = orig;
@@ -170,16 +179,16 @@ public final class ThemeEngine {
     }
 
     static double luminance(int color) {
-        return 0.2126 * Color.red(color) / 255.0 + 0.7152 * Color.green(color) / 255.0 + 0.0722 * Color.blue(color) / 255.0;
+        return 0.2126 * ((color >> 16) & 0xFF) / 255.0 + 0.7152 * ((color >> 8) & 0xFF) / 255.0 + 0.0722 * (color & 0xFF) / 255.0;
     }
 
     /** Pressed/hover variants are nudged so they stay visible against the base colour. */
     static int tintVariant(int color, boolean dark) {
         double f = dark ? 1.18 : 0.90;
         int a = color >>> 24;
-        int r = (int) Math.min(255, Math.max(0, Math.round(Color.red(color) * f)));
-        int g = (int) Math.min(255, Math.max(0, Math.round(Color.green(color) * f)));
-        int b = (int) Math.min(255, Math.max(0, Math.round(Color.blue(color) * f)));
+        int r = (int) Math.min(255, Math.max(0, Math.round(((color >> 16) & 0xFF) * f)));
+        int g = (int) Math.min(255, Math.max(0, Math.round(((color >> 8) & 0xFF) * f)));
+        int b = (int) Math.min(255, Math.max(0, Math.round((color & 0xFF) * f)));
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
