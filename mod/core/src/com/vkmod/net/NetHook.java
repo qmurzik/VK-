@@ -266,7 +266,10 @@ public final class NetHook {
             Object ct = ctM.invoke(body);
             String cts = ct == null ? "" : ct.toString().toLowerCase(Locale.ROOT);
             if (cts.contains("msgpack")) return rewriteMsgpack(method, fr, media, response, body, ct);
-            if (!cts.isEmpty() && !cts.contains("json") && !cts.contains("javascript") && !cts.contains("text/")) return null;
+            // Content-Type is required and must look like text: an absent/unknown type (binary, streamed, a file
+            // download served through the same /method/ path) must NEVER be buffered into a String and rebuilt,
+            // or non-UTF-8 bytes get silently corrupted by the String round-trip.
+            if (cts.isEmpty() || (!cts.contains("json") && !cts.contains("javascript") && !cts.contains("text/"))) return null;
             String original = (String) stringM.invoke(body);
             if (original == null) return null;
             String filtered = null;

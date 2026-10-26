@@ -12,7 +12,7 @@ import com.vkmod.feat.ProxyConfig;
 public final class Mod {
     private Mod() {}
 
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "1.0.1";
     private static volatile Application app;
     private static volatile boolean attached;
 

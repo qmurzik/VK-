@@ -56,6 +56,7 @@ public class NetHookTest {
             + "{\"type\":\"post\",\"text\":\"repost\",\"copy_history\":[{}]}]}}";
 
     @Test public void filtersJsonFeed() throws IOException {
+        Registry.setOn("ads_feed", true);
         boolean[] pr = {false};
         u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed?v=5", FEED, "application/json; charset=utf-8", pr));
         assertTrue(pr[0]);
@@ -65,6 +66,7 @@ public class NetHookTest {
     }
 
     @Test public void filtersMsgpackFeedAndKeepsContentType() throws IOException {
+        Registry.setOn("ads_feed", true);
         byte[] packed = Msgpack.fromJson(FEED);
         // body is passed as latin1 string through the fake; build the msgpack body directly instead
         boolean[] pr = {false};
@@ -91,6 +93,7 @@ public class NetHookTest {
     }
 
     @Test public void swallowsOnlineAndAnalytics() throws IOException {
+        Registry.setOn("block_trackers", true);
         for (String m : new String[]{"account.setOnline", "stats.trackEvents"}) {
             boolean[] pr = {false};
             u r = interceptor.intercept(chain("https://api.vk.ru/method/" + m, "{}", "application/json", pr));
@@ -100,6 +103,7 @@ public class NetHookTest {
     }
 
     @Test public void dropsTrackerHostWithIoException() {
+        Registry.setOn("block_trackers", true);
         boolean[] pr = {false};
         try {
             interceptor.intercept(chain("https://tracker-api.my.com/x", "{}", "application/json", pr));
@@ -120,19 +124,51 @@ public class NetHookTest {
         assertEquals("BINARY", r2.g.string());
     }
 
-    @Test public void disabledFeaturesStopFiltering() throws IOException {
-        Registry.setOn("ads_feed", false);
-        Registry.setOn("hide_reposts", false);
-        Registry.setOn("promo_communities", false);
-        Registry.setOn("ads_stories", false);
-        Registry.setOn("ads_clips", false);
-        Registry.setOn("banners", false);
+    @Test public void adAndPrivacyTogglesAreOffByDefault() throws IOException {
+        // Fresh registry, nothing touched yet in this test: filtering must be a no-op.
+        for (String id : new String[]{"ads_feed", "promo_communities", "ads_stories", "ads_clips", "banners", "block_trackers"}) {
+            assertFalse(id, Registry.isOn(id));
+        }
+        Registry.setOn("hide_reposts", false); // setUp() enables it for the other, older tests in this class
         boolean[] pr = {false};
         u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", FEED, "application/json", pr));
-        assertEquals(3, new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").length());
+        assertEquals("no feature is on by default; nothing should be removed", 3,
+                new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").length());
+    }
+
+    @Test public void enablingThenDisablingFeedFiltersTakesEffectImmediately() throws IOException {
+        Registry.setOn("ads_feed", true);
+        Registry.setOn("hide_reposts", true);
+        u r = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", FEED, "application/json", new boolean[]{false}));
+        assertEquals(1, new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").length());
+        Registry.setOn("ads_feed", false);
+        Registry.setOn("hide_reposts", false);
+        u r2 = interceptor.intercept(chain("https://api.vk.ru/method/newsfeed.getFeed", FEED, "application/json", new boolean[]{false}));
+        assertEquals(3, new JSONObject(r2.g.string()).getJSONObject("response").getJSONArray("items").length());
+    }
+
+    /** Regression test for the bug that broke app startup: a response with no/non-text Content-Type must pass
+     * through completely untouched, even while filtering is active — reading it as a String and rebuilding the
+     * body would silently corrupt non-UTF-8 bytes (binary payloads served through a /method/ URL). */
+    @Test public void responsesWithoutTextContentTypeAreNeverRebuilt() throws IOException {
+        Registry.setOn("ads_feed", true);
+        final byte[] raw = {0x00, (byte) 0xFF, 0x10, (byte) 0x80, 0x01, 0x02};
+        for (final String ct : new String[]{"", "application/octet-stream", "image/jpeg"}) {
+            Interceptor.a c = new Interceptor.a() {
+                final p req = new p("https://api.vk.ru/method/docs.getUploadServer", "GET");
+                public u a(p pVar) { return new u(pVar, okhttp3.Protocol.HTTP_1_1, "OK", 200, v.create(raw, new m(ct))); }
+                public p request() { return req; }
+                public okhttp3.d call() { return null; }
+                public int d() { return 0; }
+                public Interceptor.a c(int i) { return this; }
+            };
+            u r = interceptor.intercept(c);
+            assertArrayEquals("content-type [" + ct + "] must not be touched", raw, r.g.bytes());
+        }
     }
 
     @Test public void realAdTypesOfVk8200AreRemoved() throws IOException {
+        Registry.setOn("ads_feed", true);
         String body = "{\"response\":{\"items\":[{\"type\":\"ads_post\"},{\"type\":\"ads_app_slider\"},{\"type\":\"promo_button\"},"
                 + "{\"type\":\"videos_promo\"},{\"type\":\"clips_ozon\"},{\"type\":\"ads_disabled\"},{\"type\":\"post\",\"text\":\"ok\"}]}}";
         boolean[] pr = {false};
@@ -171,6 +207,7 @@ public class NetHookTest {
     }
 
     @Test public void videoAdDescriptorsRemovedWhenEnabled() throws IOException {
+        Registry.setOn("ads_clips", true);
         String body = "{\"response\":{\"items\":[{\"id\":1,\"ads_info\":{\"preroll\":1},\"title\":\"t\"}]}}";
         u r = interceptor.intercept(chain("https://api.vk.ru/method/video.get", body, "application/json", new boolean[]{false}));
         JSONObject item = new JSONObject(r.g.string()).getJSONObject("response").getJSONArray("items").getJSONObject(0);
@@ -226,6 +263,7 @@ public class NetHookTest {
 
     @Test public void fetchStyleMethodsAreDroppedNotFaked() {
         Registry.setOn("no_easter_eggs", true);
+        Registry.setOn("banners", true);
         try { interceptor.intercept(chain("https://api.vk.ru/method/specials.getEasterEggs", "{}", "application/json", new boolean[]{false})); fail(); }
         catch (IOException expected) { }
         try { interceptor.intercept(chain("https://api.vk.ru/method/splashscreens.get", "{}", "application/json", new boolean[]{false})); fail(); }
