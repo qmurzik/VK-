@@ -1,0 +1,7 @@
+<!-- QVK 3.0 components, inserted before </application> by qvk/build.py. -->
+<activity android:name="re.sova.qmods.Qvk3MusicActivity" android:exported="false" android:label="QVK Music"
+    android:launchMode="singleTask" android:taskAffinity="ru.qmods.qvk.music"
+    android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<service android:name="re.sova.qmods.Qvk3MusicService" android:exported="false"
+    android:foregroundServiceType="mediaPlayback" />

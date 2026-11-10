@@ -1,0 +1,8 @@
+# Android-free classes compiled into the JVM unit tests (paths relative to src/main/java).
+re/sova/qmods/Qvk3Track.java
+re/sova/qmods/Qvk3Queue.java
+re/sova/qmods/Qvk3Lyrics.java
+re/sova/qmods/Qvk3Id3.java
+re/sova/qmods/Qvk3DesignTokens.java
+re/sova/qmods/Qvk3SettingsIndex.java
+re/sova/qmods/Qvk3UpdateManifest.java

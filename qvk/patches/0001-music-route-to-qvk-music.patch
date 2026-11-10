@@ -1,0 +1,19 @@
+--- a/smali_classes21/re/sova/qmods/NativeRoutes.smali	2026-11-10 16:25:52.047123519 +0000
++++ b/smali_classes21/re/sova/qmods/NativeRoutes.smali	2026-11-10 16:25:52.062246257 +0000
+@@ -250,6 +250,16 @@
+         }
+     .end annotation
+ 
++    # QVK 3.0: QVK Music replaces the VK music section (falls back to the classic route when disabled).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3MusicEntry;->open(Landroid/app/Activity;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_classic_music
++
++    return-void
++
++    :qvk3_classic_music
+     .line 16
+     sget-object v0, Lre/sova/qmods/MusicLanding;->online:Ljava/util/function/BooleanSupplier;
+ 

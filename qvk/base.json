@@ -1,0 +1,13 @@
+{
+  "comment": "Базовая сборка, поверх которой накладывается QVK 3.0. Сам APK в репозиторий не кладётся: он скачивается и проверяется по SHA-256.",
+  "name": "QVK 2.6.18 (VK 8.100)",
+  "urls": [
+    "https://qmods.ru/qvk-community.php?action=release-apk&id=06d7242978b4764108d5c26d22c9714c"
+  ],
+  "sha256": "70baec02dd89176f913939acd94addf6178436af36899cea42513472385959f9",
+  "package": "ru.qmods.qvk",
+  "versionCode": 23776,
+  "versionName": "8.100-qvk-2.6.18",
+  "vkBase": "8.100",
+  "signerSha256": "a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc"
+}

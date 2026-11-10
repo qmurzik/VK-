@@ -1,0 +1,19 @@
+--- a/smali_classes21/re/sova/qmods/SongLyrics.smali	2026-11-10 16:26:21.694821748 +0000
++++ b/smali_classes21/re/sova/qmods/SongLyrics.smali	2026-11-10 16:26:21.709009982 +0000
+@@ -1913,6 +1913,16 @@
+     .line 213
+     invoke-static {p1}, Lre/sova/qmods/SongLyrics;->check(Lre/sova/qmods/RuntimeSession$Scope;)V
+ 
++    # QVK 3.0: VK text first (by audio_id), before the local cache and LRCLIB.
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3ClassicLyrics;->vk(Lre/sova/qmods/SongLyrics$Track;Lre/sova/qmods/RuntimeSession$Scope;)Lre/sova/qmods/SongLyrics$Result;
++
++    move-result-object v0
++
++    if-eqz v0, :qvk3_lyrics_fallback
++
++    return-object v0
++
++    :qvk3_lyrics_fallback
+     .line 214
+     iget-wide v0, p1, Lre/sova/qmods/RuntimeSession$Scope;->account:J
+ 
