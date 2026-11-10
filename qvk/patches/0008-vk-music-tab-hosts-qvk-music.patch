@@ -1,0 +1,55 @@
+--- a/smali_classes12/com/vk/music/fragment/impl/MusicContainerFragment.smali	2026-11-10 20:48:11.260744542 +0000
++++ b/smali_classes12/com/vk/music/fragment/impl/MusicContainerFragment.smali	2026-11-10 20:48:11.288283089 +0000
+@@ -151,6 +151,16 @@
+ .method public final LH()V
+     .locals 5
+ 
++    # QVK 3.0: the tab shows QVK Music; do not load VK's catalog into it.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3MusicEntry;->embedded(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_vk_catalog
++
++    return-void
++
++    :qvk3_vk_catalog
+     .line 1
+     new-instance v0, Lcom/vk/music/fragment/impl/c;
+ 
+@@ -468,6 +478,18 @@
+ .method public onBackPressed()Z
+     .locals 1
+ 
++    # QVK 3.0: back inside the embedded QVK Music screen.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3MusicEntry;->tabBack(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_vk_back
++
++    const/4 v0, 0x1
++
++    return v0
++
++    :qvk3_vk_back
+     .line 1
+     invoke-virtual {p0}, Lcom/vk/music/fragment/impl/MusicContainerFragment;->IH()Lcom/vk/core/fragments/FragmentImpl;
+ 
+@@ -507,6 +529,16 @@
+ .method public onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;
+     .locals 0
+ 
++    # QVK 3.0: VK's music tab hosts QVK Music inline (falls back to VK's container when disabled).
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3MusicEntry;->tabView(Ljava/lang/Object;Landroid/view/LayoutInflater;)Landroid/view/View;
++
++    move-result-object p2
++
++    if-eqz p2, :qvk3_vk_view
++
++    return-object p2
++
++    :qvk3_vk_view
+     .line 1
+     new-instance p2, Lcom/vk/core/view/a;
+ 

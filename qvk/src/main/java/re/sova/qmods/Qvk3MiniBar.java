@@ -28,7 +28,6 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
     private ImageView cover, play;
     private TextView title, artist;
     private String coverFor = "";
-    private boolean listening;
 
     static synchronized void install(Application app) {
         if (instance != null) return;
@@ -42,17 +41,31 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
                 && !n.contains("Video") && !n.contains("Camera") && !n.contains("Story") && !n.contains("Call");
     }
 
+    private WeakReference<Activity> resumed = new WeakReference<>(null);
+    private boolean engineHooked;
+
+    /** Called once by the engine when it is created, so the bar appears as soon as playback starts. */
+    static void engineCreated(Qvk3MusicEngine e) {
+        Qvk3MiniBar m = instance;
+        if (m == null || m.engineHooked) return;
+        m.engineHooked = true;
+        e.addListener(m);
+    }
+
     @Override
     public void onActivityResumed(Activity a) {
         if (!vkScreen(a)) return;
+        resumed = new WeakReference<>(a);
         Qvk3MusicEngine e = Qvk3MusicEngine.peek();
-        if (e == null || e.current() == null || e.state() == Qvk3MusicEngine.IDLE) return;
-        if (Qvk3MusicSettings.prefs(a).getBoolean(HIDDEN, false) && !e.isPlaying()) return;
+        if (e == null) return;
+        engineCreated(e);
+        if (e.current() == null || e.state() == Qvk3MusicEngine.IDLE) return;
         attach(a, e);
     }
 
     @Override
     public void onActivityPaused(Activity a) {
+        if (resumed.get() == a) resumed = new WeakReference<>(null);
         if (host.get() == a) detach();
     }
 
@@ -69,15 +82,10 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         bar.setAlpha(0f);
         bar.setTranslationY(Qvk3Ui.dp(a, 24));
         bar.animate().alpha(1f).translationY(0).setDuration(220).start();
-        e.addListener(this);
-        listening = true;
         onState(e);
     }
 
     private void detach() {
-        Qvk3MusicEngine e = Qvk3MusicEngine.peek();
-        if (listening && e != null) e.removeListener(this);
-        listening = false;
         if (bar != null && bar.getParent() instanceof ViewGroup) ((ViewGroup) bar.getParent()).removeView(bar);
         bar = null;
         coverFor = "";
@@ -113,17 +121,23 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
             detach();
         }));
         l.setOnClickListener(v -> a.startActivity(new android.content.Intent(a, Qvk3MusicActivity.class)
-                .putExtra(Qvk3MusicActivity.EXTRA_PLAYER, true)
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)));
+                .putExtra(Qvk3MusicActivity.EXTRA_PLAYER_ONLY, true)
+                ));
         l.setContentDescription("QVK Music. Нажмите, чтобы открыть плеер");
         return l;
     }
 
     @Override
     public void onState(Qvk3MusicEngine e) {
-        Activity a = host.get();
-        if (bar == null || a == null) return;
         Qvk3Track t = e.current();
+        if (bar == null) {
+            // playback started while a VK screen is on top: show the bar right away
+            Activity top = resumed.get();
+            if (top != null && t != null && e.state() != Qvk3MusicEngine.IDLE && !top.isFinishing()) attach(top, e);
+            return;
+        }
+        Activity a = host.get();
+        if (a == null) return;
         if (t == null || e.state() == Qvk3MusicEngine.IDLE) {
             detach();
             return;

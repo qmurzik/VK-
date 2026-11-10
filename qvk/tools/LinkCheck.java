@@ -72,6 +72,7 @@ public final class LinkCheck {
                     checkedRefs++;
                     if (ref instanceof MethodReference) {
                         MethodReference mr = (MethodReference) ref;
+                        if (mr.getDefiningClass().startsWith("[")) continue; // array methods (clone) live in the runtime
                         if (!appType(mr.getDefiningClass())) continue;
                         if (!classes.containsKey(mr.getDefiningClass())) {
                             problems.add(where + ": missing class " + mr.getDefiningClass());

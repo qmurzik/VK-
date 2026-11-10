@@ -10,6 +10,8 @@ import android.content.SharedPreferences;
  */
 public final class Qvk3MusicSettings {
     public static final String ENABLED = "qvk3_music_enabled";
+    /** Play tracks started anywhere in VK (feed, messages, profiles) with the QVK Music engine. */
+    public static final String TAKE_OVER = "qvk3_music_take_over";
     public static final String GAPLESS = "qvk3_music_gapless";
     public static final String CROSSFADE = "qvk3_music_crossfade";
     public static final String PAUSE_ON_UNPLUG = "qvk3_music_pause_unplug";
@@ -92,7 +94,7 @@ public final class Qvk3MusicSettings {
     }
 
     public static int coverflowSpacing(Context c) {
-        return Math.max(30, Math.min(90, prefs(c).getInt(COVERFLOW_SPACING, 55)));
+        return Math.max(30, Math.min(90, prefs(c).getInt(COVERFLOW_SPACING, 62)));
     }
 
     public static String progressStyle(Context c) {

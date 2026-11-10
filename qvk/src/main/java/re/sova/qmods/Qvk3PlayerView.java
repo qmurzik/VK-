@@ -198,7 +198,18 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             Qvk3Ui.toast(a, "Текст скопирован");
             return true;
         });
-        stage.addView(lyricsList, new LayoutParams(-1, -1));
+        if (cover != null) {
+            // the lyrics panel takes exactly the cover's frame: same size, same place, same corners
+            LayoutParams cl = (LayoutParams) cover.getLayoutParams();
+            float lr = dp(Qvk3MusicSettings.coverRadiusDp(a));
+            lyricsList.setBackground(Qvk3Ui.rounded(onDark ? 0x66000000 : 0x14000000, lr));
+            Qvk3Ui.clipRound(lyricsList, lr);
+            lyricsList.setPadding(dp(8), dp(10), dp(8), dp(10));
+            lyricsList.setClipToPadding(false);
+            stage.addView(lyricsList, new LayoutParams(cl.width, cl.height, Gravity.CENTER));
+        } else {
+            stage.addView(lyricsList, new LayoutParams(-1, -1));
+        }
         col.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
 
         // title + favourite
@@ -214,9 +225,9 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         artist = Qvk3Ui.line(a, "", 16, fg2, false);
         artist.setOnClickListener(v -> {
             Qvk3Track t = engine.current();
-            if (t != null && !t.artist.isEmpty() && a instanceof Qvk3MusicActivity) {
+            if (t != null && !t.artist.isEmpty() && Qvk3MusicScreen.of(a) != null) {
                 if (onClose != null) onClose.run();
-                ((Qvk3MusicActivity) a).openArtist(t.artist);
+                Qvk3MusicScreen.of(a).openArtist(t.artist);
             }
         });
         texts.addView(title, Qvk3Ui.match());
@@ -337,9 +348,9 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                     Qvk3MusicSettingsScreen.playerLook(a, this::rebuild);
                     break;
                 case 3:
-                    if (t != null && a instanceof Qvk3MusicActivity) {
+                    if (t != null && Qvk3MusicScreen.of(a) != null) {
                         if (onClose != null) onClose.run();
-                        ((Qvk3MusicActivity) a).openArtist(t.artist);
+                        Qvk3MusicScreen.of(a).openArtist(t.artist);
                     }
                     break;
                 default:
@@ -468,9 +479,9 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         lyricsMode = on;
         lyricsList.setVisibility(on ? VISIBLE : GONE);
         boolean over = Qvk3MusicSettings.lyricsOverCover(a);
+        // "over the cover": the dimmed cover stays visible under the text; otherwise the panel replaces it
         if (cover != null) cover.setVisibility(on && !over ? INVISIBLE : VISIBLE);
-        if (cover != null && on && over) cover.setAlpha(0.25f);
-        else if (cover != null) cover.setAlpha(1f);
+        if (cover != null) cover.setAlpha(on && over ? 0.45f : 1f);
         if (flow != null) flow.setVisibility(on ? INVISIBLE : VISIBLE);
         Qvk3Track t = engine.current();
         if (on && t != null) loadLyrics(t);

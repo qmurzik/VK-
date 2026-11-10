@@ -111,7 +111,8 @@ public final class Qvk3MusicSettingsScreen {
     }
 
     static void refreshPlayer(Activity a) {
-        if (a instanceof Qvk3MusicActivity) ((Qvk3MusicActivity) a).rebuildPlayer();
+        Qvk3MusicScreen sc = Qvk3MusicScreen.of(a);
+        if (sc != null) sc.rebuildPlayer();
     }
 
     static Switch toggle(Activity a, String title, String key, boolean def, Runnable after) {
@@ -281,6 +282,7 @@ public final class Qvk3MusicSettingsScreen {
                             + "\nАккаунт: " + (Qvk3MusicLibrary.account() > 0 ? "вход выполнен" : "нет входа")
                             + "\n" + Qvk3MusicLibrary.get(a).stats()));
                     c.addView(toggle(a, "QVK Music вместо раздела «Музыка» ВК", Qvk3MusicSettings.ENABLED, true, null));
+                    c.addView(toggle(a, "Играть треки из ленты и сообщений в QVK Music", Qvk3MusicSettings.TAKE_OVER, true, null));
                     c.addView(info(a, p, "Выключите, чтобы временно вернуться к штатному музыкальному разделу ВК (классический режим)."));
                 };
         }

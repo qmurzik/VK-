@@ -204,8 +204,7 @@ public final class Qvk3SettingsActivity extends Activity {
     static Qvk3SettingsIndex buildIndex(Activity a) {
         Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
         // QVK 3.0 items first so they lead their cards
-        idx.addScreen("qvk3:styles", "Стили QVK 3.0", "Classic, Modern, Glass, AMOLED, Compact, Cozy, Neon, iOS", 0, "QVK 3.0");
-        idx.addScreen("qvk3:editor", "Конструктор оформления", "Цвета, радиусы, шрифт, плотность — с предпросмотром", 0, "QVK 3.0");
+        idx.addScreen("qvk3:styles", "Стили и конструктор", "8 стилей, цвета, форма, шрифт, плотность — с живым предпросмотром", 0, "QVK 3.0");
         idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
         idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
@@ -399,7 +398,7 @@ public final class Qvk3SettingsActivity extends Activity {
         chips.setPadding(0, dp(14), 0, 0);
         chips.addView(chip("Стили", true, this::styles), Qvk3Ui.weight(1));
         chips.addView(gap());
-        chips.addView(chip("Конструктор", false, () -> Qvk3StyleEditor.show(this)), Qvk3Ui.weight(1));
+        chips.addView(chip("Сценарии", false, this::scenarios), Qvk3Ui.weight(1));
         chips.addView(gap());
         chips.addView(chip(t.dark ? "Светлая" : "Тёмная", false, this::quickTheme), Qvk3Ui.weight(1));
         look.addView(chips);
@@ -422,7 +421,21 @@ public final class Qvk3SettingsActivity extends Activity {
         // recent changes
         List<Qvk3SettingsHistory.Entry> hist = Qvk3SettingsHistory.list(this);
         if (!hist.isEmpty()) {
-            header("Недавние изменения");
+            // header row with a compact "undo" chip instead of a full-width row
+            LinearLayout hr = new LinearLayout(this);
+            hr.setGravity(Gravity.CENTER_VERTICAL);
+            hr.setPadding(dp(16), dp(22), dp(4), dp(8));
+            TextView ht = Qvk3Ui.text(this, "НЕДАВНИЕ ИЗМЕНЕНИЯ", 12, p.text2, true);
+            ht.setLetterSpacing(0.06f);
+            ht.setAccessibilityHeading(true);
+            hr.addView(ht, Qvk3Ui.weight(1));
+            TextView undoChip = Qvk3Ui.text(this, "Отменить", 13, p.accent, true);
+            undoChip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            undoChip.setBackground(Qvk3Ui.ripple(this, p.dark ? 0xFF2A2C33 : 0xFFE4EAF5, 0x33888888, dp(14)));
+            undoChip.setContentDescription("Отменить последнее изменение");
+            undoChip.setOnClickListener(v -> undo());
+            hr.addView(undoChip);
+            content.addView(hr);
             LinearLayout c = card();
             java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT);
             for (int i = 0; i < Math.min(3, hist.size()); i++) {
@@ -431,7 +444,7 @@ public final class Qvk3SettingsActivity extends Activity {
                 TextView when = Qvk3Ui.text(this, df.format(new java.util.Date(e.time)), 12, p.text2, false);
                 row(c, null, 0, e.title, null, when, it == null ? null : () -> showSection(it.section), null);
             }
-            row(c, Qvk3Icons.UNDO, 0xFF8E8E93, "Отменить последнее изменение", null, new View(this), this::undo, null);
+
         }
 
         // categories
@@ -525,10 +538,8 @@ public final class Qvk3SettingsActivity extends Activity {
     private void qvk3(String what) throws Exception {
         switch (what) {
             case "styles":
-                styles();
-                break;
             case "editor":
-                Qvk3StyleEditor.show(this);
+                styles();
                 break;
             case "resetLook":
                 Qvk3Ui.dialog(this).setTitle("Сбросить всё оформление?")
@@ -586,10 +597,7 @@ public final class Qvk3SettingsActivity extends Activity {
     }
 
     private void styles() {
-        List<Qvk3DesignTokens> all = new ArrayList<>(Qvk3DesignTokens.PRESETS.values());
-        String[] labels = new String[all.size()];
-        for (int i = 0; i < labels.length; i++) labels[i] = all.get(i).title + " — " + all.get(i).description;
-        Qvk3Ui.dialog(this).setTitle("Стиль оформления").setItems(labels, (d, i) -> Qvk3StyleEditor.preview(this, all.get(i))).show();
+        startActivity(new Intent(this, Qvk3StylesActivity.class));
     }
 
     private void quickTheme() {

@@ -1,6 +1,6 @@
 <!-- QVK 3.0 components, inserted before </application> by qvk/build.py. -->
 <activity android:name="re.sova.qmods.Qvk3MusicActivity" android:exported="false" android:label="QVK Music"
-    android:launchMode="singleTask" android:taskAffinity="ru.qmods.qvk.music"
+    android:launchMode="singleTop"
     android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
     android:windowSoftInputMode="adjustResize" />
 <service android:name="re.sova.qmods.Qvk3MusicService" android:exported="false"
@@ -11,3 +11,5 @@
 <receiver android:name="re.sova.qmods.Qvk3UpdateReceiver" android:exported="false" />
 <provider android:name="re.sova.qmods.Qvk3Runtime" android:authorities="ru.qmods.qvk.qvk3runtime"
     android:exported="false" android:initOrder="-100" />
+<activity android:name="re.sova.qmods.Qvk3StylesActivity" android:exported="false" android:label="Оформление"
+    android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />

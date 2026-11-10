@@ -104,6 +104,7 @@ public final class Qvk3MusicEngine {
         prefs = app.getSharedPreferences("qvk3_music", Context.MODE_PRIVATE);
         speed = prefs.getFloat("speed", 1f);
         worker.post(this::restoreState);
+        Qvk3Jobs.main(() -> Qvk3MiniBar.engineCreated(this));
     }
 
     // ---------------------------------------------------------------- public API (thread-safe, async)

@@ -1,0 +1,21 @@
+--- a/smali_classes18/com/vkontakte/android/audio/AudioFacade.smali	2026-11-10 20:48:11.268218290 +0000
++++ b/smali_classes18/com/vkontakte/android/audio/AudioFacade.smali	2026-11-10 20:48:11.288804549 +0000
+@@ -504,6 +504,18 @@
+         }
+     .end annotation
+ 
++    # QVK 3.0: playback requests from anywhere in VK are played by the QVK Music engine.
++    move-object/from16 v0, p4
++
++    invoke-static {p0, p2, v0}, Lre/sova/qmods/Qvk3MusicEntry;->play(Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_vk_player
++
++    return-void
++
++    :qvk3_vk_player
+     .line 1
+     move-object v0, p0
+ 

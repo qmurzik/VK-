@@ -15,6 +15,11 @@ public class ShotsTest {
   static void idle(){ for(int i=0;i<5;i++){ org.robolectric.shadows.ShadowLooper.idleMainLooper(); try{Thread.sleep(150);}catch(Exception e){} } }
   static List<Qvk3Track> tracks(){ List<Qvk3Track> l=new ArrayList<>(); String[][] d={{"Кино","Группа крови"},{"Земфира","Хочешь?"},{"Сплин","Выхода нет"},{"Би-2","Полковнику никто не пишет"},{"Мумий Тролль","Владивосток 2000"}};
     for(int i=0;i<d.length;i++) l.add(new Qvk3Track(1,i+1,"",d[i][0],d[i][1],"Альбом "+(i+1),180+i*17,"https://x/"+i,"",i==0,0,"",0)); return l; }
+  @Test public void styles() throws Exception {
+    Activity a=Robolectric.buildActivity(Qvk3StylesActivity.class).setup().get(); idle();
+    shot(a.getWindow().getDecorView(),"styles");
+    tall(a,"styles_full");
+  }
   @Test public void settings() throws Exception {
     Activity a=Robolectric.buildActivity(Qvk3SettingsActivity.class).setup().get(); idle();
     shot(a.getWindow().getDecorView(),"settings_home");

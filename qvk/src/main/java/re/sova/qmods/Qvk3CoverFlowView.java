@@ -52,7 +52,7 @@ public final class Qvk3CoverFlowView extends View {
         void onItem(int index, boolean settled);
     }
 
-    private static final int VISIBLE_SIDE = 4; // covers drawn on each side
+    private static final int VISIBLE_SIDE = 5; // covers drawn on each side
     private static final float UNIT = 1000f;   // scroller works in integer units: 1 item = 1000
 
     private final List<Item> items = new ArrayList<>();
@@ -69,7 +69,7 @@ public final class Qvk3CoverFlowView extends View {
     private boolean dragging;
     private float pos; // current position in items (0 = first centred)
     private int coverPx;
-    private int spacingPercent = 55;
+    private int spacingPercent = 62;
     private float radius;
     private Listener listener;
     private int lastSettled = -1;
@@ -77,7 +77,7 @@ public final class Qvk3CoverFlowView extends View {
 
     public Qvk3CoverFlowView(Context c) {
         super(c);
-        scroller = new Scroller(c, new android.view.animation.DecelerateInterpolator(1.4f));
+        scroller = new Scroller(c, new android.view.animation.DecelerateInterpolator(2.2f));
         scroller.setFriction(ViewConfiguration.getScrollFriction() * 1.6f);
         ViewConfiguration vc = ViewConfiguration.get(c);
         touchSlop = vc.getScaledTouchSlop();
@@ -155,8 +155,9 @@ public final class Qvk3CoverFlowView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         if (scroller.computeScrollOffset()) {
-            pos = scroller.getCurrX() / UNIT;
-            fastFling = Math.abs(scroller.getCurrVelocity()) > UNIT * 6;
+            float np = scroller.getCurrX() / UNIT;
+            fastFling = Math.abs(np - pos) > 0.12f; // more than ~7 albums per second: draw cached covers only
+            pos = np;
             postInvalidateOnAnimation();
             if (scroller.isFinished()) settle();
         }
@@ -196,7 +197,8 @@ public final class Qvk3CoverFlowView extends View {
         float sign = Math.signum(d);
         float scale = 1f - Math.min(ad, 3f) * 0.08f;
         float w = coverPx * scale, h = coverPx * scale;
-        float x = cx + d * spacing() * 0.55f + sign * Math.min(ad, 1f) * spacing() * 0.6f;
+        // steady step between side covers + a clearly larger free gap around the centre album
+        float x = cx + d * spacing() * 0.6f + sign * Math.min(ad, 1f) * spacing() * 0.95f;
         float cy = top + coverPx / 2f;
         float pw = (float) (w * Math.cos(angle)) * (ad > 0.01f ? 0.92f : 1f);
         float far = 1f - 0.22f * (float) Math.sin(angle);
@@ -297,12 +299,15 @@ public final class Qvk3CoverFlowView extends View {
                 if (!dragging) {
                     tap(e.getX());
                 } else if (Math.abs(vx) > minFling) {
+                    // Inertia: a strong swipe travels many albums and keeps gliding (decelerating) for up to
+                    // ~2.5 s; the end point is an exact album, so the motion always finishes centred.
+                    float itemsPerSecond = -vx / (spacing() * 0.8f);
+                    float travel = Math.max(-40f, Math.min(40f, itemsPerSecond * 0.55f));
+                    int target = Math.max(0, Math.min(items.size() - 1, Math.round(pos + travel)));
                     int start = Math.round(pos * UNIT);
-                    int v = Math.round(-vx / (spacing() * 0.8f) * UNIT);
-                    scroller.fling(start, 0, v, 0, 0, Math.round((items.size() - 1) * UNIT), 0, 0);
-                    // snap the natural end point to the nearest album
-                    int end = Math.round(Math.round(scroller.getFinalX() / UNIT) * UNIT);
-                    scroller.setFinalX(Math.max(0, Math.min(end, Math.round((items.size() - 1) * UNIT))));
+                    int dist = Math.round(target * UNIT) - start;
+                    int duration = (int) Math.min(2600, 450 + 260 * Math.sqrt(Math.abs(dist) / UNIT));
+                    scroller.startScroll(start, 0, dist, 0, duration);
                     postInvalidateOnAnimation();
                 } else {
                     smoothScrollTo(Math.round(pos));
