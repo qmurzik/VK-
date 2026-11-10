@@ -270,7 +270,7 @@ def build_apk(t, bt, mod_dex, release):
     return final, n + 1
 
 
-def verify(final, meta, release, t, bt, touched, mod_classes):
+def verify(final, meta, release, t, bt, touched, mod_classes, android_jar):
     out = subprocess.run([os.path.join(bt, "apksigner"), "verify", "--print-certs", final],
                          check=True, capture_output=True, text=True).stdout
     cert = re.search(r"Signer #1 certificate SHA-256 digest: (\w+)", out).group(1)
@@ -293,7 +293,7 @@ def verify(final, meta, release, t, bt, touched, mod_classes):
         m = re.match(r"smali(?:_classes\d+)?/(.+)\.smali$", p)
         if m:
             scopes.append("L" + m.group(1))
-    run(["java", "-Xmx6g", "-cp", lc_cp + os.pathsep + lc_dir, "LinkCheck", final] + scopes)
+    run(["java", "-Xmx6g", "-Dandroid.jar=" + android_jar, "-cp", lc_cp + os.pathsep + lc_dir, "LinkCheck", final] + scopes)
 
 
 def unit_tests(t, android_jar):
@@ -332,7 +332,7 @@ def main():
     release = patch_manifest_and_version()
     add_assets()
     final, dex_index = build_apk(t, bt, mod_dex, release)
-    verify(final, meta, release, t, bt, touched, mod_classes)
+    verify(final, meta, release, t, bt, touched, mod_classes, android_jar)
     log(f"QVK 3.0 module dex: classes{dex_index}.dex")
     log(f"done: {final} ({os.path.getsize(final) // (1 << 20)} MB, sha256 {sha256(final)})")
 

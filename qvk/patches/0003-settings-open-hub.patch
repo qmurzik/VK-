@@ -1,0 +1,19 @@
+--- a/smali_classes21/re/sova/qmods/RuntimeBridge.smali	2026-11-10 16:39:26.959773056 +0000
++++ b/smali_classes21/re/sova/qmods/RuntimeBridge.smali	2026-11-10 16:39:26.978878508 +0000
+@@ -2619,6 +2619,16 @@
+ .method public static open(Landroid/app/Activity;)V
+     .locals 2
+ 
++    # QVK 3.0: menus open the new settings centre (the classic screen stays available from it).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3SettingsBridge;->openHub(Landroid/app/Activity;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_classic_settings
++
++    return-void
++
++    :qvk3_classic_settings
+     .line 283
+     new-instance v0, Landroid/content/Intent;
+ 

@@ -75,9 +75,15 @@ public final class LinkCheck {
                         if (!appType(mr.getDefiningClass())) continue;
                         if (!classes.containsKey(mr.getDefiningClass())) {
                             problems.add(where + ": missing class " + mr.getDefiningClass());
-                        } else if (!resolveMethod(mr.getDefiningClass(), mr, new HashSet<>())) {
-                            problems.add(where + ": missing method " + mr.getDefiningClass() + "->" + mr.getName()
-                                    + "(" + String.join("", mr.getParameterTypes()) + ")" + mr.getReturnType());
+                        } else {
+                            Method target = findMethod(mr.getDefiningClass(), mr, new HashSet<>());
+                            if (target == null && !resolveMethod(mr.getDefiningClass(), mr, new HashSet<>())) {
+                                problems.add(where + ": missing method " + mr.getDefiningClass() + "->" + mr.getName()
+                                        + "(" + String.join("", mr.getParameterTypes()) + ")" + mr.getReturnType());
+                            } else if (target != null && !accessible(c.getType(), target.getDefiningClass(), target.getAccessFlags())) {
+                                problems.add(where + ": illegal access to " + target.getDefiningClass() + "->" + target.getName()
+                                        + " (" + ((target.getAccessFlags() & 0x2) != 0 ? "private" : "package-private") + ")");
+                            }
                         }
                     } else if (ref instanceof FieldReference) {
                         FieldReference fr = (FieldReference) ref;
@@ -122,10 +128,75 @@ public final class LinkCheck {
                 || t.startsWith("Landroidx/") || t.startsWith("Landroid/support/");
     }
 
+    private static java.net.URLClassLoader framework;
+
+    /** Loads framework classes from android.jar (java.* from the running JDK) to check inherited members. */
+    private static Class<?> frameworkClass(String type) {
+        String name = type.substring(1, type.length() - 1).replace('/', '.');
+        try {
+            if (framework == null) {
+                String jar = System.getProperty("android.jar");
+                framework = new java.net.URLClassLoader(new java.net.URL[]{new File(jar).toURI().toURL()}, ClassLoader.getPlatformClassLoader());
+            }
+            return Class.forName(name, false, framework);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static boolean frameworkHasMethod(String type, MethodReference ref) {
+        Class<?> c = frameworkClass(type);
+        if (c == null) return System.getProperty("android.jar") == null; // cannot check without android.jar
+        for (Class<?> k = c; k != null; k = k.getSuperclass()) {
+            if (declares(k, ref)) return true;
+            for (Class<?> i : k.getInterfaces()) if (declares(i, ref)) return true;
+        }
+        return false;
+    }
+
+    private static boolean declares(Class<?> k, MethodReference ref) {
+        try {
+            for (java.lang.reflect.Method m : k.getDeclaredMethods()) {
+                if (!m.getName().equals(ref.getName()) || m.getParameterCount() != ref.getParameterTypes().size()) continue;
+                if (!desc(m.getReturnType()).equals(ref.getReturnType())) continue;
+                boolean ok = true;
+                Class<?>[] ps = m.getParameterTypes();
+                for (int i = 0; i < ps.length; i++) if (!desc(ps[i]).equals(ref.getParameterTypes().get(i).toString())) ok = false;
+                if (ok) return true;
+            }
+            if (ref.getName().equals("<init>")) {
+                for (java.lang.reflect.Constructor<?> m : k.getDeclaredConstructors()) {
+                    if (m.getParameterCount() != ref.getParameterTypes().size()) continue;
+                    boolean ok = true;
+                    Class<?>[] ps = m.getParameterTypes();
+                    for (int i = 0; i < ps.length; i++) if (!desc(ps[i]).equals(ref.getParameterTypes().get(i).toString())) ok = false;
+                    if (ok) return true;
+                }
+            }
+        } catch (Throwable t) {
+            return true; // unreadable class: do not report
+        }
+        return false;
+    }
+
+    private static String desc(Class<?> c) {
+        if (c.isArray()) return "[" + desc(c.getComponentType());
+        if (c == void.class) return "V";
+        if (c == int.class) return "I";
+        if (c == boolean.class) return "Z";
+        if (c == long.class) return "J";
+        if (c == byte.class) return "B";
+        if (c == char.class) return "C";
+        if (c == short.class) return "S";
+        if (c == float.class) return "F";
+        if (c == double.class) return "D";
+        return "L" + c.getName().replace('.', '/') + ";";
+    }
+
     private static boolean resolveMethod(String type, MethodReference ref, Set<String> seen) {
         if (!seen.add(type)) return false;
         ClassDef c = classes.get(type);
-        if (c == null) return !appType(type); // hierarchy left the APK: framework class, trust javac
+        if (c == null) return !appType(type) && frameworkHasMethod(type, ref); // left the APK: check the framework class
         for (Method m : c.getMethods()) {
             if (m.getName().equals(ref.getName()) && m.getReturnType().equals(ref.getReturnType())
                     && same(m.getParameterTypes(), ref.getParameterTypes())) return true;
@@ -135,10 +206,42 @@ public final class LinkCheck {
         return false;
     }
 
+    /** Method definition inside the APK (null when it lives in the framework or is missing). */
+    private static Method findMethod(String type, MethodReference ref, Set<String> seen) {
+        if (!seen.add(type)) return null;
+        ClassDef c = classes.get(type);
+        if (c == null) return null;
+        for (Method m : c.getMethods()) {
+            if (m.getName().equals(ref.getName()) && m.getReturnType().equals(ref.getReturnType())
+                    && same(m.getParameterTypes(), ref.getParameterTypes())) return m;
+        }
+        if (c.getSuperclass() != null) {
+            Method m = findMethod(c.getSuperclass(), ref, seen);
+            if (m != null) return m;
+        }
+        for (String i : c.getInterfaces()) {
+            Method m = findMethod(i, ref, seen);
+            if (m != null) return m;
+        }
+        return null;
+    }
+
+    private static String pkg(String type) {
+        int i = type.lastIndexOf('/');
+        return i < 0 ? "" : type.substring(0, i);
+    }
+
+    /** private: only the same class (or its nest via synthetic accessors); package-private: same package. */
+    private static boolean accessible(String caller, String owner, int flags) {
+        if ((flags & 0x1) != 0 || (flags & 0x4) != 0) return true; // public / protected (protected checked by javac)
+        if ((flags & 0x2) != 0) return caller.equals(owner); // d8 (min-api 28) uses synthetic accessors, never nestmates
+        return pkg(caller).equals(pkg(owner));
+    }
+
     private static boolean resolveField(String type, FieldReference ref, Set<String> seen) {
         if (!seen.add(type)) return false;
         ClassDef c = classes.get(type);
-        if (c == null) return !appType(type);
+        if (c == null) return !appType(type); // framework fields: javac-checked for Java code
         for (Field f : c.getFields()) {
             if (f.getName().equals(ref.getName()) && f.getType().equals(ref.getType())) return true;
         }

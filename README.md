@@ -1,3 +1,6 @@
+> **QVK 3.0** (модификация клиента на базе QVK 2.6.18 / VK 8.100) находится в каталоге [`qvk/`](qvk/README.md).
+> Отчёт о работах — [`QVK_REWORK_REPORT.md`](QVK_REWORK_REPORT.md), тест-план — [`QVK_TEST_PLAN.md`](QVK_TEST_PLAN.md).
+
 # VK Enhancer
 
 LSPosed-модуль для приложения **ВКонтакте** (90+ функций) (`com.vkontakte.android`): скрывает рекламу,

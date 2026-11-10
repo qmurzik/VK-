@@ -1,0 +1,12 @@
+--- a/smali_classes21/re/sova/qmods/QModsActivity.smali	2026-11-10 16:39:26.994540268 +0000
++++ b/smali_classes21/re/sova/qmods/QModsActivity.smali	2026-11-10 16:39:27.009352581 +0000
+@@ -10759,6 +10759,9 @@
+     .line 122
+     :cond_13
+     :goto_6
++    # QVK 3.0: run a catalog action requested by the new settings centre.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3SettingsBridge;->afterClassicCreate(Lre/sova/qmods/QModsActivity;)V
++
+     return-void
+ .end method
+ 

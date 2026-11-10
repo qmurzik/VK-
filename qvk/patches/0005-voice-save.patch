@@ -1,0 +1,23 @@
+--- a/smali_classes21/re/sova/qmods/VoiceSave$1.smali	2026-11-10 16:43:18.965195168 +0000
++++ b/smali_classes21/re/sova/qmods/VoiceSave$1.smali	2026-11-10 16:43:18.987110357 +0000
+@@ -305,7 +305,7 @@
+ 
+     const-string v1, "voice"
+ 
+-    invoke-static {v0, p1, p2, v1}, Lre/sova/qmods/NativeMedia;->request(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
++    invoke-static {v0, p1, p2, v1}, Lre/sova/qmods/Qvk3VoiceSave;->request(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+     :try_end_2
+     .catch Ljava/lang/Exception; {:try_start_2 .. :try_end_2} :catch_0
+ 
+--- a/smali_classes21/re/sova/qmods/VoiceSave.smali	2026-11-10 16:43:18.968894328 +0000
++++ b/smali_classes21/re/sova/qmods/VoiceSave.smali	2026-11-10 16:43:18.987294428 +0000
+@@ -340,6 +340,9 @@
+ .method public static url(Ljava/lang/Object;)Ljava/lang/String;
+     .locals 6
+ 
++    # QVK 3.0: remember the attachment so the saver can use VK's local copy and both links.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3VoiceSave;->remember(Ljava/lang/Object;)V
++
+     .line 82
+     const/4 v0, 0x0
+ 
