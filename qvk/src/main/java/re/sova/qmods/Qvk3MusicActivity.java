@@ -2,6 +2,7 @@ package re.sova.qmods;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -37,6 +38,7 @@ import java.util.List;
  */
 public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine.Listener {
     static final String EXTRA_TAB = "qvk3_tab";
+    static final String EXTRA_PLAYER = "qvk3_open_player";
     private static final int REQ_IMPORT = 41;
     static final String[] TABS = {"Главная", "Моя музыка", "Плейлисты", "Поиск", "Загрузки"};
 
@@ -49,10 +51,14 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
     private ListView list;
     private Rows rows;
     private LinearLayout mini;
+    private View miniBox;
     private ImageView miniCover;
-    private TextView miniTitle, miniArtist, miniPlay;
+    private TextView miniTitle, miniArtist;
+    private ImageView miniPlay;
     private Qvk3PlayerView player;
     private int tab;
+    private View searchRow;
+    private android.widget.ProgressBar miniProgress;
     private final Deque<Runnable> back = new ArrayDeque<>();
     private Runnable current;
     private Feed feed;
@@ -126,9 +132,9 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
             Row r = items.get(i);
             if (feed != null && i >= items.size() - 15) feed.more();
             if (r.type == Row.HEADER) {
-                TextView t = convert instanceof TextView ? (TextView) convert : Qvk3Ui.text(Qvk3MusicActivity.this, "", 20, p.text, true);
+                TextView t = convert instanceof TextView ? (TextView) convert : Qvk3Ui.text(Qvk3MusicActivity.this, "", 21, p.text, true);
                 t.setText(r.title);
-                t.setPadding(Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 18), Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 6));
+                t.setPadding(Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 22), Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 8));
                 t.setAccessibilityHeading(true);
                 return t;
             }
@@ -150,7 +156,7 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
 
     final class ItemHolder {
         final LinearLayout row = new LinearLayout(Qvk3MusicActivity.this);
-        final ImageView cover = Qvk3Ui.cover(Qvk3MusicActivity.this, p, 48, 8);
+        final ImageView cover = Qvk3Ui.cover(Qvk3MusicActivity.this, p, 52, 10);
         final TextView title = Qvk3Ui.line(Qvk3MusicActivity.this, "", 16, p.text, false);
         final TextView sub = Qvk3Ui.line(Qvk3MusicActivity.this, "", 13, p.text2, false);
         final TextView right = Qvk3Ui.text(Qvk3MusicActivity.this, "", 13, p.text2, false);
@@ -178,19 +184,32 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
             title.setText(r.title);
             title.setTextColor(now ? p.accent : r.track != null && !r.track.playable() ? p.text2 : p.text);
             sub.setText(r.subtitle);
-            right.setText((r.saved ? "⬇ " : "") + (r.right == null ? "" : r.right));
+            right.setText((r.saved ? "⬇  " : "") + (r.right == null ? "" : r.right));
+            right.setTextColor(r.saved ? p.accent : p.text2);
             row.setContentDescription(r.title + ", " + r.subtitle + (r.saved ? ", сохранён на устройстве" : "")
                     + (r.right == null || r.right.isEmpty() ? "" : ", " + r.right) + (now ? ", сейчас играет" : ""));
             if (r.cover == null || !r.cover.equals(boundCover)) {
                 boundCover = r.cover;
-                cover.setImageBitmap(Qvk3Images.get(row.getContext()).cached(r.cover, 144));
-                if (cover.getDrawable() == null && r.cover != null && !r.cover.isEmpty()) {
+                android.graphics.Bitmap hit = Qvk3Images.get(row.getContext()).cached(r.cover, 144);
+                setRounded(cover, hit, 10);
+                if (hit == null && r.cover != null && !r.cover.isEmpty()) {
                     final String want = r.cover;
                     Qvk3Images.get(row.getContext()).load(want, 144, b -> {
-                        if (want.equals(boundCover)) cover.setImageBitmap(b);
+                        if (want.equals(boundCover)) setRounded(cover, b, 10);
                     });
                 }
             }
+        }
+    }
+
+    void setRounded(ImageView v, android.graphics.Bitmap b, int radiusDp) {
+        if (b == null) {
+            v.setImageDrawable(Qvk3Icons.of(Qvk3Icons.MUSIC, p.text2));
+            int pad = Qvk3Ui.dp(this, 14);
+            v.setPadding(pad, pad, pad, pad);
+        } else {
+            v.setPadding(0, 0, 0, 0);
+            v.setImageDrawable(Qvk3Ui.roundedBitmap(b, Qvk3Ui.dp(this, radiusDp)));
         }
     }
 
@@ -292,7 +311,7 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
         tab = state != null ? state.getInt(EXTRA_TAB, 0) : getIntent().getIntExtra(EXTRA_TAB,
                 Qvk3MusicSettings.prefs(this).getInt(Qvk3MusicSettings.START_TAB, 0));
         build();
-        boolean showPlayer = state != null && state.getBoolean("player");
+        boolean showPlayer = state != null ? state.getBoolean("player") : getIntent().getBooleanExtra(EXTRA_PLAYER, false);
         selectTab(tab);
         if (showPlayer) openPlayer();
         if (Build.VERSION.SDK_INT >= 33) {
@@ -303,6 +322,13 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
         Qvk3MusicDownloads.setListener((key, percent, status) -> {
             if (tab == 4 && back.isEmpty()) showDownloads();
         });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(EXTRA_PLAYER, false)) openPlayer();
     }
 
     @Override
@@ -366,11 +392,12 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 4), 0);
-        header.addView(Qvk3Ui.glyph(this, p, "←", "Назад", 22, v -> handleBack()));
-        screenTitle = Qvk3Ui.line(this, "QVK Music", 22, p.text, true);
+        header.addView(Qvk3Ui.icon(this, Qvk3Icons.BACK, p.text, 48, 24, "Назад", v -> handleBack()));
+        screenTitle = Qvk3Ui.line(this, "Музыка", 28, p.text, true);
         screenTitle.setAccessibilityHeading(true);
+        screenTitle.setPadding(Qvk3Ui.dp(this, 6), 0, 0, 0);
         header.addView(screenTitle, Qvk3Ui.weight(1));
-        header.addView(Qvk3Ui.glyph(this, p, "⚙", "Настройки QVK Music", 20, v -> Qvk3MusicSettingsScreen.show(this)));
+        header.addView(Qvk3Ui.icon(this, Qvk3Icons.TUNE, p.text, 48, 22, "Настройки QVK Music", v -> Qvk3MusicSettingsScreen.show(this)));
         col.addView(header, Qvk3Ui.match());
 
         search = new EditText(this);
@@ -379,8 +406,9 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
         search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         search.setTextColor(p.text);
         search.setHintTextColor(p.text2);
-        search.setBackground(Qvk3Ui.rounded(p.surface2, Qvk3Ui.dp(this, 20)));
-        search.setPadding(Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 10), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 10));
+        search.setBackground(Qvk3Ui.rounded(p.surface2, Qvk3Ui.dp(this, 14)));
+        search.setPadding(Qvk3Ui.dp(this, 44), Qvk3Ui.dp(this, 11), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 11));
+        search.setTextSize(16);
         search.setOnEditorActionListener((v, id, ev) -> {
             if (id == EditorInfo.IME_ACTION_SEARCH || ev != null && ev.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
                 runSearch(search.getText().toString(), false);
@@ -406,9 +434,18 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
                 }
             }
         });
+        FrameLayout searchBox = new FrameLayout(this);
+        searchBox.addView(search, new FrameLayout.LayoutParams(-1, -2));
+        ImageView mag = new ImageView(this);
+        mag.setImageDrawable(Qvk3Icons.of(Qvk3Icons.SEARCH, p.text2));
+        FrameLayout.LayoutParams mlp0 = new FrameLayout.LayoutParams(Qvk3Ui.dp(this, 20), Qvk3Ui.dp(this, 20), Gravity.CENTER_VERTICAL | Gravity.START);
+        mlp0.leftMargin = Qvk3Ui.dp(this, 14);
+        searchBox.addView(mag, mlp0);
+        searchBox.setTag("search");
         LinearLayout.LayoutParams slp = Qvk3Ui.match();
-        slp.setMargins(Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 4));
-        col.addView(search, slp);
+        slp.setMargins(Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 6));
+        col.addView(searchBox, slp);
+        searchRow = searchBox;
 
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
@@ -420,6 +457,9 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
                 back.clear();
                 selectTab(idx);
             });
+            t.setTextSize(14);
+            t.setPadding(Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 8), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 8));
+            t.setMinHeight(Qvk3Ui.dp(this, 40));
             LinearLayout.LayoutParams lp = Qvk3Ui.wrap();
             lp.rightMargin = Qvk3Ui.dp(this, 6);
             tabs.addView(t, lp);
@@ -444,32 +484,42 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
         });
         col.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
 
+        LinearLayout miniWrap = new LinearLayout(this);
+        miniWrap.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{0xFF232530, 0xFF16181F});
+        bg.setCornerRadius(Qvk3Ui.dp(this, 18));
+        miniWrap.setBackground(bg);
+        miniWrap.setElevation(Qvk3Ui.dp(this, 8));
+        miniWrap.setClipToOutline(true);
         mini = new LinearLayout(this);
         mini.setGravity(Gravity.CENTER_VERTICAL);
-        mini.setPadding(Qvk3Ui.dp(this, 12), Qvk3Ui.dp(this, 6), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 6));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(p.surface);
-        bg.setCornerRadius(Qvk3Ui.dp(this, 16));
-        mini.setBackground(bg);
-        mini.setElevation(Qvk3Ui.dp(this, 6));
-        miniCover = Qvk3Ui.cover(this, p, 44, 8);
+        mini.setPadding(Qvk3Ui.dp(this, 8), Qvk3Ui.dp(this, 8), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 6));
+        miniCover = Qvk3Ui.cover(this, p, 44, 10);
+        miniCover.setBackground(Qvk3Ui.rounded(0x33FFFFFF, Qvk3Ui.dp(this, 10)));
         mini.addView(miniCover);
         LinearLayout mt = new LinearLayout(this);
         mt.setOrientation(LinearLayout.VERTICAL);
-        mt.setPadding(Qvk3Ui.dp(this, 10), 0, 0, 0);
-        miniTitle = Qvk3Ui.line(this, "", 15, p.text, true);
-        miniArtist = Qvk3Ui.line(this, "", 13, p.text2, false);
+        mt.setPadding(Qvk3Ui.dp(this, 12), 0, 0, 0);
+        miniTitle = Qvk3Ui.line(this, "", 15, Color.WHITE, true);
+        miniArtist = Qvk3Ui.line(this, "", 13, 0xB3FFFFFF, false);
         mt.addView(miniTitle);
         mt.addView(miniArtist);
         mini.addView(mt, Qvk3Ui.weight(1));
-        miniPlay = Qvk3Ui.glyph(this, p, "▶", "Играть", 24, v -> engine.toggle());
+        miniPlay = Qvk3Ui.icon(this, Qvk3Icons.PLAY, Color.WHITE, 48, 24, "Играть", v -> engine.toggle());
         mini.addView(miniPlay);
-        mini.addView(Qvk3Ui.glyph(this, p, "⏭", "Следующий трек", 22, v -> engine.next()));
-        mini.setOnClickListener(v -> openPlayer());
-        mini.setContentDescription("Мини-плеер. Нажмите, чтобы открыть плеер");
+        mini.addView(Qvk3Ui.icon(this, Qvk3Icons.NEXT, Color.WHITE, 44, 20, "Следующий трек", v -> engine.next()));
+        miniWrap.setOnClickListener(v -> openPlayer());
+        miniWrap.setContentDescription("Мини-плеер. Нажмите, чтобы открыть плеер");
+        miniWrap.addView(mini, Qvk3Ui.match());
+        miniProgress = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        miniProgress.setMax(1000);
+        miniProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
+        miniProgress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x33FFFFFF));
+        miniWrap.addView(miniProgress, new LinearLayout.LayoutParams(-1, Qvk3Ui.dp(this, 3)));
         LinearLayout.LayoutParams mlp = Qvk3Ui.match();
-        mlp.setMargins(Qvk3Ui.dp(this, 8), 0, Qvk3Ui.dp(this, 8), Qvk3Ui.dp(this, 8));
-        col.addView(mini, mlp);
+        mlp.setMargins(Qvk3Ui.dp(this, 10), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 10), Qvk3Ui.dp(this, 10));
+        col.addView(miniWrap, mlp);
+        miniBox = miniWrap;
         setContentView(root);
     }
 
@@ -482,8 +532,8 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
         for (int i = 0; i < tabs.getChildCount(); i++) {
             TextView t = (TextView) tabs.getChildAt(i);
             boolean sel = i == tab;
-            t.setTextColor(sel ? p.onAccent : p.accent);
-            t.setBackground(Qvk3Ui.ripple(this, sel ? p.accent : (p.dark ? 0x1FFFFFFF : 0x14000000), 0x33888888, Qvk3Ui.dp(this, 22)));
+            t.setTextColor(sel ? (p.dark ? 0xFF111214 : Color.WHITE) : p.text);
+            t.setBackground(Qvk3Ui.ripple(this, sel ? (p.dark ? Color.WHITE : 0xFF111214) : p.surface2, 0x33888888, Qvk3Ui.dp(this, 20)));
             t.setSelected(sel);
         }
     }
@@ -491,7 +541,7 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
     void selectTab(int i) {
         tab = Math.max(0, Math.min(TABS.length - 1, i));
         highlightTab();
-        search.setVisibility(tab == 3 || tab == 1 ? View.VISIBLE : View.GONE);
+        searchRow.setVisibility(tab == 3 || tab == 1 ? View.VISIBLE : View.GONE);
         switch (tab) {
             case 1:
                 go(this::showMyMusic);
@@ -598,7 +648,7 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
     }
 
     private void showHome() {
-        screenTitle.setText("QVK Music");
+        screenTitle.setText("Музыка");
         List<Row> r = new ArrayList<>();
         Qvk3Track cur = engine.current();
         if (cur != null) {
@@ -1060,19 +1110,20 @@ public final class Qvk3MusicActivity extends Activity implements Qvk3MusicEngine
     @Override
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
-        mini.setVisibility(t == null ? View.GONE : View.VISIBLE);
+        miniBox.setVisibility(t == null ? View.GONE : View.VISIBLE);
         if (t == null) return;
+        miniProgress.setProgress(e.duration() > 0 ? (int) (e.position() * 1000 / e.duration()) : 0);
         miniTitle.setText(t.title);
         miniArtist.setText(e.state() == Qvk3MusicEngine.ERROR ? e.error() : t.artist);
-        miniArtist.setTextColor(e.state() == Qvk3MusicEngine.ERROR ? 0xFFE64646 : p.text2);
+        miniArtist.setTextColor(e.state() == Qvk3MusicEngine.ERROR ? 0xFFFF6B6B : 0xB3FFFFFF);
         boolean playing = e.isPlaying();
-        miniPlay.setText(playing ? "⏸" : "▶");
+        Qvk3Ui.setIcon(miniPlay, playing ? Qvk3Icons.PAUSE : Qvk3Icons.PLAY, Color.WHITE);
         miniPlay.setContentDescription(playing ? "Пауза" : "Играть");
         if (!t.key().equals(miniCoverFor)) {
             miniCoverFor = t.key();
             miniCover.setImageBitmap(null);
             Qvk3Images.get(this).load(t.cover, 144, b -> {
-                if (t.key().equals(miniCoverFor)) miniCover.setImageBitmap(b);
+                if (t.key().equals(miniCoverFor)) setRounded(miniCover, b, 10);
             });
             rows.notifyDataSetChanged(); // highlight the playing row
         }

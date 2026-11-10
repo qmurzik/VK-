@@ -14,3 +14,7 @@ local.properties
 # QVK build cache and output (base APK is never committed)
 qvk/.cache/
 qvk/out/
+qvk/screenshots/target/
+qvk/screenshots/shots/
+qvk/screenshots/*.jar
+qvk/screenshots/*.aar

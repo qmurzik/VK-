@@ -83,10 +83,10 @@ public final class Qvk3DesignTokens {
                 0xFFFFFFFF, 0xFFCCE4FF, 12, 100, "system", "solid", "normal", "flat", false));
         put(p("modern", "QVK Modern", "Минимализм, крупные заголовки, мягкие формы", false,
                 0xFF3F8AE0, 0xFFF6F7F9, 0xFFFFFFFF, 0xFFF6F7F9, 0xFF111214, 0xFF6D7380, 0xFFE8EAED, 0xFFEEF2F8,
-                0xFFFFFFFF, 0xFFDDEBFF, 20, 100, "inter", "solid", "normal", "material", false));
+                0xFFFFFFFF, 0xFFDDEBFF, 20, 100, "inter", "solid", "normal", "flat", false));
         put(p("glass", "QVK Glass", "Полупрозрачные поверхности и мягкий градиент", true,
                 0xFF7AB8FF, 0xFF0F1724, 0xCC1B2536, 0xB31B2536, 0xFFF2F6FC, 0xFFA9B6C8, 0x33FFFFFF, 0x33FFFFFF,
-                0xCC243248, 0xCC2F5A8F, 24, 100, "system", "gradient", "normal", "material", true));
+                0xCC243248, 0xCC2F5A8F, 24, 100, "system", "gradient", "normal", "flat", true));
         put(p("amoled", "QVK AMOLED", "Чистый чёрный фон для OLED-экранов", true,
                 0xFF71AAEB, 0xFF000000, 0xFF000000, 0xFF000000, 0xFFF5F5F5, 0xFFA8A8A8, 0xFF1F1F1F, 0xFF141414,
                 0xFF161616, 0xFF1E3A5C, 16, 100, "system", "solid", "normal", "flat", false));
@@ -95,10 +95,10 @@ public final class Qvk3DesignTokens {
                 0xFFFFFFFF, 0xFFD6E8FF, 6, 92, "condensed", "solid", "compact", "flat", false));
         put(p("cozy", "QVK Cozy", "Тёплые мягкие цвета и спокойный интерфейс", false,
                 0xFFC07A4F, 0xFFF7F1EA, 0xFFFFFBF6, 0xFFFFFBF6, 0xFF2E2620, 0xFF7C6E62, 0xFFEADFD3, 0xFFF1E6DA,
-                0xFFFFFBF6, 0xFFF3DCC8, 22, 104, "noto_serif", "gradient", "comfortable", "material", false));
+                0xFFFFFBF6, 0xFFF3DCC8, 22, 104, "noto_serif", "gradient", "comfortable", "flat", false));
         put(p("neon", "QVK Neon", "Тёмный фон и выразительные неоновые акценты", true,
                 0xFFFF2BD6, 0xFF0B0B14, 0xFF14142A, 0xFF0B0B14, 0xFFF4F0FF, 0xFFB7A9E8, 0xFF2A2350, 0xFF221D44,
-                0xFF1B1838, 0xFF3D1F66, 18, 100, "inter", "grid", "normal", "material", true));
+                0xFF1B1838, 0xFF3D1F66, 18, 100, "inter", "grid", "normal", "flat", true));
         put(p("ios", "QVK iOS", "Элементы iOS-эстетики: группы, крупные заголовки, плавность", false,
                 0xFF007AFF, 0xFFF2F2F7, 0xFFFFFFFF, 0xFFF9F9F9, 0xFF000000, 0xFF8A8A8E, 0xFFC6C6C8, 0xFFE5E5EA,
                 0xFFE9E9EB, 0xFF007AFF, 14, 100, "system", "solid", "normal", "ios", false));
@@ -139,7 +139,8 @@ public final class Qvk3DesignTokens {
 
     /** Black or white, whichever reads better on {@code bg}. */
     public static int onColor(int bg) {
-        return contrast(0xFFFFFFFF, bg) >= contrast(0xFF000000, bg) ? 0xFFFFFFFF : 0xFF000000;
+        // White wins whenever it is readable (≥3:1, buttons use bold/large text): accent buttons stay white-on-colour.
+        return contrast(0xFFFFFFFF, bg) >= 3.0 || contrast(0xFFFFFFFF, bg) >= contrast(0xFF000000, bg) ? 0xFFFFFFFF : 0xFF000000;
     }
 
     /** Moves {@code fg} towards black/white until it reaches {@code ratio} against {@code bg}. */
@@ -176,6 +177,25 @@ public final class Qvk3DesignTokens {
                 highlight, incoming, outgoing, radius, textScale, font, background, density, components, heavy);
     }
 
+    /**
+     * Counterpart of this style for the other VK base theme. QVK's palette overrides only 9 colours on top of
+     * VK's current light/dark theme, so a style must exist in both variants; otherwise a dark palette over a
+     * light VK theme leaves hundreds of light elements (the "перекрас" bugs).
+     */
+    public Qvk3DesignTokens variant(boolean wantDark) {
+        if (wantDark == dark) return this;
+        if (wantDark) {
+            int page = mix(0xFF0E0F12, accent, 0.04f), content = mix(0xFF1B1C20, accent, 0.05f), in = 0xFF26272C;
+            return new Qvk3DesignTokens(id, title, description, true, accent, page, content, content, 0xFFEDEEF0, 0xFF9A9DA5,
+                    0xFF9A9DA5, 0xFF2B2C31, mix(content, accent, 0.15f), in, mix(in, accent, 0.45f), radius, textScale, font,
+                    background, density, components, heavy);
+        }
+        int content = 0xFFFFFFFF;
+        return new Qvk3DesignTokens(id, title, description, false, accent, 0xFFF2F3F5, content, content, 0xFF000000, 0xFF818C99,
+                0xFF818C99, 0xFFDCE1E6, mix(content, accent, 0.10f), 0xFFFFFFFF, mix(content, accent, 0.22f), radius, textScale, font,
+                background, density, components, heavy);
+    }
+
     /** Theme JSON understood by QVK's ThemePalette.apply (format sova-vk-theme-1). */
     public JSONObject toTheme() {
         Qvk3DesignTokens t = checked();
@@ -205,15 +225,18 @@ public final class Qvk3DesignTokens {
     public Map<String, Boolean> componentFlags(boolean weakDevice) {
         Map<String, Boolean> m = new LinkedHashMap<>();
         boolean ios = components.equals("ios"), material = components.equals("material");
+        // Only the chosen family is switched on; colour overrides of those engines stay off so that the
+        // token palette is the single source of colour (two engines recolouring the same views flickered).
         m.put("qvk_ios_enabled", ios);
-        for (String k : new String[]{"qvk_ios_colors", "qvk_ios_typography", "qvk_ios_headers", "qvk_ios_dock", "qvk_ios_chats", "qvk_ios_cards", "qvk_ios_motion", "qvk_ios_controls"}) {
+        for (String k : new String[]{"qvk_ios_typography", "qvk_ios_headers", "qvk_ios_dock", "qvk_ios_chats", "qvk_ios_cards", "qvk_ios_motion", "qvk_ios_controls"}) {
             m.put(k, ios);
         }
+        m.put("qvk_ios_colors", false);
         m.put("qvk_material3_enabled", material);
         for (String k : new String[]{"qvk_material3_shapes", "qvk_material3_navigation", "qvk_material3_motion"}) m.put(k, material);
-        // Colours always come from the token theme, not from the component family.
         m.put("qvk_material3_colors", false);
         m.put("qvk_material3_dynamic", false);
+        m.put("qvk_monet_colors", false);
         m.put("qvk_compact_dialogs", density.equals("compact"));
         m.put("qvk_motion_blur", heavy && !weakDevice);
         return m;

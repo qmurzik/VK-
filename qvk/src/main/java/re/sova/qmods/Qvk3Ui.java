@@ -174,6 +174,133 @@ public final class Qvk3Ui {
         Qvk3Jobs.main(() -> android.widget.Toast.makeText(c.getApplicationContext(), s, android.widget.Toast.LENGTH_LONG).show());
     }
 
+    /** Round icon button with ripple, 48dp touch target, TalkBack label. */
+    public static android.widget.ImageView icon(Context c, String name, int color, int boxDp, int iconDp, String description, View.OnClickListener l) {
+        android.widget.ImageView v = new android.widget.ImageView(c);
+        v.setImageDrawable(Qvk3Icons.of(name, color));
+        int pad = dp(c, (boxDp - iconDp) / 2f);
+        v.setPadding(pad, pad, pad, pad);
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(c, boxDp), dp(c, boxDp)));
+        v.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33888888), null, rounded(Color.WHITE, dp(c, boxDp) / 2f)));
+        v.setContentDescription(description);
+        v.setOnClickListener(l);
+        return v;
+    }
+
+    public static void setIcon(android.widget.ImageView v, String name, int color) {
+        v.setImageDrawable(Qvk3Icons.of(name, color));
+    }
+
+    /** Slim rounded progress track with a small round thumb. */
+    public static void styleSeek(Context c, android.widget.SeekBar s, int active, int track) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(track);
+        bg.setCornerRadius(dp(c, 3));
+        GradientDrawable fg = new GradientDrawable();
+        fg.setColor(active);
+        fg.setCornerRadius(dp(c, 3));
+        android.graphics.drawable.ClipDrawable clip = new android.graphics.drawable.ClipDrawable(fg, Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL);
+        android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(new Drawable[]{bg, clip});
+        layers.setId(0, android.R.id.background);
+        layers.setId(1, android.R.id.progress);
+        int h = dp(c, 4);
+        layers.setLayerHeight(0, h);
+        layers.setLayerHeight(1, h);
+        layers.setLayerGravity(0, Gravity.CENTER_VERTICAL);
+        layers.setLayerGravity(1, Gravity.CENTER_VERTICAL);
+        s.setProgressDrawable(layers);
+        GradientDrawable thumb = new GradientDrawable();
+        thumb.setShape(GradientDrawable.OVAL);
+        thumb.setColor(active);
+        thumb.setSize(dp(c, 14), dp(c, 14));
+        s.setThumb(thumb);
+        s.setSplitTrack(false);
+        s.setMinHeight(dp(c, 32));
+        s.setMaxHeight(dp(c, 32));
+    }
+
+    /** Card container: rounded surface with optional title above it. */
+    public static LinearLayout card(Context c, Palette p) {
+        LinearLayout l = new LinearLayout(c);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setBackground(rounded(p.surface, dp(c, 18)));
+        l.setClipToOutline(true);
+        return l;
+    }
+
+    /** Square rounded tile with a white icon, used as the leading icon of settings rows. */
+    public static View tile(Context c, String icon, int color, int sizeDp) {
+        android.widget.ImageView v = new android.widget.ImageView(c);
+        v.setImageDrawable(Qvk3Icons.of(icon, Color.WHITE));
+        int pad = dp(c, sizeDp * 0.2f);
+        v.setPadding(pad, pad, pad, pad);
+        v.setBackground(rounded(color, dp(c, sizeDp * 0.28f)));
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(c, sizeDp), dp(c, sizeDp)));
+        v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return v;
+    }
+
+    /** Bitmap drawable with rounded corners drawn by a shader (independent of outline clipping support). */
+    public static Drawable roundedBitmap(final android.graphics.Bitmap b, final float radius) {
+        return new Drawable() {
+            final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+            final android.graphics.RectF r = new android.graphics.RectF();
+
+            @Override
+            public void draw(android.graphics.Canvas c) {
+                android.graphics.Rect bounds = getBounds();
+                android.graphics.BitmapShader sh = new android.graphics.BitmapShader(b, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP);
+                android.graphics.Matrix m = new android.graphics.Matrix();
+                float s = Math.max(bounds.width() / (float) b.getWidth(), bounds.height() / (float) b.getHeight());
+                m.setScale(s, s);
+                m.postTranslate(bounds.left + (bounds.width() - b.getWidth() * s) / 2f, bounds.top + (bounds.height() - b.getHeight() * s) / 2f);
+                sh.setLocalMatrix(m);
+                paint.setShader(sh);
+                r.set(bounds);
+                c.drawRoundRect(r, radius, radius, paint);
+            }
+
+            @Override
+            public void setAlpha(int alpha) {
+                paint.setAlpha(alpha);
+            }
+
+            @Override
+            public void setColorFilter(android.graphics.ColorFilter cf) {
+                paint.setColorFilter(cf);
+            }
+
+            @Override
+            public int getOpacity() {
+                return android.graphics.PixelFormat.TRANSLUCENT;
+            }
+        };
+    }
+
+    /** Average colour of a bitmap (for player backgrounds). */
+    public static int average(android.graphics.Bitmap b) {
+        if (b == null) return 0xFF3A3F4A;
+        android.graphics.Bitmap s = android.graphics.Bitmap.createScaledBitmap(b, 12, 12, true);
+        long r = 0, g = 0, bl = 0;
+        for (int x = 0; x < 12; x++)
+            for (int y = 0; y < 12; y++) {
+                int px = s.getPixel(x, y);
+                r += (px >> 16) & 0xff;
+                g += (px >> 8) & 0xff;
+                bl += px & 0xff;
+            }
+        return 0xFF000000 | ((int) (r / 144) << 16) | ((int) (g / 144) << 8) | (int) (bl / 144);
+    }
+
+    /** Darkened, saturated version of a colour suitable as a background under white text. */
+    public static int deep(int color, float value) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] = Math.min(1f, hsv[1] * 1.2f + 0.1f);
+        hsv[2] = value;
+        return Color.HSVToColor(hsv);
+    }
+
     public static ColorDrawable color(int c) {
         return new ColorDrawable(c);
     }

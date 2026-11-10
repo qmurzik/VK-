@@ -15,6 +15,27 @@ import java.util.Map;
 public final class Qvk3Appearance {
     public static final String STYLE = "qvk3_style";
     public static final String TOKENS = "qvk3_tokens";
+    /**
+     * QVK's existing "system" slot mode. The patched ThemeProfiles.slotAt() resolves it by VK's real
+     * light/dark theme instead of Android's night mode (they differ when VK's theme is set manually).
+     * Reusing the existing value keeps QVK 2.x settings import/export valid.
+     */
+    public static final String MODE_VK = "system";
+
+    /** Called from the patched ThemeProfiles.slotAt(): maps "system" to VK's current light/dark theme. */
+    public static String slotMode(Context c, String mode) {
+        if (!MODE_VK.equals(mode)) return mode;
+        Context ctx = c != null ? c : RuntimeBridge.context;
+        return ctx != null && vkDark(ctx) ? "dark" : "light";
+    }
+
+    static boolean vkDark(Context c) {
+        try {
+            return NativeTheme.dark(c);
+        } catch (Throwable t) {
+            return Qvk3Ui.night(c);
+        }
+    }
     static final String BACKUP = "qvk3_appearance_backup";
     static final String[] THEME_KEYS = {"qmods_theme_palette", "qvk_theme_profile_day", "qvk_theme_profile_night", "qvk_theme_profile_mode"};
 
@@ -39,7 +60,7 @@ public final class Qvk3Appearance {
     }
 
     public static String currentTitle(Context c) {
-        return prefs(c).contains(STYLE) ? current(c).title : "Оформление QVK 2.x (без стиля 3.0)";
+        return prefs(c).contains(STYLE) ? current(c).title : "Стандартное (QVK 2.x)";
     }
 
     public static boolean weakDevice(Context c) {
@@ -58,8 +79,14 @@ public final class Qvk3Appearance {
         e.putInt("qvk_material3_radius", Math.max(12, Math.min(28, r)));
         e.putString(STYLE, t.id);
         if ("custom".equals(t.id)) e.putString(TOKENS, t.toJson().toString());
+        // Both variants, chosen at runtime by VK's real light/dark theme ("vk" slot mode, patch 0006).
+        String day = t.variant(false).toTheme().toString(), night = t.variant(true).toTheme().toString();
+        e.putString(ThemeProfiles.MODE, MODE_VK);
+        e.putString(ThemeProfiles.DAY, ThemePalette.validate(day));
+        e.putString(ThemeProfiles.NIGHT, ThemePalette.validate(night));
+        e.putString("qmods_theme_palette", ThemePalette.validate(vkDark(a) ? night : day));
         e.commit();
-        ThemePalette.apply(a, t.toTheme().toString());
+        ThemePalette.refresh(a);
         Qvk3SettingsHistory.record(a, STYLE, "Стиль оформления: " + t.title);
     }
 

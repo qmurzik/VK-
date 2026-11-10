@@ -21,25 +21,21 @@ import java.util.Map;
  */
 public final class Qvk3SettingsIndex {
     public static final String[] SECTIONS = {
-            "Внешний вид", "Темы и персонализация", "Навигация и жесты", "Сообщения и чаты", "Конфиденциальность",
-            "Музыка и плеер", "Видео и медиа", "Уведомления и Push", "Загрузки и хранилище", "Производительность и батарея",
-            "Дополнительные функции", "Резервные копии и синхронизация", "Обновления QVK", "Диагностика", "О приложении"};
+            "Оформление", "Навигация", "Сообщения", "Приватность и защита", "Музыка",
+            "Лента и медиа", "Уведомления", "Система", "Обновления и о QVK"};
     public static final String[] SECTION_HINTS = {
-            "Студия интерфейса, Material, iOS, шрифты, значок",
-            "Стили QVK 3.0, конструктор, темы, фоны, пузыри",
-            "Нижняя панель, боковое меню, стартовый экран, жесты",
-            "Нечиталка, быстрые ответы, скрытые диалоги, PIN чатов",
-            "Онлайн, статистика, блокировка приложения",
+            "Стили, конструктор, темы, шрифты, значок",
+            "Нижняя панель, боковое меню, стартовый экран",
+            "Нечиталка, голосовые, стикеры, скрытые чаты",
+            "Онлайн, статистика, PIN и блокировка",
             "QVK Music, плеер, офлайн, тексты песен",
-            "Видео, клипы, истории, GIF, фото",
+            "Лента, истории, реклама, видео и фото",
             "Режим доставки, звук, диагностика Push",
-            "Папки загрузок, кэш, место на устройстве",
-            "Анимации, эффекты, фоновая работа",
-            "Инструменты, стикеры Telegram, значки",
-            "Экспорт и импорт настроек, серверная копия",
-            "Сервер обновлений, зеркала, история версий",
-            "Отчёты об ошибках, проверка функций",
-            "Версия, лицензии, сообщество"};
+            "Загрузки, место, сеть, батарея, копии, отладка",
+            "Обновления, версия, лицензии"};
+    /** Icon and tile colour of each section (index-aligned with SECTIONS). */
+    public static final String[] SECTION_ICONS = {"palette", "nav", "chat", "lock", "music", "image", "bell", "sliders", "update"};
+    public static final int[] SECTION_COLORS = {0xFFAF52DE, 0xFF5856D6, 0xFF34C759, 0xFF3A3A3C, 0xFFFF2D55, 0xFFFF9500, 0xFFFF3B30, 0xFF8E8E93, 0xFF007AFF};
 
     public static final int SWITCH = 0, ACTION = 1, SCREEN = 2;
 
@@ -49,13 +45,16 @@ public final class Qvk3SettingsIndex {
         public final String title;
         public final String summary;
         public final int section;
+        /** Card title inside the section ("Нечиталка", "Голосовые", …). */
+        public final String group;
         public final int type;
         public final String target;  // QModsActivity action / SettingsHub route / qvk3:* route
         public final boolean def;
         final String haystack;
 
-        Item(String id, String key, String title, String summary, int section, int type, String target, boolean def) {
+        Item(String id, String key, String title, String summary, int section, String group, int type, String target, boolean def) {
             this.id = id;
+            this.group = group;
             this.key = key;
             this.title = title;
             this.summary = summary == null ? "" : summary;
@@ -86,116 +85,155 @@ public final class Qvk3SettingsIndex {
 
     void add(Item i) {
         if (byId.containsKey(i.id)) return;
+        // catalog entries with the same visible title and action (QVK lists some actions in two groups)
+        if (i.type != SWITCH) for (Item o : items) if (o.type != SWITCH && o.section == i.section && normal(o.title).equals(normal(i.title))) return;
         items.add(i);
         byId.put(i.id, i);
     }
 
     // ------------------------------------------------------------------ section mapping
 
-    static final Map<String, Integer> KEY_SECTION = new HashMap<>();
+    /** key → "section|card title". Keys not listed fall back to their catalog group (see placeCatalog). */
+    static final Map<String, String> PLACE = new HashMap<>();
+
+    static void place(int section, String group, String... keys) {
+        for (String k : keys) PLACE.put(k, section + "|" + group);
+    }
 
     static {
-        String[][] map = {
-                {"0", "qvk_ios_style", "qvk_material3_style", "bottomDescription", "fullTime", "disable_nft_avatars", "disable_emoji_status", "changeIcon", "appLanguage", "qvk_system_emoji", "qvk_compact_dialogs", "qvk_compact_community_tabs", "qvk_compact_community_info", "core_christmas_garland", "use_old_read_indicator", "disable_reactions", "rounded_writebar"},
-                {"1", "qvk_personalization", "qvk_monet_colors", "qvk_monet_options", "themes", "qvk_theme_catalog", "qvk_splash_options", "badges", "sova_badges_enabled", "qvk_ornament_catalog", "qvk_badge_application"},
-                {"2", "launchPage", "transparentNavbar", "editDock", "forceShowDrawer", "drawer_ignore_navigation_level", "hide_bottom_navigation", "hide_drawer_dashboard", "editDrawerItems", "editSAItems", "editServiceTiles", "qvk_services_layout", "qvk_services_icon_style", "qvk_floating_navigation", "qvk_drawer_zone", "qvk_drawer_cards_options", "feed_double_tap_like", "qmods_lite_services", "qvk_hide_widgets_settings", "disableServicesShowcase", "disableSuperAppForYou", "disableSuperPromo"},
-                {"4", "online_privacy", "online_privacy_bypass", "offline", "telemetry", "news_telemetry", "music_telemetry", "device_mask", "qvk_client_platform_settings", "enablePin", "setPin", "fingerUnlock", "vibrateOnTap", "timeout", "lock", "qvk_pattern_setup", "qvk_hide_vpn_detection", "screenshot_dnr", "multiaccount75", "qvk_online_status_viewer"},
-                {"5", "qvk_disable_audio_ads"},
-                {"6", "disableClipsAds", "disableVideoAds", "qvk_story_downloads", "qvk_story_download_action", "qvk_gif_names", "qvk_wall_media", "qvk_image_search", "qvk_video_links", "core_new_photo_editor_collage", "storyDNR", "disableStories", "storyAdblock"},
-                {"7", "qvk_push_modes", "qvk_notification_sound", "qvk_notification_tools", "qvk_background_delivery", "disable_push_warning"},
-                {"8", "sova_music_download_folder", "clearAudioCache"},
-                {"9", "qvk_smooth_motion", "qvk_motion_options", "qvk_motion_blur_options", "short_share_timeout"},
-                {"11", "export_server_auto", "export_server", "import_server", "export", "import", "qvk_settings_catalog"},
-                {"12", "qmods_updates"},
-                {"14", "qmods_announcements"},
-                {"3", "voiceDownload", "fastReplies", "qvk_hidden_dialogs", "qvk_community_inbox", "qvk_chat_privacy", "qvk_text_tools_settings", "qvk_index59", "qvk_folders59", "tgstickers", "qvk_account_names"},
-        };
-        for (String[] row : map) {
-            int s = Integer.parseInt(row[0]);
-            for (int i = 1; i < row.length; i++) KEY_SECTION.put(row[i], s);
-        }
+        place(0, "Стиль интерфейса", "qvk_ios_style", "qvk_material3_style");
+        place(0, "Темы и цвета", "themes", "qvk_theme_catalog", "qvk_monet_colors", "qvk_monet_options");
+        place(0, "Персонализация", "qvk_personalization");
+        place(0, "Анимации и запуск", "qvk_motion_options", "qvk_smooth_motion", "qvk_motion_blur_options", "qvk_splash_options");
+        place(0, "Значки и украшения", "badges", "sova_badges_enabled", "qvk_ornament_catalog", "qvk_badge_application", "disable_nft_avatars", "disable_emoji_status", "core_christmas_garland");
+        place(0, "Иконка, язык и эмодзи", "changeIcon", "appLanguage", "qvk_system_emoji");
+        place(1, "Нижняя панель", "editDock", "hide_bottom_navigation", "transparentNavbar", "bottomDescription", "qvk_floating_navigation");
+        place(1, "Боковое меню", "forceShowDrawer", "drawer_ignore_navigation_level", "hide_drawer_dashboard", "editDrawerItems", "qvk_drawer_zone", "qvk_drawer_cards_options");
+        place(1, "Сервисы", "editSAItems", "editServiceTiles", "qvk_services_layout", "qvk_services_icon_style", "disableServicesShowcase", "disableSuperAppForYou", "disableSuperPromo", "qmods_lite_services", "qvk_hide_widgets_settings");
+        place(1, "Запуск", "launchPage");
+        place(2, "Нечиталка и «печатает»", "dnrGlobal", "dnrPM", "dnrGroups", "dnrConvs", "dntGlobal", "dntPM", "dntGroups", "dntConvs", "qvk_chat_privacy", "screenshot_dnr");
+        place(2, "Голосовые и звонки", "voiceDownload", "voice_platform_codec", "voiceEnhance", "disableBTHeadsetRecording", "hide_vmsg_button", "disableVoipButtons");
+        place(2, "Удалённые и изменённые", "undelete", "choose_undeleted_text_mark", "unedit");
+        place(2, "Стикеры, эмодзи и реакции", "tgstickers", "emojiHints", "replace_vk_reactions", "disable_reactions", "vas_new_stickers_suggestion", "qvk_gif_names", "swap_attachments_with_emoji");
+        place(2, "Чаты и диалоги", "fastReplies", "qvk_hidden_dialogs", "qvk_community_inbox", "qvk_text_tools_settings", "qvk_index59", "qvk_folders59",
+                "qvk_hide_dialog_greeting", "rounded_writebar", "qvk_compact_dialogs", "use_old_read_indicator", "disable_message_tooltip", "qvk_account_names", "fullTime");
+        place(3, "Приватность", "online_privacy", "online_privacy_bypass", "offline", "device_mask", "qvk_client_platform_settings", "qvk_online_status_viewer", "multiaccount75", "qvk_hide_vpn_detection");
+        place(3, "Статистика и аналитика", "telemetry", "news_telemetry", "music_telemetry");
+        place(3, "Блокировка приложения", "enablePin", "setPin", "fingerUnlock", "vibrateOnTap", "timeout", "lock", "qvk_pattern_setup");
+        place(4, "Классический раздел ВК", "autoCache", "qmods_offline_music", "shuffle_hint", "downloadAudio", "cache_my_music_mp3", "audio_service",
+                "use_legacy_shuffle", "remove_catalog_banners", "classic_my_music", "show_my_music", "qmods_music_compat", "qvk_disable_audio_ads",
+                "qvk_music_playlists", "qvk_music_export_quality", "qvk_music_explorer", "qvk_music_lab59", "audio_saving_player_state", "sova_music_download_folder", "clearAudioCache");
+        place(5, "Лента", "changeFeedSettings", "__dbg_no_ads", "disableAdsInGroups", "disableRecommendedPosts", "disableClipsBlock", "disableSourcePosts", "for_you_as_feed",
+                "poll_preview", "rightLikes", "feed_post_footer_redesign_v3", "feed_redesign_islands", "feed_repost_headers_redesign", "feed_redesign_text_position",
+                "resetFeedStyle", "hidePostPromotion", "qvk_feed_rules59", "feed_double_tap_like", "con_posting_redesign", "qvk_post_coauthors");
+        place(5, "Истории", "disableStories", "storyDNR", "storyAdblock", "qvk_story_downloads", "qvk_story_download_action");
+        place(5, "Видео, клипы и фото", "disableClipsAds", "disableVideoAds", "qvk_video_links", "qvk_wall_media", "qvk_image_search", "core_new_photo_editor_collage");
+        place(5, "Сообщества и друзья", "qmods_groups_compat", "qvk_community_layout", "qvk_community_recommendations", "qvk_hide_possible_friends",
+                "qvk_hide_friends_contacts_prompt", "qvk_hide_friends_suggest_prompt");
+        place(6, "Доставка уведомлений", "qvk_push_modes", "qvk_background_delivery", "disable_push_warning");
+        place(6, "Звук и вид уведомлений", "qvk_notification_sound", "qvk_notification_tools");
+        place(7, "Резервные копии", "export_server_auto", "export_server", "import_server", "export", "import", "qvk_settings_catalog");
+        place(7, "Сеть и адреса", "sslPinning", "apiHost", "oauthHost", "vkUiHostUri", "spaUri", "awayPhpDomain", "vkDesktopDomain", "resetDomains", "disableAway");
+        place(7, "Инструменты", "qvk_workbench", "qvk_tools59", "disable_contacts_warning", "short_share_timeout");
+        place(8, "Объявления и обновления", "qmods_announcements", "qmods_updates");
     }
 
-    /** Section for a catalog entry: explicit map first, then the catalog group. */
-    static int sectionFor(String group, String key) {
-        Integer s = KEY_SECTION.get(key);
-        if (s != null) return s;
+    /** Placement of a catalog entry: explicit table first, then its catalog group. */
+    static String[] placeCatalog(String group, String key) {
+        String v = PLACE.get(key);
+        if (v != null) return v.split("\\|", 2);
         switch (group) {
             case "Стили интерфейса":
-                return 0;
+                return new String[]{"0", "Стиль интерфейса"};
             case "Сообщения":
-                return 3;
+                return new String[]{"2", "Чаты и диалоги"};
             case "Приватность":
+                return new String[]{"3", "Приватность"};
             case "Блокировка":
-                return 4;
+                return new String[]{"3", "Блокировка приложения"};
             case "Музыка":
-                return 5;
+                return new String[]{"4", "Классический раздел ВК"};
             case "Лента":
-                return 0;
+                return new String[]{"5", "Лента"};
             case "Интерфейс":
-                return 0;
+                return new String[]{"0", "Интерфейс"};
             case "Сеть":
-                return 10;
+                return new String[]{"7", "Сеть и адреса"};
             default:
-                return 10;
+                return new String[]{"7", "Прочее"};
         }
     }
 
-    /** SettingsHub group → section, for screens that are not catalog entries. */
-    static int sectionForHub(String group, String target) {
+    /** SettingsHub screens. */
+    static String[] placeHub(String group, String target) {
         switch (target) {
             case "original:themes":
             case "themeCatalog":
+                return new String[]{"0", "Темы и цвета"};
             case "personal":
+                return new String[]{"0", "Персонализация"};
             case "original:badges":
-                return 1;
+                return new String[]{"0", "Значки и украшения"};
+            case "ios":
+            case "material3":
+            case "modern":
+            case "comfort":
+                return new String[]{"0", "Стиль интерфейса"};
+            case "icons":
+            case "languagesCustom":
+                return new String[]{"0", "Иконка, язык и эмодзи"};
             case "dock":
             case "all:appearance":
-                return 2;
+                return new String[]{"1", "Нижняя панель"};
             case "original:pushes":
             case "pushModes":
+                return new String[]{"6", "Доставка уведомлений"};
             case "notificationSound":
-                return 7;
+                return new String[]{"6", "Звук и вид уведомлений"};
             case "original:tools":
             case "original:other":
-                return 11;
+                return new String[]{"7", "Резервные копии"};
             case "appDiagnostics":
             case "original:debug":
             case "appearanceRecovery":
-                return 13;
+                return new String[]{"7", "Диагностика"};
             case "qmodsInbox":
-                return 12;
             case "original:about":
             case "builtinLicenses":
-                return 14;
+                return new String[]{"8", "О QVK"};
             case "videoLinks":
             case "storyDownloads":
-                return 6;
+                return new String[]{"5", "Видео, клипы и фото"};
             case "original:locker":
+                return new String[]{"3", "Блокировка приложения"};
             case "all:privacy":
             case "anonymous":
             case "clientPlatform":
-                return 4;
+                return new String[]{"3", "Приватность"};
+            case "settingsHome:stickers":
+                return new String[]{"2", "Стикеры, эмодзи и реакции"};
+            case "all:network":
+                return new String[]{"7", "Сеть и адреса"};
             default:
                 break;
         }
         switch (group) {
             case "appearance":
-                return 0;
+                return new String[]{"0", "Интерфейс"};
             case "messages":
-                return 3;
+                return new String[]{"2", "Чаты и диалоги"};
             case "media":
-                return 5;
+                return new String[]{"4", "Классический раздел ВК"};
             case "privacy":
-                return 4;
+                return new String[]{"3", "Приватность"};
             case "network":
-                return 7;
+                return new String[]{"6", "Доставка уведомлений"};
             case "about":
-                return 14;
+                return new String[]{"8", "О QVK"};
             case "feed":
-                return 0;
+                return new String[]{"5", "Лента"};
             default:
-                return 10;
+                return new String[]{"7", "Инструменты"};
         }
     }
 
@@ -216,19 +254,36 @@ public final class Qvk3SettingsIndex {
                 boolean sw = o.optBoolean("switch") || key.equals("enablePin");
                 String summary = o.optString("summary", o.optString("detail"));
                 if ("partial".equals(o.optString("status"))) summary = (summary.isEmpty() ? "" : summary + " ") + "(работает частично)";
-                add(new Item(key, sw ? key : null, o.optString("title"), summary, sectionFor(name, key),
+                String[] pl = placeCatalog(name, key);
+                add(new Item(key, sw ? key : null, o.optString("title"), summary, Integer.parseInt(pl[0]), pl[1],
                         sw ? SWITCH : ACTION, sw ? null : o.optString("action", key), o.optBoolean("default")));
             }
         }
     }
 
     /** Adds a screen (SettingsHub route or a QVK 3.0 route). */
-    public void addScreen(String target, String title, String summary, int section) {
-        add(new Item("screen:" + target, null, title, summary, section, SCREEN, target, false));
+    public void addScreen(String target, String title, String summary, int section, String group) {
+        add(new Item("screen:" + target, null, title, summary, section, group, SCREEN, target, false));
     }
 
     public void addHubScreen(String group, String title, String summary, String target) {
-        addScreen(target, title, summary, sectionForHub(group, target));
+        // "all:"/"basic:" routes only re-list catalog switches that the centre already shows; a screen whose
+        // target or title duplicates a catalog entry would appear twice.
+        if (target.startsWith("all:") || target.startsWith("basic:")) return;
+        String nt = normal(title);
+        for (Item i : items) {
+            if (target.equals(i.target) || normal(i.title).equals(nt)) return;
+            if (target.startsWith("tools59:") && target.equals(i.target)) return;
+        }
+        String[] pl = placeHub(group, target);
+        addScreen(target, title, summary, Integer.parseInt(pl[0]), pl[1]);
+    }
+
+    /** Card titles of a section in display order (order of first appearance, QVK 3.0 cards first). */
+    public List<String> groups(int section) {
+        List<String> out = new ArrayList<>();
+        for (Item i : items) if (i.section == section && !out.contains(i.group)) out.add(i.group);
+        return out;
     }
 
     // ------------------------------------------------------------------ search

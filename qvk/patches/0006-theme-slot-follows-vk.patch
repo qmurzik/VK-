@@ -1,0 +1,14 @@
+--- a/smali_classes21/re/sova/qmods/ThemeProfiles.smali	2026-11-10 17:50:19.117945322 +0000
++++ b/smali_classes21/re/sova/qmods/ThemeProfiles.smali	2026-11-10 17:50:19.132155997 +0000
+@@ -833,6 +833,11 @@
+     .line 38
+     :cond_1
+     :goto_0
++    # QVK 3.0: "system" mode follows VK's own light/dark theme, so the matching style variant is used.
++    invoke-static {p0, v0}, Lre/sova/qmods/Qvk3Appearance;->slotMode(Landroid/content/Context;Ljava/lang/String;)Ljava/lang/String;
++
++    move-result-object v0
++
+     const-string p1, "system"
+ 
+     invoke-virtual {p1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z

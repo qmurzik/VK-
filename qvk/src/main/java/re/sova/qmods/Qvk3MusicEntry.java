@@ -1,6 +1,7 @@
 package re.sova.qmods;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
 
@@ -14,6 +15,37 @@ import android.os.SystemClock;
  */
 public final class Qvk3MusicEntry {
     private static long lastOpen;
+
+    /**
+     * Called (patch 0007) at the start of VK's MusicFragmentNavigator.a(Context) — the single launcher used by
+     * VK's own entries (services, profile "Музыка", side menu, links). Only the user's own music library is
+     * redirected; podcasts/audiobooks, searches, specific catalog links and other people's music stay in VK.
+     */
+    public static boolean fromNavigator(Object navigator, Context ctx) {
+        try {
+            if (navigator == null || ctx == null || !Qvk3MusicSettings.enabled(ctx)) return false;
+            if (navigator.getClass().getField("b").getBoolean(navigator)) return false; // podcasts / audiobooks
+            Object builder = navigator.getClass().getField("a").get(navigator);
+            android.os.Bundle args = (android.os.Bundle) builder.getClass().getField("W3").get(builder);
+            if (args != null) {
+                if (args.containsKey("query") || args.containsKey("key_url")) return false;
+                Object owner = args.get("owner_id");
+                if (owner != null) {
+                    long id = ((Number) owner.getClass().getMethod("getValue").invoke(owner)).longValue();
+                    if (id != RuntimeBridge.account()) return false;
+                }
+            }
+            if (ctx instanceof Activity) return open((Activity) ctx);
+            long now = SystemClock.elapsedRealtime();
+            if (now - lastOpen < 700) return true;
+            lastOpen = now;
+            ctx.startActivity(new Intent(ctx, Qvk3MusicActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            return true;
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.music.navigator", t);
+            return false;
+        }
+    }
 
     /** Returns true when QVK Music handled the navigation. Never throws into VK code. */
     public static boolean open(Activity a) {

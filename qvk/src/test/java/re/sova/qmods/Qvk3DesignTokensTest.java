@@ -36,7 +36,23 @@ public class Qvk3DesignTokensTest {
         assertTrue(compact.componentFlags(false).get("qvk_compact_dialogs"));
         assertFalse(cozy.componentFlags(false).get("qvk_compact_dialogs"));
         assertTrue(Qvk3DesignTokens.PRESETS.get("ios").componentFlags(false).get("qvk_ios_enabled"));
-        assertTrue(Qvk3DesignTokens.PRESETS.get("modern").componentFlags(false).get("qvk_material3_enabled"));
+        assertFalse("presets must not force Material", Qvk3DesignTokens.PRESETS.get("modern").componentFlags(false).get("qvk_material3_enabled"));
+        assertFalse(Qvk3DesignTokens.PRESETS.get("ios").componentFlags(false).get("qvk_ios_colors"));
+    }
+
+    @Test public void everyPresetHasReadableLightAndDarkVariants() {
+        for (Qvk3DesignTokens t : Qvk3DesignTokens.PRESETS.values()) {
+            for (boolean dark : new boolean[]{false, true}) {
+                Qvk3DesignTokens v = t.variant(dark);
+                assertEquals(dark, v.dark);
+                assertEquals(t.accent, v.accent);
+                JSONObject theme = v.toTheme();
+                int text = c(theme, "text_primary"), content = c(theme, "background_content");
+                assertTrue(t.id + " dark=" + dark, Qvk3DesignTokens.contrast(text, content) >= 4.5);
+                boolean pageDark = Qvk3DesignTokens.luminance(c(theme, "background_page")) < 0.2;
+                assertEquals(t.id + " page brightness matches variant", dark, pageDark);
+            }
+        }
     }
 
     @Test public void heavyEffectsOffOnWeakDevices() {

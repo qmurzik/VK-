@@ -27,14 +27,15 @@ public class Qvk3SettingsIndexTest {
         assertEquals("replies", idx.get("fastReplies").target);
         assertNull(idx.get("gone"));
         assertTrue(idx.get("autoCache").summary.contains("частично"));
-        assertEquals(5, idx.get("autoCache").section);
-        assertEquals(3, idx.get("dnrGlobal").section);
+        assertEquals(4, idx.get("autoCache").section);
+        assertEquals(2, idx.get("dnrGlobal").section);
+        assertEquals("Нечиталка и «печатает»", idx.get("dnrGlobal").group);
     }
 
     @Test public void searchMatchesPrefixesAcrossWordsAndRanksTitles() throws Exception {
         Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
         idx.addCatalog(new JSONArray(FIXTURE));
-        idx.addScreen("x", "Сообщения сообществ", "Нечиталка не действует", 3);
+        idx.addScreen("x", "Сообщения сообществ", "Нечиталка не действует", 2, "Чаты и диалоги");
         List<Qvk3SettingsIndex.Item> r = idx.search("нечит", 10);
         assertEquals("dnrGlobal", r.get(0).id);
         assertEquals(2, r.size());
@@ -45,8 +46,8 @@ public class Qvk3SettingsIndexTest {
 
     @Test public void duplicateIdsIgnored() {
         Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
-        idx.addScreen("a", "A", "", 0);
-        idx.addScreen("a", "A2", "", 1);
+        idx.addScreen("a", "A", "", 0, "g");
+        idx.addScreen("a", "A2", "", 1, "g");
         assertEquals(1, idx.all().size());
     }
 
@@ -60,7 +61,27 @@ public class Qvk3SettingsIndexTest {
         assertTrue("catalog size " + idx.all().size(), idx.all().size() >= 150);
         int[] perSection = new int[Qvk3SettingsIndex.SECTIONS.length];
         for (Qvk3SettingsIndex.Item i : idx.all()) perSection[i.section]++;
-        for (int s : new int[]{0, 1, 2, 3, 4, 5, 6, 7}) assertTrue(Qvk3SettingsIndex.SECTIONS[s], perSection[s] > 0);
+        for (int s : new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8}) assertTrue(Qvk3SettingsIndex.SECTIONS[s], perSection[s] > 0);
+        // hub screens are merged without duplicates
+        String[][] hub = {{"messages", "Скрытые диалоги", "", "hiddenDialogs"}, {"messages", "Сообщения и нечиталка", "", "all:messages"},
+                {"tools", "Тамагочи", "", "tamagotchi"}};
+        for (String[] h : hub) idx.addHubScreen(h[0], h[1], h[2], h[3]);
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Qvk3SettingsIndex.Item i : idx.all()) if (i.type != Qvk3SettingsIndex.SWITCH)
+            assertTrue("duplicate: " + i.title, seen.add(i.section + "/" + Qvk3SettingsIndex.normal(i.title)));
+        assertNull(idx.get("screen:all:messages"));
+        assertNotNull(idx.get("screen:tamagotchi"));
+        // nothing large lands in a catch-all card
+        int other = 0;
+        for (Qvk3SettingsIndex.Item i : idx.all()) if (i.group.equals("Прочее")) other++;
+        assertTrue("items in «Прочее»: " + other, other <= 3);
+        // every card is reasonably sized (no 50-item dump)
+        for (int s = 0; s < Qvk3SettingsIndex.SECTIONS.length; s++)
+            for (String g : idx.groups(s)) {
+                int n = 0;
+                for (Qvk3SettingsIndex.Item i : idx.section(s)) if (i.group.equals(g)) n++;
+                assertTrue(Qvk3SettingsIndex.SECTIONS[s] + " / " + g + ": " + n, n <= 25);
+            }
         assertFalse(idx.search("PIN", 5).isEmpty());
         assertFalse(idx.search("стикеры telegram", 5).isEmpty());
     }

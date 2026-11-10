@@ -3,6 +3,8 @@ package re.sova.qmods;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
@@ -10,11 +12,10 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -27,124 +28,35 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * QVK 3.0 settings centre. Header with version, pinned search, current style, light/dark switch and the
- * active scenario; 15 sections; favourites; recent changes with undo; per-section reset.
- *
- * Settings are the same keys QVK 2.x uses (FeatureCatalog / SettingsRuntime.toggle), so nothing has to be
- * migrated and the classic screen ("Классические настройки QVK") keeps working side by side.
+ * QVK 3.0 settings centre: large title, pinned search, appearance card, 9 categories with icon tiles, and
+ * inside each category grouped cards ("Нечиталка", "Голосовые", …). Same preference keys as QVK 2.x.
  */
 public final class Qvk3SettingsActivity extends Activity {
     static final String FAVORITES = "qvk3_settings_favorites";
     private Qvk3Ui.Palette p;
     private Qvk3SettingsIndex index;
-    private ListView list;
-    private Adapter adapter;
+    private LinearLayout content;
+    private ScrollView scroll;
     private EditText search;
-    private TextView title, home;
+    private TextView title, subtitle;
+    private View back;
     private int section = -1;
     private Object backCallback;
 
-    interface RowAction {
-        void run();
-    }
-
-    static final class Row {
-        final int kind; // 0 header, 1 link, 2 switch, 3 note
-        final String title, summary;
-        final Qvk3SettingsIndex.Item item;
-        final RowAction click;
-
-        Row(int kind, String title, String summary, Qvk3SettingsIndex.Item item, RowAction click) {
-            this.kind = kind;
-            this.title = title;
-            this.summary = summary;
-            this.item = item;
-            this.click = click;
-        }
-    }
-
-    final class Adapter extends BaseAdapter {
-        final List<Row> rows = new ArrayList<>();
-
-        @Override
-        public int getCount() {
-            return rows.size();
-        }
-
-        @Override
-        public Object getItem(int i) {
-            return rows.get(i);
-        }
-
-        @Override
-        public long getItemId(int i) {
-            return i;
-        }
-
-        @Override
-        public int getViewTypeCount() {
-            return 4;
-        }
-
-        @Override
-        public int getItemViewType(int i) {
-            return rows.get(i).kind;
-        }
-
-        @Override
-        public boolean isEnabled(int i) {
-            return rows.get(i).kind != 0 && (rows.get(i).click != null || rows.get(i).kind == 2);
-        }
-
-        @Override
-        public View getView(int i, View convert, ViewGroup parent) {
-            Row r = rows.get(i);
-            Activity a = Qvk3SettingsActivity.this;
-            int pad = Qvk3Ui.dp(a, 16);
-            if (r.kind == 0) {
-                TextView t = Qvk3Ui.text(a, r.title, 14, p.accent, true);
-                t.setPadding(pad, Qvk3Ui.dp(a, 20), pad, Qvk3Ui.dp(a, 6));
-                t.setAccessibilityHeading(true);
-                return t;
-            }
-            if (r.kind == 3) {
-                TextView t = Qvk3Ui.text(a, r.title, 13, p.text2, false);
-                t.setPadding(pad, Qvk3Ui.dp(a, 6), pad, Qvk3Ui.dp(a, 6));
-                return t;
-            }
-            LinearLayout row = new LinearLayout(a);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(pad, Qvk3Ui.dp(a, 10), pad, Qvk3Ui.dp(a, 10));
-            row.setMinimumHeight(Qvk3Ui.dp(a, 56));
-            LinearLayout texts = new LinearLayout(a);
-            texts.setOrientation(LinearLayout.VERTICAL);
-            boolean fav = r.item != null && favorites().contains(r.item.id);
-            texts.addView(Qvk3Ui.text(a, (fav ? "★ " : "") + r.title, 16, p.text, false));
-            if (r.summary != null && !r.summary.isEmpty()) texts.addView(Qvk3Ui.text(a, r.summary, 13, p.text2, false));
-            row.addView(texts, Qvk3Ui.weight(1));
-            if (r.kind == 2) {
-                Switch s = new Switch(a);
-                s.setChecked(value(r.item));
-                s.setClickable(false);
-                s.setFocusable(false);
-                s.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-                row.addView(s);
-                row.setContentDescription(r.title + ". " + (value(r.item) ? "Включено" : "Выключено") + ". " + r.summary);
-            } else {
-                row.addView(Qvk3Ui.text(a, "›", 22, p.text2, false));
-                row.setContentDescription(r.title + ". " + (r.summary == null ? "" : r.summary));
-            }
-            return row;
-        }
+    private int dp(float v) {
+        return Qvk3Ui.dp(this, v);
     }
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        p = Qvk3Ui.palette(this, Qvk3Appearance.current(this).dark ? "amoled" : "modern");
+        boolean dark = Qvk3Ui.night(this);
+        int accent = Qvk3Ui.accent(this);
+        p = dark ? new Qvk3Ui.Palette(true, 0xFF0E0F12, 0xFF1C1D21, 0xFF2A2B30, 0xFFF2F3F5, 0xFF8E9199, accent, Color.WHITE, 0xFF2C2D32)
+                : new Qvk3Ui.Palette(false, 0xFFF2F3F7, Color.WHITE, 0xFFE9EAEE, 0xFF0B0B0D, 0xFF7C7F87, accent, Color.WHITE, 0xFFE4E5EA);
         Qvk3Ui.bars(this, p);
-        index = buildIndex();
+        index = buildIndex(this);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(p.bg);
@@ -152,26 +64,35 @@ public final class Qvk3SettingsActivity extends Activity {
 
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 4), Qvk3Ui.dp(this, 8), 0);
-        home = Qvk3Ui.glyph(this, p, "⌂", "На главный экран настроек", 22, v -> showHome());
-        head.addView(home);
+        head.setPadding(dp(8), dp(6), dp(8), 0);
+        back = Qvk3Ui.icon(this, Qvk3Icons.BACK, p.text, 48, 24, "Назад", v -> handleBack());
+        head.addView(back);
         LinearLayout tt = new LinearLayout(this);
         tt.setOrientation(LinearLayout.VERTICAL);
-        title = Qvk3Ui.line(this, "QVK", 24, p.text, true);
+        tt.setPadding(dp(8), 0, 0, 0);
+        title = Qvk3Ui.line(this, "Настройки", 30, p.text, true);
         title.setAccessibilityHeading(true);
+        subtitle = Qvk3Ui.line(this, version(), 13, p.text2, false);
         tt.addView(title);
-        tt.addView(Qvk3Ui.line(this, Qvk3Updates.installedName(this) + " · на базе VK " + Qvk3UpdateManifest.VK_BASE, 12, p.text2, false));
+        tt.addView(subtitle);
         head.addView(tt, Qvk3Ui.weight(1));
-        head.addView(Qvk3Ui.glyph(this, p, "↶", "Отменить последнее изменение", 22, v -> undo()));
+        head.addView(Qvk3Ui.icon(this, Qvk3Icons.UNDO, p.text, 48, 22, "Отменить последнее изменение", v -> undo()));
         root.addView(head, Qvk3Ui.match());
 
+        FrameLayout searchBox = new FrameLayout(this);
         search = new EditText(this);
-        search.setHint("Поиск по всем настройкам");
+        search.setHint("Поиск настроек");
         search.setSingleLine(true);
+        search.setTextSize(16);
         search.setTextColor(p.text);
         search.setHintTextColor(p.text2);
-        search.setBackground(Qvk3Ui.rounded(p.surface2, Qvk3Ui.dp(this, 20)));
-        search.setPadding(Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 10), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 10));
+        search.setBackground(Qvk3Ui.rounded(p.dark ? p.surface : 0xFFE5E6EB, dp(14)));
+        search.setPadding(dp(44), dp(11), dp(16), dp(11));
+        searchBox.addView(search, new FrameLayout.LayoutParams(-1, -2));
+        android.widget.ImageView mag = new android.widget.ImageView(this);
+        mag.setImageDrawable(Qvk3Icons.of(Qvk3Icons.SEARCH, p.text2));
+        searchBox.addView(mag, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER_VERTICAL | Gravity.START));
+        ((FrameLayout.LayoutParams) mag.getLayoutParams()).leftMargin = dp(14);
         search.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int a, int b, int c) {
@@ -183,36 +104,27 @@ public final class Qvk3SettingsActivity extends Activity {
 
             @Override
             public void afterTextChanged(Editable s) {
-                list.removeCallbacks(doSearch);
-                list.postDelayed(doSearch, 150);
+                content.removeCallbacks(doSearch);
+                content.postDelayed(doSearch, 150);
             }
         });
         LinearLayout.LayoutParams slp = Qvk3Ui.match();
-        slp.setMargins(Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 6), Qvk3Ui.dp(this, 16), Qvk3Ui.dp(this, 6));
-        root.addView(search, slp);
+        slp.setMargins(dp(16), dp(10), dp(16), dp(6));
+        root.addView(searchBox, slp);
 
-        list = new ListView(this);
-        list.setDivider(null);
-        adapter = new Adapter();
-        list.setAdapter(adapter);
-        list.setOnItemClickListener((parent, view, i, id) -> click(adapter.rows.get(i)));
-        list.setOnItemLongClickListener((parent, view, i, id) -> {
-            Row r = adapter.rows.get(i);
-            if (r.item == null) return false;
-            toggleFavorite(r.item);
-            return true;
-        });
-        root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
+        scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
+        content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(4), dp(16), dp(32));
+        scroll.addView(content);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
 
         if (state != null) section = state.getInt("section", -1);
-        if (state != null && !state.getString("query", "").isEmpty()) {
-            search.setText(state.getString("query"));
-        } else if (section >= 0) {
-            showSection(section);
-        } else {
-            showHome();
-        }
+        if (state != null && !state.getString("query", "").isEmpty()) search.setText(state.getString("query"));
+        else if (section >= 0) showSection(section);
+        else showHome();
         if (Build.VERSION.SDK_INT >= 33) {
             android.window.OnBackInvokedCallback cb = this::handleBack;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
@@ -220,10 +132,15 @@ public final class Qvk3SettingsActivity extends Activity {
         }
     }
 
+    private String version() {
+        String n = Qvk3Updates.installedName(this);
+        return "QVK " + (n == null || n.equals("?") ? "3.0" : n.replace("8.100-qvk-", "")) + " · на базе VK " + Qvk3UpdateManifest.VK_BASE;
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
-        adapter.notifyDataSetChanged(); // values may have changed in a QVK 2.x screen
+        refresh();
     }
 
     @Override
@@ -258,34 +175,53 @@ public final class Qvk3SettingsActivity extends Activity {
         finish();
     }
 
+    private void refresh() {
+        if (search.length() > 0) doSearch.run();
+        else if (section >= 0) showSection(section);
+        else showHome();
+    }
+
     // ------------------------------------------------------------------ data
 
-    private Qvk3SettingsIndex buildIndex() {
-        Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
-        try (InputStream in = getAssets().open("qmods_features.json")) {
+    static JSONArray catalog(Activity a) {
+        try (InputStream in = a.getAssets().open("qmods_features.json")) {
             byte[] b = new byte[1 << 20];
             int n = Qvk3Id3.readFully(in, b);
-            idx.addCatalog(new JSONArray(new String(b, 0, n, "UTF-8")));
+            return new JSONArray(new String(b, 0, n, "UTF-8"));
         } catch (Exception e) {
+            String path = System.getProperty("qvk.features"); // JVM screenshot tests only
+            if (path != null) {
+                try {
+                    return new JSONArray(new String(java.nio.file.Files.readAllBytes(new java.io.File(path).toPath()), "UTF-8"));
+                } catch (Exception ignored) {
+                }
+            }
             RuntimeFaults.record("qvk3.settings.catalog", e);
+            return new JSONArray();
         }
+    }
+
+    static Qvk3SettingsIndex buildIndex(Activity a) {
+        Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
+        // QVK 3.0 items first so they lead their cards
+        idx.addScreen("qvk3:styles", "Стили QVK 3.0", "Classic, Modern, Glass, AMOLED, Compact, Cozy, Neon, iOS", 0, "QVK 3.0");
+        idx.addScreen("qvk3:editor", "Конструктор оформления", "Цвета, радиусы, шрифт, плотность — с предпросмотром", 0, "QVK 3.0");
+        idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
+        idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
+        idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
+        idx.addScreen("qvk3:musicSettings", "Настройки QVK Music", "Воспроизведение, звук, плеер, офлайн, тексты", 4, "QVK Music");
+        idx.addScreen("qvk3:push", "Диагностика Push", "Google/microG, транспорт, фоновые ограничения", 6, "Доставка уведомлений");
+        idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 7, "Загрузки и место");
+        idx.addScreen("qvk3:perf", "Облегчённый режим", "Без размытия и прозрачности — для слабых устройств", 7, "Производительность и батарея");
+        idx.addScreen("qvk3:battery", "Фоновая работа и батарея", "Оптимизация батареи и ограничения Android", 7, "Производительность и батарея");
+        idx.addScreen("qvk3:faults", "Журнал ошибок", "Сбои модулей с указанием компонента", 7, "Диагностика");
+        idx.addScreen("qvk3:updates", "Проверить обновления", "Загрузка с докачкой, проверка подписи", 8, "Обновления");
+        idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса, зеркала и ключи подписи", 8, "Обновления");
+        idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 8, "О QVK");
+        idx.addScreen("qvk3:classic", "Классические настройки QVK", "Прежний экран настроек QVK 2.x", 8, "О QVK");
+        idx.addScreen("qvk3:classicDefault", "Открывать классические настройки", "Вернуть прежний экран вместо этого центра", 8, "О QVK");
+        idx.addCatalog(catalog(a));
         for (SettingsHub.Entry e : SettingsHub.ENTRIES) idx.addHubScreen(e.group, e.title, e.detail, e.target);
-        idx.addScreen("qvk3:styles", "Стили QVK 3.0", "Classic, Modern, Glass, AMOLED, Compact, Cozy, Neon, iOS", 1);
-        idx.addScreen("qvk3:editor", "Конструктор оформления", "Цвета, фон, карточки, радиусы, шрифт, плотность — с предпросмотром", 1);
-        idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Темы и стили; остальные настройки и данные не затрагиваются", 1);
-        idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 1);
-        idx.addScreen("qvk3:music", "QVK Music", "Собственный музыкальный раздел и плеер", 5);
-        idx.addScreen("qvk3:musicSettings", "Настройки QVK Music", "Воспроизведение, звук, плеер, офлайн, тексты, CoverFlow", 5);
-        idx.addScreen("qvk3:push", "Диагностический центр Push", "Сервисы Google/microG, транспорт, фоновые ограничения", 7);
-        idx.addScreen("qvk3:perf", "Облегчённый режим", "Отключить тяжёлые эффекты (размытие, прозрачность)", 9);
-        idx.addScreen("qvk3:battery", "Фоновая работа и батарея", "Оптимизация батареи, ограничения Android", 9);
-        idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 8);
-        idx.addScreen("qvk3:updates", "Обновления QVK", "Проверка, загрузка с докачкой, история версий", 12);
-        idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса манифеста и зеркала, ключи подписи", 12);
-        idx.addScreen("qvk3:faults", "Журнал ошибок QVK 3.0", "Последние сбои модулей с указанием компонента", 13);
-        idx.addScreen("qvk3:classic", "Классические настройки QVK", "Прежний экран настроек QVK 2.x", 14);
-        idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 14);
-        idx.addScreen("qvk3:classicDefault", "Открывать классические настройки по умолчанию", "Флаг возврата к прежнему интерфейсу настроек QVK 2.x", 14);
         return idx;
     }
 
@@ -298,19 +234,118 @@ public final class Qvk3SettingsActivity extends Activity {
         boolean add = !f.remove(it.id);
         if (add) f.add(it.id);
         Qvk3MusicSettings.prefs(this).edit().putStringSet(FAVORITES, f).apply();
-        Qvk3Ui.toast(this, add ? "Добавлено в избранные настройки" : "Убрано из избранных");
-        adapter.notifyDataSetChanged();
+        Qvk3Ui.toast(this, add ? "Добавлено в избранное" : "Убрано из избранного");
+        refresh();
     }
 
     private boolean value(Qvk3SettingsIndex.Item it) {
-        SharedPreferences prefs = Qvk3MusicSettings.prefs(this);
         try {
             FeatureCatalog.Entry e = FeatureCatalog.get(this).find(it.key);
             if (e != null) return e.value();
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
             // fall back to the raw preference
         }
-        return prefs.getBoolean(it.key, it.def);
+        return Qvk3MusicSettings.prefs(this).getBoolean(it.key, it.def);
+    }
+
+    // ------------------------------------------------------------------ building blocks
+
+    private void header(String text) {
+        TextView t = Qvk3Ui.text(this, text.toUpperCase(java.util.Locale.ROOT), 12, p.text2, true);
+        t.setLetterSpacing(0.06f);
+        t.setPadding(dp(16), dp(22), dp(16), dp(8));
+        t.setAccessibilityHeading(true);
+        content.addView(t);
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = Qvk3Ui.card(this, p);
+        content.addView(c, Qvk3Ui.match());
+        return c;
+    }
+
+    private void divider(LinearLayout card, int inset) {
+        if (card.getChildCount() == 0) return;
+        View d = new View(this);
+        d.setBackgroundColor(p.divider);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, Math.max(1, dp(0.6f)));
+        lp.leftMargin = dp(inset);
+        card.addView(d, lp);
+    }
+
+    /** One row: optional tile, title, summary, trailing chevron/switch/value. */
+    private LinearLayout row(LinearLayout card, String icon, int tileColor, String titleText, String summary, View trailing, Runnable click, Runnable longClick) {
+        divider(card, icon != null ? 64 : 16);
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setMinimumHeight(dp(56));
+        r.setPadding(dp(16), dp(10), dp(12), dp(10));
+        r.setBackground(Qvk3Ui.ripple(this, 0, p.dark ? 0x22FFFFFF : 0x14000000, 0));
+        if (icon != null) {
+            View tile = Qvk3Ui.tile(this, icon, tileColor, 32);
+            LinearLayout.LayoutParams tl = (LinearLayout.LayoutParams) tile.getLayoutParams();
+            tl.rightMargin = dp(16);
+            r.addView(tile, tl);
+        }
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.addView(Qvk3Ui.text(this, titleText, 16, p.text, false));
+        if (summary != null && !summary.isEmpty()) {
+            TextView s = Qvk3Ui.text(this, summary, 13, p.text2, false);
+            s.setMaxLines(2);
+            s.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            texts.addView(s);
+        }
+        r.addView(texts, Qvk3Ui.weight(1));
+        if (trailing == null) {
+            android.widget.ImageView chev = new android.widget.ImageView(this);
+            chev.setImageDrawable(Qvk3Icons.of(Qvk3Icons.RIGHT, p.dark ? 0xFF5C5F66 : 0xFFC4C6CC));
+            trailing = chev;
+            chev.setLayoutParams(new LinearLayout.LayoutParams(dp(20), dp(20)));
+        }
+        r.addView(trailing);
+        if (click != null) r.setOnClickListener(v -> click.run());
+        if (longClick != null) r.setOnLongClickListener(v -> {
+            longClick.run();
+            return true;
+        });
+        r.setContentDescription(titleText + (summary == null ? "" : ". " + summary));
+        card.addView(r, Qvk3Ui.match());
+        return r;
+    }
+
+    private Switch toggle(boolean checked) {
+        Switch s = new Switch(this);
+        s.setChecked(checked);
+        s.setClickable(false);
+        s.setFocusable(false);
+        s.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int[][] st = {{android.R.attr.state_checked}, {}};
+        s.setThumbTintList(new ColorStateList(st, new int[]{Color.WHITE, p.dark ? 0xFFB9BBC2 : Color.WHITE}));
+        s.setTrackTintList(new ColorStateList(st, new int[]{0xFF34C759, p.dark ? 0xFF3A3B40 : 0xFFD9DAE0}));
+        return s;
+    }
+
+    private void itemRow(LinearLayout card, Qvk3SettingsIndex.Item it, boolean showSection) {
+        boolean fav = favorites().contains(it.id);
+        String sum = it.summary;
+        if (showSection) sum = Qvk3SettingsIndex.SECTIONS[it.section] + " › " + it.group + (sum.isEmpty() ? "" : " · " + sum);
+        String t = (fav ? "★ " : "") + it.title;
+        if (it.type == Qvk3SettingsIndex.SWITCH) {
+            boolean on = value(it);
+            LinearLayout r = row(card, null, 0, t, sum, toggle(on), () -> flip(it), () -> toggleFavorite(it));
+            r.setContentDescription(it.title + ". " + (on ? "Включено" : "Выключено") + ". " + it.summary);
+        } else {
+            row(card, null, 0, t, sum, null, () -> open(it), () -> toggleFavorite(it));
+        }
+    }
+
+    private void begin(String heading, String sub, boolean home) {
+        content.removeAllViews();
+        title.setText(heading);
+        subtitle.setText(sub);
+        back.setVisibility(home ? View.GONE : View.VISIBLE);
+        scroll.scrollTo(0, 0);
     }
 
     // ------------------------------------------------------------------ screens
@@ -322,82 +357,138 @@ public final class Qvk3SettingsActivity extends Activity {
             else showHome();
             return;
         }
-        List<Row> rows = new ArrayList<>();
-        List<Qvk3SettingsIndex.Item> found = index.search(q, 80);
-        rows.add(new Row(3, found.isEmpty() ? "Ничего не найдено" : "Найдено: " + found.size(), null, null, null));
-        for (Qvk3SettingsIndex.Item it : found) rows.add(row(it, true));
-        set(rows, "Поиск");
+        List<Qvk3SettingsIndex.Item> found = index.search(q, 60);
+        begin("Поиск", found.isEmpty() ? "Ничего не найдено" : "Найдено: " + found.size(), false);
+        if (found.isEmpty()) return;
+        LinearLayout c = card();
+        for (Qvk3SettingsIndex.Item it : found) itemRow(c, it, true);
     };
-
-    private void set(List<Row> rows, String heading) {
-        adapter.rows.clear();
-        adapter.rows.addAll(rows);
-        adapter.notifyDataSetChanged();
-        title.setText(heading);
-        home.setVisibility(section >= 0 || search.length() > 0 ? View.VISIBLE : View.INVISIBLE);
-    }
-
-    private Row row(Qvk3SettingsIndex.Item it, boolean withSection) {
-        String sum = it.summary + (withSection ? (it.summary.isEmpty() ? "" : " · ") + Qvk3SettingsIndex.SECTIONS[it.section] : "");
-        if (it.type == Qvk3SettingsIndex.SWITCH) return new Row(2, it.title, sum, it, () -> flip(it));
-        return new Row(1, it.title, sum, it, () -> open(it));
-    }
 
     private void showHome() {
         section = -1;
         if (search.length() > 0) search.setText("");
-        List<Row> rows = new ArrayList<>();
+        begin("Настройки", version(), true);
+
+        // appearance card
         Qvk3DesignTokens t = Qvk3Appearance.current(this);
-        rows.add(new Row(1, "Стиль: " + Qvk3Appearance.currentTitle(this), "Нажмите, чтобы выбрать другой стиль", null, this::styles));
-        rows.add(new Row(1, t.dark ? "☀ Переключить на светлое оформление" : "☾ Переключить на тёмное оформление",
-                t.dark ? "Применит QVK Classic" : "Применит QVK AMOLED", null, this::quickTheme));
+        LinearLayout look = card();
+        look.setPadding(dp(16), dp(16), dp(16), dp(14));
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout sw = new LinearLayout(this);
+        for (int col : new int[]{t.accent, Qvk3DesignTokens.over(t.page, 0xFF000000), Qvk3DesignTokens.over(t.content, 0xFF000000), Qvk3DesignTokens.over(t.outgoing, 0xFF000000)}) {
+            View dot = new View(this);
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            g.setColor(col);
+            g.setStroke(dp(2), p.surface);
+            dot.setBackground(g);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
+            lp.leftMargin = sw.getChildCount() == 0 ? 0 : -dp(9);
+            sw.addView(dot, lp);
+        }
+        top.addView(sw);
+        LinearLayout lt = new LinearLayout(this);
+        lt.setOrientation(LinearLayout.VERTICAL);
+        lt.setPadding(dp(14), 0, 0, 0);
+        lt.addView(Qvk3Ui.text(this, "Оформление", 13, p.text2, false));
+        lt.addView(Qvk3Ui.line(this, Qvk3Appearance.currentTitle(this), 18, p.text, true));
+        top.addView(lt, Qvk3Ui.weight(1));
+        look.addView(top);
+        LinearLayout chips = new LinearLayout(this);
+        chips.setPadding(0, dp(14), 0, 0);
+        chips.addView(chip("Стили", true, this::styles), Qvk3Ui.weight(1));
+        chips.addView(gap());
+        chips.addView(chip("Конструктор", false, () -> Qvk3StyleEditor.show(this)), Qvk3Ui.weight(1));
+        chips.addView(gap());
+        chips.addView(chip(t.dark ? "Светлая" : "Тёмная", false, this::quickTheme), Qvk3Ui.weight(1));
+        look.addView(chips);
+
+        // scenario
         Qvk3Scenarios.Scenario sc = Qvk3Scenarios.find(this, Qvk3Scenarios.active(this));
-        rows.add(new Row(1, "Сценарий: " + (sc == null ? "не выбран" : sc.title), sc == null ? "Профили поведения приложения в одно касание" : sc.description, null, this::scenarios));
+        LinearLayout scCard = card();
+        ((LinearLayout.LayoutParams) scCard.getLayoutParams()).topMargin = dp(12);
+        row(scCard, Qvk3Icons.WAND, 0xFF5AC8FA, "Сценарий: " + (sc == null ? "не выбран" : sc.title),
+                sc == null ? "Обычный, Работа, Ночь, Музыка, Фокус" : sc.description, null, this::scenarios, null);
+
+        // favourites
         Set<String> fav = favorites();
         if (!fav.isEmpty()) {
-            rows.add(new Row(0, "Избранные настройки", null, null, null));
-            for (Qvk3SettingsIndex.Item it : index.all()) if (fav.contains(it.id)) rows.add(row(it, true));
+            header("Избранное");
+            LinearLayout c = card();
+            for (Qvk3SettingsIndex.Item it : index.all()) if (fav.contains(it.id)) itemRow(c, it, false);
         }
+
+        // recent changes
         List<Qvk3SettingsHistory.Entry> hist = Qvk3SettingsHistory.list(this);
         if (!hist.isEmpty()) {
-            rows.add(new Row(0, "Недавно изменённые", null, null, null));
+            header("Недавние изменения");
+            LinearLayout c = card();
             java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT);
-            for (int i = 0; i < Math.min(5, hist.size()); i++) {
+            for (int i = 0; i < Math.min(3, hist.size()); i++) {
                 Qvk3SettingsHistory.Entry e = hist.get(i);
                 Qvk3SettingsIndex.Item it = index.get(e.key);
-                rows.add(new Row(it != null ? 1 : 3, e.title, df.format(new java.util.Date(e.time)), it, it == null ? null : () -> showSection(it.section)));
+                TextView when = Qvk3Ui.text(this, df.format(new java.util.Date(e.time)), 12, p.text2, false);
+                row(c, null, 0, e.title, null, when, it == null ? null : () -> showSection(it.section), null);
             }
-            rows.add(new Row(1, "↶ Отменить последнее изменение", null, null, this::undo));
+            row(c, Qvk3Icons.UNDO, 0xFF8E8E93, "Отменить последнее изменение", null, new View(this), this::undo, null);
         }
-        rows.add(new Row(0, "Разделы", null, null, null));
-        for (int s = 0; s < Qvk3SettingsIndex.SECTIONS.length; s++) {
-            final int sec = s;
-            int n = index.section(s).size();
-            rows.add(new Row(1, Qvk3SettingsIndex.SECTIONS[s], Qvk3SettingsIndex.SECTION_HINTS[s] + " · " + n, null, () -> showSection(sec)));
+
+        // categories
+        int[][] groups = {{0, 1}, {2, 3, 6}, {4, 5}, {7, 8}};
+        for (int[] g : groups) {
+            LinearLayout c = card();
+            ((LinearLayout.LayoutParams) c.getLayoutParams()).topMargin = dp(18);
+            for (int s : g) {
+                final int sec = s;
+                row(c, Qvk3SettingsIndex.SECTION_ICONS[s], Qvk3SettingsIndex.SECTION_COLORS[s], Qvk3SettingsIndex.SECTIONS[s],
+                        Qvk3SettingsIndex.SECTION_HINTS[s], null, () -> showSection(sec), null);
+            }
         }
-        rows.add(new Row(3, "Долгое нажатие на настройку добавляет её в избранное.", null, null, null));
-        set(rows, "QVK");
-        list.setSelection(0);
+        TextView hint = Qvk3Ui.text(this, "Удерживайте настройку, чтобы добавить её в избранное.", 13, p.text2, false);
+        hint.setGravity(Gravity.CENTER);
+        hint.setPadding(dp(16), dp(18), dp(16), 0);
+        content.addView(hint);
+    }
+
+    private View gap() {
+        View v = new View(this);
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(8), 1));
+        return v;
+    }
+
+    private TextView chip(String label, boolean primary, Runnable r) {
+        TextView b = Qvk3Ui.text(this, label, 14, primary ? Color.WHITE : p.accent, true);
+        b.setGravity(Gravity.CENTER);
+        b.setSingleLine(true);
+        b.setPadding(dp(8), dp(10), dp(8), dp(10));
+        b.setMinHeight(dp(44));
+        b.setBackground(Qvk3Ui.ripple(this, primary ? p.accent : (p.dark ? 0xFF2A2C33 : 0xFFEDF1F8), 0x33888888, dp(12)));
+        b.setOnClickListener(v -> r.run());
+        return b;
     }
 
     private void showSection(int s) {
         section = s;
-        List<Row> rows = new ArrayList<>();
-        List<Qvk3SettingsIndex.Item> items = index.section(s);
-        List<Row> switches = new ArrayList<>(), links = new ArrayList<>();
-        for (Qvk3SettingsIndex.Item it : items) (it.type == Qvk3SettingsIndex.SWITCH ? switches : links).add(row(it, false));
-        if (!links.isEmpty()) {
-            rows.add(new Row(0, "Экраны и действия", null, null, null));
-            rows.addAll(links);
+        begin(Qvk3SettingsIndex.SECTIONS[s], Qvk3SettingsIndex.SECTION_HINTS[s], false);
+        Qvk3SettingsIndex.Item first = null;
+        for (String g : index.groups(s)) {
+            header(g);
+            LinearLayout c = card();
+            List<Qvk3SettingsIndex.Item> screens = new ArrayList<>(), switches = new ArrayList<>();
+            for (Qvk3SettingsIndex.Item it : index.section(s)) {
+                if (!it.group.equals(g)) continue;
+                (it.type == Qvk3SettingsIndex.SWITCH ? switches : screens).add(it);
+            }
+            for (Qvk3SettingsIndex.Item it : screens) itemRow(c, it, false);
+            for (Qvk3SettingsIndex.Item it : switches) itemRow(c, it, false);
+            if (first == null && !switches.isEmpty()) first = switches.get(0);
         }
-        if (!switches.isEmpty()) {
-            rows.add(new Row(0, "Переключатели", null, null, null));
-            rows.addAll(switches);
-            rows.add(new Row(1, "Сбросить раздел «" + Qvk3SettingsIndex.SECTIONS[s] + "»", "Вернуть переключатели раздела к значениям по умолчанию", null, () -> resetSection(s)));
+        if (first != null) {
+            LinearLayout c = card();
+            ((LinearLayout.LayoutParams) c.getLayoutParams()).topMargin = dp(24);
+            row(c, null, 0, "Сбросить переключатели раздела", "Вернуть значения по умолчанию; PIN не сбрасывается", new View(this), () -> resetSection(s), null);
         }
-        if (rows.isEmpty()) rows.add(new Row(3, "В этом разделе пока нет настроек", null, null, null));
-        set(rows, Qvk3SettingsIndex.SECTIONS[s]);
-        list.setSelection(0);
     }
 
     // ------------------------------------------------------------------ actions
@@ -411,23 +502,20 @@ public final class Qvk3SettingsActivity extends Activity {
         Qvk3SettingsHistory.before(this, it.key, (now ? "Включено: " : "Выключено: ") + it.title);
         try {
             SettingsRuntime.toggle(it.key, now);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Qvk3MusicSettings.prefs(this).edit().putBoolean(it.key, now).apply();
         }
-        adapter.notifyDataSetChanged();
+        int y = scroll.getScrollY();
+        refresh();
+        scroll.post(() -> scroll.scrollTo(0, y));
     }
 
     private void open(Qvk3SettingsIndex.Item it) {
         String t = it.target;
         try {
-            if (t.startsWith("qvk3:")) {
-                qvk3(t.substring(5));
-            } else if (it.type == Qvk3SettingsIndex.SCREEN) {
-                SettingsHub.open(this, t);
-            } else {
-                // Catalog action: run through the classic QVK screen, which owns these actions.
-                Qvk3SettingsBridge.runClassicAction(this, t);
-            }
+            if (t.startsWith("qvk3:")) qvk3(t.substring(5));
+            else if (it.type == Qvk3SettingsIndex.SCREEN) SettingsHub.open(this, t);
+            else Qvk3SettingsBridge.runClassicAction(this, t);
         } catch (Throwable e) {
             RuntimeFaults.record("qvk3.settings.open", e);
             Qvk3Ui.toast(this, "Не удалось открыть: " + Qvk3Jobs.message(e));
@@ -444,7 +532,7 @@ public final class Qvk3SettingsActivity extends Activity {
                 break;
             case "resetLook":
                 Qvk3Ui.dialog(this).setTitle("Сбросить всё оформление?")
-                        .setMessage("Будут сброшены тема, стили iOS/Material и стиль QVK 3.0. Остальные настройки, переписки и данные не изменятся. Отменить можно кнопкой ↶.")
+                        .setMessage("Будут сброшены тема, стили iOS/Material и стиль QVK 3.0. Остальные настройки и данные не изменятся.")
                         .setPositiveButton("Сбросить", (d, w) -> Qvk3Appearance.reset(this)).setNegativeButton("Отмена", null).show();
                 break;
             case "scenarios":
@@ -463,8 +551,10 @@ public final class Qvk3SettingsActivity extends Activity {
                 SharedPreferences pr = Qvk3MusicSettings.prefs(this);
                 boolean on = !pr.getBoolean("qvk3_perf_light", Qvk3Compat.lowRam(this));
                 Qvk3SettingsHistory.before(this, "qvk3_perf_light", on ? "Облегчённый режим включён" : "Облегчённый режим выключен");
-                pr.edit().putBoolean("qvk3_perf_light", on).putBoolean("qvk_motion_blur", on ? false : pr.getBoolean("qvk_motion_blur", false)).apply();
-                Qvk3Ui.toast(this, on ? "Облегчённый режим включён: размытие и прозрачность отключены" : "Облегчённый режим выключен");
+                SharedPreferences.Editor e = pr.edit().putBoolean("qvk3_perf_light", on);
+                if (on) e.putBoolean("qvk_motion_blur", false);
+                e.apply();
+                Qvk3Ui.toast(this, on ? "Облегчённый режим включён" : "Облегчённый режим выключен");
                 break;
             }
             case "battery":
@@ -487,8 +577,7 @@ public final class Qvk3SettingsActivity extends Activity {
                 boolean on = !pr.getBoolean(Qvk3SettingsBridge.CLASSIC, false);
                 Qvk3SettingsHistory.before(this, Qvk3SettingsBridge.CLASSIC, on ? "Классические настройки по умолчанию" : "Центр настроек QVK 3.0 по умолчанию");
                 pr.edit().putBoolean(Qvk3SettingsBridge.CLASSIC, on).apply();
-                Qvk3Ui.toast(this, on ? "Меню будет открывать классические настройки. Центр 3.0 доступен по ярлыку «Настройки QVK»"
-                        : "Меню будет открывать центр настроек QVK 3.0");
+                Qvk3Ui.toast(this, on ? "Меню будет открывать классические настройки. Этот центр — по ярлыку «Настройки QVK»" : "Меню будет открывать этот центр");
                 break;
             }
             default:
@@ -504,9 +593,8 @@ public final class Qvk3SettingsActivity extends Activity {
     }
 
     private void quickTheme() {
-        Qvk3DesignTokens target = Qvk3DesignTokens.PRESETS.get(Qvk3Appearance.current(this).dark ? "classic" : "amoled");
         try {
-            Qvk3Appearance.apply(this, target);
+            Qvk3Appearance.apply(this, Qvk3DesignTokens.PRESETS.get(Qvk3Appearance.current(this).dark ? "classic" : "amoled"));
         } catch (Exception e) {
             Qvk3Ui.toast(this, "Не удалось применить: " + Qvk3Jobs.message(e));
         }
@@ -526,9 +614,11 @@ public final class Qvk3SettingsActivity extends Activity {
                     StringBuilder what = new StringBuilder();
                     for (String k : s.values.keySet()) {
                         Qvk3SettingsIndex.Item it = index.get(k);
-                        what.append("• ").append(it != null ? it.title : k).append(": ").append(s.values.get(k)).append('\n');
+                        Object v = s.values.get(k);
+                        what.append("• ").append(it != null ? it.title : k).append(": ")
+                                .append(v instanceof Boolean ? ((Boolean) v ? "вкл" : "выкл") : v).append('\n');
                     }
-                    if (!s.style.isEmpty()) what.append("• Стиль: ").append(Qvk3DesignTokens.PRESETS.containsKey(s.style) ? Qvk3DesignTokens.PRESETS.get(s.style).title : s.style);
+                    if (!s.style.isEmpty() && Qvk3DesignTokens.PRESETS.containsKey(s.style)) what.append("• Стиль: ").append(Qvk3DesignTokens.PRESETS.get(s.style).title);
                     android.app.AlertDialog.Builder b = Qvk3Ui.dialog(this).setTitle(s.title).setMessage(s.description + "\n\nБудет изменено:\n" + what)
                             .setPositiveButton("Применить", (d2, w) -> {
                                 try {
@@ -572,16 +662,15 @@ public final class Qvk3SettingsActivity extends Activity {
 
     private void resetSection(int s) {
         Qvk3Ui.dialog(this).setTitle("Сбросить «" + Qvk3SettingsIndex.SECTIONS[s] + "»?")
-                .setMessage("Переключатели раздела вернутся к значениям по умолчанию. Другие разделы и данные не изменятся.")
+                .setMessage("Переключатели раздела вернутся к значениям по умолчанию. Другие разделы и данные не изменятся. Каждое изменение можно отменить.")
                 .setPositiveButton("Сбросить", (d, w) -> {
                     SharedPreferences.Editor e = Qvk3MusicSettings.prefs(this).edit();
                     for (Qvk3SettingsIndex.Item it : index.section(s)) {
-                        if (it.type != Qvk3SettingsIndex.SWITCH || it.key.equals("enablePin")) continue; // PIN is never reset silently
-                        Qvk3SettingsHistory.before(this, it.key, "Сброс: " + it.title); // each key stays undoable
+                        if (it.type != Qvk3SettingsIndex.SWITCH || it.key.equals("enablePin")) continue;
+                        Qvk3SettingsHistory.before(this, it.key, "Сброс: " + it.title);
                         e.remove(it.key);
                     }
                     e.apply();
-                    Qvk3SettingsHistory.record(this, "section:" + s, "Сброшен раздел «" + Qvk3SettingsIndex.SECTIONS[s] + "»");
                     showSection(s);
                 }).setNegativeButton("Отмена", null).show();
     }
@@ -589,11 +678,6 @@ public final class Qvk3SettingsActivity extends Activity {
     private void undo() {
         String t = Qvk3SettingsHistory.undoLast(this);
         Qvk3Ui.toast(this, t == null ? "Нечего отменять" : "Отменено: " + t);
-        if (section >= 0) showSection(section);
-        else showHome();
-    }
-
-    private void click(Row r) {
-        if (r.click != null) r.click.run();
+        refresh();
     }
 }

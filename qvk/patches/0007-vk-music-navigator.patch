@@ -1,0 +1,19 @@
+--- a/smali_classes12/com/vk/music/fragment/impl/c.smali	2026-11-10 17:52:35.594067022 +0000
++++ b/smali_classes12/com/vk/music/fragment/impl/c.smali	2026-11-10 17:52:35.605951424 +0000
+@@ -67,6 +67,16 @@
+ .method public final a(Landroid/content/Context;)V
+     .locals 1
+ 
++    # QVK 3.0: VK's own entries to the user's music open QVK Music (classic VK music when disabled).
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3MusicEntry;->fromNavigator(Ljava/lang/Object;Landroid/content/Context;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_vk_music
++
++    return-void
++
++    :qvk3_vk_music
+     .line 1
+     sget-object v0, Lcom/vk/core/utils/newtork/b;->a:Lcom/vk/core/utils/newtork/b;
+ 

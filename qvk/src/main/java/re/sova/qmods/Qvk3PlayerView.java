@@ -3,19 +3,21 @@ package re.sova.qmods;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.RenderEffect;
 import android.graphics.Shader;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.AbsListView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -26,19 +28,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Full-screen player of QVK Music. One view, five layouts (Modern, Classic, AMOLED, Glass, CoverFlow) on
- * the same engine; switching layout or cover/lyrics options rebuilds only this view — playback is not
- * restarted. Lyrics (synced or plain) can be shown over the cover or full screen; manual scrolling pauses
- * auto-scroll for a few seconds.
+ * Full-screen player of QVK Music. One view, five layouts (Modern, Classic, AMOLED, Glass, CoverFlow) on the
+ * same engine. Modern/Glass tint the background with the cover colour; all controls are vector icons.
+ * Changing the layout rebuilds only this view — playback is not restarted.
  */
 public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine.Listener {
     private final Activity a;
     private final Qvk3MusicEngine engine;
-    private Qvk3Ui.Palette p;
     private String layout;
-    private ImageView background, cover;
+    private boolean onDark;
+    private int fg, fg2, accent;
+    private ImageView background, cover, play, shuffle, repeat, heart;
+    private View playBg;
     private Qvk3CoverFlowView flow;
-    private TextView title, artist, pos, dur, play, shuffle, repeat, info;
+    private TextView title, artist, pos, dur, info, speedLabel, sub;
     private SeekBar seek;
     private ListView lyricsList;
     private ArrayAdapter<String> lyricsAdapter;
@@ -50,6 +53,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     private int lastLine = -2;
     private String coverFor = "";
     private Runnable onClose;
+    private GradientDrawable gradient;
 
     public Qvk3PlayerView(Activity a) {
         super(a);
@@ -63,76 +67,116 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         onClose = r;
     }
 
-    /** Rebuilds the layout from current settings (called after the user changes player appearance). */
+    private int dp(float v) {
+        return Qvk3Ui.dp(a, v);
+    }
+
     public void rebuild() {
         removeAllViews();
         layout = Qvk3MusicSettings.layout(a);
-        p = Qvk3Ui.palette(a, layout);
+        Qvk3Ui.Palette p = Qvk3Ui.palette(a, layout.equals("classic") ? "classic" : "modern");
+        onDark = !layout.equals("classic") || p.dark;
+        fg = onDark ? Color.WHITE : p.text;
+        fg2 = onDark ? 0xB3FFFFFF : p.text2;
+        accent = p.accent;
         coverFor = "";
         lastLine = -2;
-        setBackgroundColor(p.bg);
+
+        gradient = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFF2B3140, 0xFF0D0F14});
+        if (layout.equals("amoled")) setBackgroundColor(Color.BLACK);
+        else if (layout.equals("classic")) setBackgroundColor(p.bg);
+        else setBackground(gradient);
+
         background = new ImageView(a);
         background.setScaleType(ImageView.ScaleType.CENTER_CROP);
         background.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        background.setVisibility(GONE);
+        if (layout.equals("glass")) {
+            background.setVisibility(VISIBLE);
+            if (!Qvk3Appearance.weakDevice(a) && Build.VERSION.SDK_INT >= 31) {
+                background.setRenderEffect(RenderEffect.createBlurEffect(80, 80, Shader.TileMode.CLAMP));
+                background.setAlpha(0.6f);
+            } else {
+                background.setAlpha(0.22f);
+            }
+        }
         addView(background, new LayoutParams(-1, -1));
-        if (layout.equals("glass") && !Qvk3Appearance.weakDevice(a) && Build.VERSION.SDK_INT >= 31) {
-            background.setRenderEffect(RenderEffect.createBlurEffect(60, 60, Shader.TileMode.CLAMP));
-            background.setAlpha(0.55f);
-        } else if (layout.equals("glass")) {
-            background.setAlpha(0.25f); // weak device or Android < 12: dimmed cover instead of blur
-        } else {
-            background.setVisibility(GONE);
+        if (layout.equals("glass")) {
+            View shade = new View(a);
+            shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x33000000, 0xCC000000}));
+            addView(shade, new LayoutParams(-1, -1));
         }
 
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 8), pad, Qvk3Ui.dp(a, 16));
+        col.setPadding(dp(16), dp(8), dp(16), dp(16));
         addView(col, new LayoutParams(-1, -1));
 
+        // top bar
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(Qvk3Ui.glyph(a, p, "⌄", "Свернуть плеер", 26, v -> {
+        top.addView(Qvk3Ui.icon(a, Qvk3Icons.DOWN, fg, 48, 26, "Свернуть плеер", v -> {
             if (onClose != null) onClose.run();
         }));
-        TextView heading = Qvk3Ui.line(a, Qvk3MusicSettings.LAYOUT_TITLES[indexOf(layout)], 14, p.text2, true);
-        heading.setGravity(Gravity.CENTER);
-        top.addView(heading, Qvk3Ui.weight(1));
-        top.addView(Qvk3Ui.glyph(a, p, "☰", "Очередь", 20, v -> Qvk3QueueDialog.show(a)));
+        LinearLayout tt = new LinearLayout(a);
+        tt.setOrientation(LinearLayout.VERTICAL);
+        tt.setGravity(Gravity.CENTER);
+        TextView now = Qvk3Ui.line(a, "СЕЙЧАС ИГРАЕТ", 11, fg2, true);
+        now.setLetterSpacing(0.12f);
+        now.setGravity(Gravity.CENTER);
+        sub = Qvk3Ui.line(a, "", 13, fg, true);
+        sub.setGravity(Gravity.CENTER);
+        tt.addView(now, Qvk3Ui.match());
+        tt.addView(sub, Qvk3Ui.match());
+        top.addView(tt, Qvk3Ui.weight(1));
+        top.addView(Qvk3Ui.icon(a, Qvk3Icons.MORE, fg, 48, 24, "Ещё", v -> more()));
         col.addView(top, Qvk3Ui.match());
 
+        // stage: cover / coverflow / lyrics
         FrameLayout stage = new FrameLayout(a);
-        boolean landscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        boolean land = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         if (layout.equals("coverflow")) {
             flow = new Qvk3CoverFlowView(a);
             flow.setId(View.generateViewId());
-            flow.setColors(p.text, p.text2, p.surface2);
+            flow.setColors(fg, fg2, 0x33FFFFFF);
             flow.setSpacingPercent(Qvk3MusicSettings.coverflowSpacing(a));
-            flow.setCornerRadius(Qvk3Ui.dp(a, Qvk3MusicSettings.coverRadiusDp(a)));
-            // Selecting a track in CoverFlow starts playback (QVK 2.x only selected it and stayed paused).
+            flow.setCornerRadius(dp(Qvk3MusicSettings.coverRadiusDp(a)));
             flow.setListener((index, settled) -> {
-                if (!settled && index != engine.queue().currentIndex()) engine.playIndex(index);
-                else if (!settled) engine.toggle();
+                if (settled) return;
+                if (index != engine.queue().currentIndex()) engine.playIndex(index);
+                else engine.toggle();
             });
             stage.addView(flow, new LayoutParams(-1, -1));
+            cover = null;
         } else {
             flow = null;
             cover = new ImageView(a);
-            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            float r = Qvk3Ui.dp(a, Qvk3MusicSettings.coverRadiusDp(a));
-            cover.setBackground(Qvk3Ui.rounded(p.surface2, r));
-            Qvk3Ui.clipRound(cover, r);
-            cover.setContentDescription("Обложка");
-            int size = Math.round(Math.min(getResources().getDisplayMetrics().widthPixels - pad * 2,
-                    getResources().getDisplayMetrics().heightPixels * (landscape ? 0.55f : 0.45f)) * Qvk3MusicSettings.coverSize(a));
-            LayoutParams lp = new LayoutParams(size, size, Gravity.CENTER);
-            stage.addView(cover, lp);
+            cover.setScaleType(ImageView.ScaleType.FIT_XY);
+            float r = dp(Qvk3MusicSettings.coverRadiusDp(a));
+            GradientDrawable ph = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0x33FFFFFF, 0x14FFFFFF});
+            ph.setCornerRadius(r);
+            cover.setBackground(onDark ? ph : Qvk3Ui.rounded(p.surface2, r));
+            cover.setOutlineProvider(new ViewOutlineProvider() {
+                @Override
+                public void getOutline(View view, Outline o) {
+                    o.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
+                }
+            });
+            cover.setClipToOutline(true);
+            cover.setElevation(dp(layout.equals("amoled") ? 0 : 18));
+            cover.setContentDescription("Обложка. Нажмите, чтобы показать текст песни");
+            cover.setImageDrawable(placeholderNote());
+            int w = getResources().getDisplayMetrics().widthPixels - dp(48);
+            int hLimit = (int) (getResources().getDisplayMetrics().heightPixels * (land ? 0.6f : 0.46f));
+            int size = Math.round(Math.min(w, hLimit) * Qvk3MusicSettings.coverSize(a));
+            stage.addView(cover, new LayoutParams(size, size, Gravity.CENTER));
             cover.setOnClickListener(v -> toggleLyrics());
         }
         lyricsList = new ListView(a);
         lyricsList.setDivider(null);
         lyricsList.setVerticalFadingEdgeEnabled(true);
-        lyricsList.setFadingEdgeLength(Qvk3Ui.dp(a, 48));
+        lyricsList.setFadingEdgeLength(dp(56));
+        lyricsList.setSelector(new android.graphics.drawable.ColorDrawable(0));
         lyricsList.setVisibility(GONE);
         lyricsList.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
@@ -154,15 +198,20 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             Qvk3Ui.toast(a, "Текст скопирован");
             return true;
         });
-        if (Qvk3MusicSettings.lyricsOverCover(a) && layout.equals("coverflow") == false) {
-            GradientDrawable shade = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xAA000000, 0xAA000000});
-            lyricsList.setBackground(shade);
-        }
         stage.addView(lyricsList, new LayoutParams(-1, -1));
         col.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        title = Qvk3Ui.line(a, "", 21, p.text, true);
-        artist = Qvk3Ui.line(a, "", 16, p.text2, false);
+        // title + favourite
+        LinearLayout meta = new LinearLayout(a);
+        meta.setGravity(Gravity.CENTER_VERTICAL);
+        meta.setPadding(dp(8), dp(12), 0, 0);
+        LinearLayout texts = new LinearLayout(a);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        title = Qvk3Ui.line(a, "", 22, fg, true);
+        title.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        title.setMarqueeRepeatLimit(-1);
+        title.setSelected(true);
+        artist = Qvk3Ui.line(a, "", 16, fg2, false);
         artist.setOnClickListener(v -> {
             Qvk3Track t = engine.current();
             if (t != null && !t.artist.isEmpty() && a instanceof Qvk3MusicActivity) {
@@ -170,16 +219,21 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 ((Qvk3MusicActivity) a).openArtist(t.artist);
             }
         });
-        col.addView(title, Qvk3Ui.match());
-        col.addView(artist, Qvk3Ui.match());
-        info = Qvk3Ui.line(a, "", 13, p.text2, false);
+        texts.addView(title, Qvk3Ui.match());
+        texts.addView(artist, Qvk3Ui.match());
+        meta.addView(texts, Qvk3Ui.weight(1));
+        heart = Qvk3Ui.icon(a, Qvk3Icons.HEART, fg, 48, 26, "В избранное", v -> toggleFavorite());
+        meta.addView(heart);
+        col.addView(meta, Qvk3Ui.match());
+
+        info = Qvk3Ui.line(a, "", 12, fg2, false);
+        info.setPadding(dp(8), dp(2), dp(8), 0);
         col.addView(info, Qvk3Ui.match());
 
         seek = new SeekBar(a);
         seek.setContentDescription("Позиция воспроизведения");
-        seek.getProgressDrawable().setTint(p.accent);
-        seek.getThumb().setTint(p.accent);
-        if ("thick".equals(Qvk3MusicSettings.progressStyle(a))) seek.setScaleY(1.6f);
+        seek.setPadding(dp(8), 0, dp(8), 0);
+        Qvk3Ui.styleSeek(a, seek, fg, onDark ? 0x40FFFFFF : 0x22000000);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
@@ -199,74 +253,117 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         });
         col.addView(seek, Qvk3Ui.match());
         LinearLayout times = new LinearLayout(a);
-        pos = Qvk3Ui.text(a, "0:00", 12, p.text2, false);
-        dur = Qvk3Ui.text(a, "0:00", 12, p.text2, false);
+        times.setPadding(dp(8), 0, dp(8), 0);
+        pos = Qvk3Ui.text(a, "0:00", 12, fg2, false);
+        dur = Qvk3Ui.text(a, "0:00", 12, fg2, false);
         dur.setGravity(Gravity.END);
         times.addView(pos, Qvk3Ui.weight(1));
         times.addView(dur, Qvk3Ui.weight(1));
         col.addView(times, Qvk3Ui.match());
 
+        // transport
         LinearLayout controls = new LinearLayout(a);
         controls.setGravity(Gravity.CENTER);
-        shuffle = Qvk3Ui.glyph(a, p, "⤮", "Перемешивание", 22, v -> engine.setShuffle(!engine.queue().shuffle()));
-        repeat = Qvk3Ui.glyph(a, p, "↻", "Повтор", 22, v -> engine.setRepeat((engine.queue().repeat() + 1) % 3));
-        play = Qvk3Ui.glyph(a, p, "▶", "Играть", 34, v -> engine.toggle());
-        play.setTextColor(p.onAccent);
-        play.setBackground(Qvk3Ui.ripple(a, p.accent, 0x33FFFFFF, Qvk3Ui.dp(a, 36)));
-        int big = Qvk3Ui.dp(a, 72);
-        controls.addView(shuffle);
-        controls.addView(Qvk3Ui.glyph(a, p, "⏮", "Предыдущий трек", 28, v -> engine.previous()));
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(big, big);
-        plp.leftMargin = plp.rightMargin = Qvk3Ui.dp(a, 12);
-        controls.addView(play, plp);
-        controls.addView(Qvk3Ui.glyph(a, p, "⏭", "Следующий трек", 28, v -> engine.next()));
-        controls.addView(repeat);
+        controls.setPadding(0, dp(6), 0, dp(6));
+        shuffle = Qvk3Ui.icon(a, Qvk3Icons.SHUFFLE, fg, 52, 22, "Перемешивание", v -> engine.setShuffle(!engine.queue().shuffle()));
+        repeat = Qvk3Ui.icon(a, Qvk3Icons.REPEAT, fg, 52, 22, "Повтор", v -> engine.setRepeat((engine.queue().repeat() + 1) % 3));
+        controls.addView(shuffle, weightBox(52));
+        controls.addView(Qvk3Ui.icon(a, Qvk3Icons.PREV, fg, 60, 32, "Предыдущий трек", v -> engine.previous()), weightBox(60));
+        FrameLayout playBox = new FrameLayout(a);
+        playBg = new View(a);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(onDark ? Color.WHITE : accent);
+        playBg.setBackground(circle);
+        playBg.setElevation(dp(6));
+        playBox.addView(playBg, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
+        play = Qvk3Ui.icon(a, Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE, 72, 34, "Играть", v -> engine.toggle());
+        play.setElevation(dp(7));
+        playBox.addView(play, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
+        controls.addView(playBox, weightBox(80));
+        controls.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, fg, 60, 32, "Следующий трек", v -> engine.next()), weightBox(60));
+        controls.addView(repeat, weightBox(52));
         col.addView(controls, Qvk3Ui.match());
 
-        HorizontalScrollView hs = new HorizontalScrollView(a);
-        hs.setHorizontalScrollBarEnabled(false);
-        LinearLayout actions = new LinearLayout(a);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        hs.addView(actions);
-        actions.addView(chip("Текст", v -> toggleLyrics()));
-        actions.addView(chip("Скорость", v -> speedDialog()));
-        actions.addView(chip("Таймер сна", v -> sleepDialog()));
-        actions.addView(chip("A–B", v -> abAction()));
-        actions.addView(chip("Звук", v -> Qvk3SoundDialog.show(a)));
-        actions.addView(chip("Скачать", v -> {
-            Qvk3Track t = engine.current();
-            if (t != null) {
-                List<Qvk3Track> one = new ArrayList<>();
-                one.add(t);
-                Qvk3Ui.toast(a, Qvk3MusicDownloads.enqueue(a, one));
-            }
-        }));
-        actions.addView(chip("★ Избранное", v -> {
-            Qvk3Track t = engine.current();
-            if (t == null) return;
-            Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
-            boolean on = !lib.favorite(t.key());
-            lib.setFavorite(t, on);
-            Qvk3Ui.toast(a, on ? "Добавлено в избранное QVK" : "Убрано из избранного QVK");
-        }));
-        actions.addView(chip("Оформление", v -> Qvk3MusicSettingsScreen.playerLook(a, this::rebuild)));
-        col.addView(hs, Qvk3Ui.match());
+        // secondary actions
+        LinearLayout extra = new LinearLayout(a);
+        extra.setGravity(Gravity.CENTER);
+        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.LYRICS, fg2, 48, 22, "Текст песни", v -> toggleLyrics()), weightBox(48));
+        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.TIMER, fg2, 48, 22, "Таймер сна", v -> sleepDialog()), weightBox(48));
+        speedLabel = Qvk3Ui.text(a, "1×", 15, fg2, true);
+        speedLabel.setGravity(Gravity.CENTER);
+        speedLabel.setMinWidth(dp(48));
+        speedLabel.setMinHeight(dp(48));
+        speedLabel.setContentDescription("Скорость воспроизведения");
+        speedLabel.setBackground(Qvk3Ui.ripple(a, 0, 0x33888888, dp(24)));
+        speedLabel.setOnClickListener(v -> speedDialog());
+        extra.addView(speedLabel, weightBox(48));
+        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.EQ, fg2, 48, 22, "Звук и эквалайзер", v -> Qvk3SoundDialog.show(a)), weightBox(48));
+        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.QUEUE, fg2, 48, 22, "Очередь", v -> Qvk3QueueDialog.show(a)), weightBox(48));
+        col.addView(extra, Qvk3Ui.match());
+
         if (lyricsMode) showLyrics(true);
         onState(engine);
     }
 
-    private static int indexOf(String layout) {
-        for (int i = 0; i < Qvk3MusicSettings.LAYOUTS.length; i++) if (Qvk3MusicSettings.LAYOUTS[i].equals(layout)) return i;
-        return 0;
+    private LinearLayout.LayoutParams weightBox(int dpSize) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(dpSize), 1);
+        lp.gravity = Gravity.CENTER;
+        return lp;
     }
 
-    private TextView chip(String label, View.OnClickListener l) {
-        TextView t = Qvk3Ui.button(a, p, label, false, l);
-        LinearLayout.LayoutParams lp = Qvk3Ui.wrap();
-        lp.rightMargin = Qvk3Ui.dp(a, 8);
-        lp.topMargin = Qvk3Ui.dp(a, 8);
-        t.setLayoutParams(lp);
-        return t;
+    private android.graphics.drawable.Drawable placeholderNote() {
+        android.graphics.drawable.InsetDrawable d = new android.graphics.drawable.InsetDrawable(Qvk3Icons.of(Qvk3Icons.MUSIC, onDark ? 0x55FFFFFF : 0x33000000), dp(96));
+        return d;
+    }
+
+    private void more() {
+        Qvk3Track t = engine.current();
+        long[] ab = engine.abRange();
+        String[] items = {"Скачать трек", ab[0] >= 0 ? "Выключить повтор A–B" : "Повтор фрагмента A–B", "Оформление плеера", "Найти треки исполнителя", "Скопировать название"};
+        Qvk3Ui.dialog(a).setItems(items, (d, w) -> {
+            switch (w) {
+                case 0:
+                    if (t != null) {
+                        List<Qvk3Track> one = new ArrayList<>();
+                        one.add(t);
+                        Qvk3Ui.toast(a, Qvk3MusicDownloads.enqueue(a, one));
+                    }
+                    break;
+                case 1:
+                    abAction();
+                    break;
+                case 2:
+                    Qvk3MusicSettingsScreen.playerLook(a, this::rebuild);
+                    break;
+                case 3:
+                    if (t != null && a instanceof Qvk3MusicActivity) {
+                        if (onClose != null) onClose.run();
+                        ((Qvk3MusicActivity) a).openArtist(t.artist);
+                    }
+                    break;
+                default:
+                    if (t != null) {
+                        android.content.ClipboardManager cm = a.getSystemService(android.content.ClipboardManager.class);
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Трек", t.label()));
+                    }
+            }
+        }).show();
+    }
+
+    private void toggleFavorite() {
+        Qvk3Track t = engine.current();
+        if (t == null) return;
+        Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
+        boolean on = !lib.favorite(t.key());
+        lib.setFavorite(t, on);
+        updateHeart(t);
+    }
+
+    private void updateHeart(Qvk3Track t) {
+        boolean fav = t != null && Qvk3MusicLibrary.get(a).favorite(t.key());
+        Qvk3Ui.setIcon(heart, fav ? Qvk3Icons.HEART_FILL : Qvk3Icons.HEART, fav ? 0xFFFF4D6A : fg);
+        heart.setContentDescription(fav ? "Убрать из избранного" : "В избранное");
     }
 
     @Override
@@ -287,27 +384,30 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         Qvk3Track t = e.current();
         title.setText(t == null ? "Ничего не играет" : t.title);
         artist.setText(t == null ? "" : t.artist);
+        sub.setText(t == null ? "QVK Music" : (t.album.isEmpty() ? "QVK Music" : t.album));
         boolean playing = e.isPlaying();
-        play.setText(playing ? "⏸" : "▶");
+        Qvk3Ui.setIcon(play, playing ? Qvk3Icons.PAUSE : Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE);
         play.setContentDescription(playing ? "Пауза" : "Играть");
-        shuffle.setAlpha(e.queue().shuffle() ? 1f : 0.45f);
-        shuffle.setTextColor(e.queue().shuffle() ? p.accent : p.text);
+        boolean sh = e.queue().shuffle();
+        Qvk3Ui.setIcon(shuffle, Qvk3Icons.SHUFFLE, sh ? accentOn() : fg);
+        shuffle.setAlpha(sh ? 1f : 0.55f);
+        shuffle.setContentDescription(sh ? "Перемешивание включено" : "Перемешивание выключено");
         int rep = e.queue().repeat();
-        repeat.setText(rep == Qvk3Queue.REPEAT_ONE ? "🔂" : "↻");
-        repeat.setAlpha(rep == Qvk3Queue.REPEAT_OFF ? 0.45f : 1f);
-        repeat.setTextColor(rep == Qvk3Queue.REPEAT_OFF ? p.text : p.accent);
+        Qvk3Ui.setIcon(repeat, rep == Qvk3Queue.REPEAT_ONE ? Qvk3Icons.REPEAT_ONE : Qvk3Icons.REPEAT, rep == Qvk3Queue.REPEAT_OFF ? fg : accentOn());
+        repeat.setAlpha(rep == Qvk3Queue.REPEAT_OFF ? 0.55f : 1f);
         repeat.setContentDescription(rep == Qvk3Queue.REPEAT_ONE ? "Повтор трека" : rep == Qvk3Queue.REPEAT_ALL ? "Повтор очереди" : "Повтор выключен");
+        speedLabel.setText(e.speed() == 1f ? "1×" : (e.speed() + "×").replace(".0×", "×"));
         StringBuilder s = new StringBuilder();
         if (e.state() == Qvk3MusicEngine.ERROR) s.append(e.error());
         else if (e.state() == Qvk3MusicEngine.BUFFERING) s.append("Загрузка…");
-        if (e.speed() != 1f) s.append(s.length() > 0 ? " · " : "").append("×").append(e.speed());
         long[] ab = e.abRange();
         if (ab[0] >= 0) s.append(s.length() > 0 ? " · " : "").append("A–B ").append(Qvk3Track.time(ab[0])).append("–").append(Qvk3Track.time(ab[1]));
-        if (e.sleepRemaining() > 0) s.append(s.length() > 0 ? " · " : "").append("сон через ").append(Qvk3Track.time(e.sleepRemaining()));
-        else if (e.sleepAfterTrack()) s.append(s.length() > 0 ? " · " : "").append("сон после трека");
-        if (t != null && !t.local.isEmpty()) s.append(s.length() > 0 ? " · " : "").append("сохранён на устройстве");
+        if (e.sleepRemaining() > 0) s.append(s.length() > 0 ? " · " : "").append("Сон через ").append(Qvk3Track.time(e.sleepRemaining()));
+        else if (e.sleepAfterTrack()) s.append(s.length() > 0 ? " · " : "").append("Сон после трека");
+        if (t != null && !t.local.isEmpty()) s.append(s.length() > 0 ? " · " : "").append("Сохранён на устройстве");
         info.setText(s);
-        info.setTextColor(e.state() == Qvk3MusicEngine.ERROR ? 0xFFE64646 : p.text2);
+        info.setVisibility(s.length() == 0 ? GONE : VISIBLE);
+        info.setTextColor(e.state() == Qvk3MusicEngine.ERROR ? 0xFFFF6B6B : fg2);
         if (!userSeeking) {
             seek.setMax((int) Math.max(1, e.duration()));
             seek.setProgress((int) e.position());
@@ -316,6 +416,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         dur.setText(Qvk3Track.time(e.duration()));
         if (t != null && !t.key().equals(coverFor)) {
             coverFor = t.key();
+            updateHeart(t);
             lyrics = null;
             lyricsFor = "";
             if (lyricsMode) loadLyrics(t);
@@ -324,17 +425,15 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 for (Qvk3Track q : e.queue().items()) items.add(new Qvk3CoverFlowView.Item(q.cover, q.title, q.artist));
                 int restore = flow.takePendingRestore();
                 flow.setItems(items, restore >= 0 ? restore : e.queue().currentIndex());
-            } else if (cover != null) {
-                cover.setImageBitmap(null);
-                Qvk3Images.get(a).load(t.cover, 900, bmp -> {
-                    if (t.key().equals(coverFor)) {
-                        cover.setImageBitmap(bmp);
-                        if (background.getVisibility() == VISIBLE) background.setImageBitmap(bmp);
-                    }
-                });
-                Qvk3Track n = e.queue().peekNext();
-                if (n != null) Qvk3Images.get(a).prefetch(n.cover, 900);
             }
+            Qvk3Images.get(a).load(t.cover, 900, bmp -> {
+                if (!t.key().equals(coverFor)) return;
+                if (cover != null) cover.setImageDrawable(bmp != null ? Qvk3Ui.roundedBitmap(bmp, dp(Qvk3MusicSettings.coverRadiusDp(a))) : placeholderNote());
+                if (background.getVisibility() == VISIBLE) background.setImageBitmap(bmp);
+                tint(bmp);
+            });
+            Qvk3Track n = e.queue().peekNext();
+            if (n != null) Qvk3Images.get(a).prefetch(n.cover, 900);
         } else if (flow != null && e.queue().currentIndex() >= 0 && flow.selected() != e.queue().currentIndex()) {
             flow.smoothScrollTo(e.queue().currentIndex());
         }
@@ -350,6 +449,17 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         }
     }
 
+    private int accentOn() {
+        return onDark ? 0xFF8EC5FF : accent;
+    }
+
+    /** Modern / CoverFlow: background gradient from the cover colour. */
+    private void tint(Bitmap bmp) {
+        if (!(layout.equals("modern") || layout.equals("coverflow"))) return;
+        int base = bmp == null ? 0xFF3A3F4A : Qvk3Ui.average(bmp);
+        gradient.setColors(new int[]{Qvk3Ui.deep(base, 0.42f), Qvk3Ui.deep(base, 0.16f), 0xFF0B0C10});
+    }
+
     private void toggleLyrics() {
         showLyrics(!lyricsMode);
     }
@@ -359,6 +469,8 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         lyricsList.setVisibility(on ? VISIBLE : GONE);
         boolean over = Qvk3MusicSettings.lyricsOverCover(a);
         if (cover != null) cover.setVisibility(on && !over ? INVISIBLE : VISIBLE);
+        if (cover != null && on && over) cover.setAlpha(0.25f);
+        else if (cover != null) cover.setAlpha(1f);
         if (flow != null) flow.setVisibility(on ? INVISIBLE : VISIBLE);
         Qvk3Track t = engine.current();
         if (on && t != null) loadLyrics(t);
@@ -383,7 +495,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 if (fl == null) {
                     List<String> msg = new ArrayList<>();
                     msg.add(fe != null ? "Текст недоступен: " + fe : "Для этого трека нет текста");
-                    if (!Qvk3MusicSettings.lyricsExternal(a)) msg.add("Внешний поиск (LRCLIB) выключен в настройках QVK Music");
+                    if (!Qvk3MusicSettings.lyricsExternal(a)) msg.add("Поиск в LRCLIB выключен в настройках QVK Music");
                     setLyricsLines(msg, null);
                 } else {
                     List<String> lines = new ArrayList<>();
@@ -400,18 +512,16 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         lyrics = l;
         lastLine = -2;
         final int size = Qvk3MusicSettings.lyricsSizeSp(a);
-        final boolean over = Qvk3MusicSettings.lyricsOverCover(a) && cover != null;
         lyricsAdapter = new ArrayAdapter<String>(a, 0, lines) {
             @Override
             public View getView(int position, View convert, ViewGroup parent) {
-                TextView tv = convert instanceof TextView ? (TextView) convert : Qvk3Ui.text(a, "", size, p.text, false);
+                TextView tv = convert instanceof TextView ? (TextView) convert : Qvk3Ui.text(a, "", size, fg, true);
                 tv.setText(getItem(position));
-                tv.setTextIsSelectable(false);
-                tv.setPadding(Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 6), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 6));
-                boolean active = lyrics != null && lyrics.synced && position == lyrics.lineAt(engine.position());
-                int base = over ? Color.WHITE : p.text;
-                tv.setTextColor(active ? (over ? Color.WHITE : p.accent) : (lyrics != null && lyrics.synced ? (base & 0x00FFFFFF) | 0x99000000 : base));
-                tv.setTextSize(size + (active ? 2 : 0));
+                tv.setPadding(dp(12), dp(7), dp(12), dp(7));
+                boolean synced = lyrics != null && lyrics.synced;
+                boolean active = synced && position == lyrics.lineAt(engine.position());
+                tv.setTextColor(active ? fg : synced ? (fg & 0x00FFFFFF) | 0x66000000 : fg);
+                tv.setTextSize(size + (active ? 3 : 0));
                 return tv;
             }
         };
@@ -421,12 +531,11 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     private void speedDialog() {
         final String[] labels = {"0.5×", "0.75×", "1×", "1.25×", "1.5×", "2×"};
         final float[] values = {0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f};
-        Qvk3Ui.dialog(a).setTitle("Скорость воспроизведения")
-                .setItems(labels, (d, i) -> engine.setSpeed(values[i])).show();
+        Qvk3Ui.dialog(a).setTitle("Скорость").setItems(labels, (d, i) -> engine.setSpeed(values[i])).show();
     }
 
     private void sleepDialog() {
-        final String[] labels = {"Выключить таймер", "15 минут", "30 минут", "45 минут", "1 час", "После текущего трека", "Своё время…"};
+        final String[] labels = {"Выключить", "15 минут", "30 минут", "45 минут", "1 час", "После текущего трека", "Своё время…"};
         Qvk3Ui.dialog(a).setTitle("Таймер сна").setItems(labels, (d, i) -> {
             switch (i) {
                 case 0:
@@ -465,7 +574,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             Qvk3Ui.toast(a, "Повтор фрагмента выключен");
         } else if (abA < 0) {
             abA = engine.position();
-            Qvk3Ui.toast(a, "Точка A: " + Qvk3Track.time(abA) + ". Нажмите ещё раз в точке B");
+            Qvk3Ui.toast(a, "Точка A: " + Qvk3Track.time(abA) + ". Откройте «Ещё» в точке B");
         } else {
             long b = engine.position();
             if (b <= abA + 500) {
@@ -477,16 +586,11 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         }
     }
 
-    /** For the activity: whether a back press should first leave lyrics mode. */
     public boolean back() {
         if (lyricsMode) {
             showLyrics(false);
             return true;
         }
         return false;
-    }
-
-    public Bitmap currentCover() {
-        return null;
     }
 }
