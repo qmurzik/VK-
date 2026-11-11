@@ -1,0 +1,11 @@
+--- a/smali_classes21/re/sova/qmods/ModernRuntime.smali	2026-11-11 17:52:20.179065419 +0000
++++ b/smali_classes21/re/sova/qmods/ModernRuntime.smali	2026-11-11 17:52:20.194081777 +0000
+@@ -2541,7 +2541,7 @@
+     goto :goto_0
+ 
+     :cond_1
+-    const-string p1, "(?:design_bottom_sheet|bottom_sheet_container|modal_card|modal_container)"
++    const-string p1, "(?:design_bottom_sheet|modal_card|modal_container)"
+ 
+     invoke-virtual {p0, p1}, Ljava/lang/String;->matches(Ljava/lang/String;)Z
+ 
