@@ -21,7 +21,7 @@ final class Qvk3Shell implements Application.ActivityLifecycleCallbacks {
     }
 
     static boolean enabled(Activity a) {
-        return Qvk3MusicSettings.prefs(a).getBoolean(Qvk3ShellActivity.ENABLED, true);
+        return Qvk3MusicSettings.prefs(a).getBoolean(Qvk3ShellActivity.ENABLED, false);
     }
 
     @Override

@@ -207,6 +207,9 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:styles", "Стили и конструктор", "8 стилей, цвета, форма, шрифт, плотность — с живым предпросмотром", 0, "QVK 3.0");
         idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
         idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
+        idx.addScreen("qvk3:dock", "Нижняя панель ВК", "Плавающая, скруглённая, полупрозрачная — настоящая панель ВК", 0, "Интерфейс ВК");
+        idx.addScreen("qvk3:rules", "Правила интерфейса ВК", "Скрыть, скруглить, перекрасить любой элемент по его имени", 0, "Интерфейс ВК");
+        idx.addScreen("qvk3:inspect", "Инспектор интерфейса", "Снять список элементов экрана ВК — для правил и для разработчика", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
         idx.addScreen("qvk3:musicSettings", "Настройки QVK Music", "Воспроизведение, звук, плеер, офлайн, тексты", 4, "QVK Music");
         idx.addScreen("qvk3:push", "Диагностика Push", "Google/microG, транспорт, фоновые ограничения", 6, "Доставка уведомлений");
@@ -218,7 +221,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса, зеркала и ключи подписи", 8, "Обновления");
         idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 8, "О QVK");
         idx.addScreen("qvk3:shell", "Открыть оболочку QVK", "Чаты и музыка в стиле iOS", 1, "Оболочка QVK");
-        idx.addScreen("qvk3:shellToggle", "Запускать оболочку QVK при старте", "Вместо главного экрана ВКонтакте; выключите, чтобы вернуть штатный запуск", 1, "Оболочка QVK");
+        idx.addScreen("qvk3:shellToggle", "Запускать оболочку QVK при старте", "Экспериментально: вместо главного экрана ВКонтакте. По умолчанию выключено", 1, "Оболочка QVK");
         idx.addScreen("qvk3:classic", "Классические настройки QVK", "Прежний экран настроек QVK 2.x", 8, "О QVK");
         idx.addScreen("qvk3:classicDefault", "Открывать классические настройки", "Вернуть прежний экран вместо этого центра", 8, "О QVK");
         idx.addCatalog(catalog(a));
@@ -551,6 +554,15 @@ public final class Qvk3SettingsActivity extends Activity {
             case "scenarios":
                 scenarios();
                 break;
+            case "dock":
+                Qvk3SkinScreen.dock(this);
+                break;
+            case "rules":
+                Qvk3SkinScreen.rules(this);
+                break;
+            case "inspect":
+                Qvk3SkinScreen.inspector(this);
+                break;
             case "music":
                 startActivity(new Intent(this, Qvk3MusicActivity.class));
                 break;
@@ -587,7 +599,7 @@ public final class Qvk3SettingsActivity extends Activity {
                 break;
             case "shellToggle": {
                 SharedPreferences pr = Qvk3MusicSettings.prefs(this);
-                boolean on = !pr.getBoolean(Qvk3ShellActivity.ENABLED, true);
+                boolean on = !pr.getBoolean(Qvk3ShellActivity.ENABLED, false);
                 Qvk3SettingsHistory.before(this, Qvk3ShellActivity.ENABLED, on ? "Оболочка QVK при старте включена" : "Оболочка QVK при старте выключена");
                 pr.edit().putBoolean(Qvk3ShellActivity.ENABLED, on).apply();
                 Qvk3Ui.toast(this, on ? "При запуске будет открываться оболочка QVK" : "При запуске будет открываться штатный ВКонтакте");

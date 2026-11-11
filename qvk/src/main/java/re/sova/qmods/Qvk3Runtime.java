@@ -44,6 +44,7 @@ public final class Qvk3Runtime extends ContentProvider {
             shortcuts(c);
             if (c instanceof android.app.Application) Qvk3MiniBar.install((android.app.Application) c);
             if (c instanceof android.app.Application) Qvk3Shell.install((android.app.Application) c);
+            if (c instanceof android.app.Application) Qvk3Skin.install((android.app.Application) c);
             Qvk3Jobs.io(() -> Qvk3Updates.cleanup(c));
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.runtime.start", t);
