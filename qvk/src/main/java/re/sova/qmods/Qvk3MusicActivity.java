@@ -15,7 +15,7 @@ public final class Qvk3MusicActivity extends Activity {
     /** Show only the player; closing it finishes the activity (used from the embedded tab and mini-player). */
     static final String EXTRA_PLAYER_ONLY = "qvk3_player_only";
     static final String EXTRA_IMPORT = "qvk3_import";
-    static final String[] TABS = {"Главная", "Моя музыка", "Плейлисты", "Поиск", "Загрузки"};
+    static final String[] TABS = {"Главная", "Моя музыка", "Плейлисты", "Поиск", "Загрузки", "Музыка ВК"};
     private Qvk3MusicScreen screen;
     private Object backCallback;
 

@@ -620,7 +620,14 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     }
 
     void selectTab(int i) {
-        tab = Math.max(0, Math.min(TABS.length - 1, i));
+        if (i == 5) {
+            // IDEA-0008: VK's own music home (джемы, предложенные плейлисты, подборки) — opened as is, so VK's
+            // changes never break it. Tracks started there still play in QVK Music.
+            Qvk3MusicEntry.openClassic(a);
+            highlightTab();
+            return;
+        }
+        tab = Math.max(0, Math.min(TABS.length - 2, i));
         highlightTab();
         searchRow.setVisibility(tab == 3 || tab == 1 ? View.VISIBLE : View.GONE);
         switch (tab) {

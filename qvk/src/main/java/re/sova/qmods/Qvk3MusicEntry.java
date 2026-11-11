@@ -15,6 +15,24 @@ import android.os.SystemClock;
  */
 public final class Qvk3MusicEntry {
     private static long lastOpen;
+    /** Until this moment VK's own music screens are not replaced (the "Музыка ВК" tab opens them on purpose). */
+    private static long classicUntil;
+
+    private static boolean classicWanted() {
+        return SystemClock.elapsedRealtime() < classicUntil;
+    }
+
+    /** Opens VK's own music section (its home with джемы and suggested playlists) without QVK taking it over. */
+    public static void openClassic(Activity a) {
+        classicUntil = SystemClock.elapsedRealtime() + 4000;
+        try {
+            NativeRoutes.music(a);
+        } catch (Throwable t) {
+            classicUntil = 0;
+            RuntimeFaults.record("qvk3.music.classic", t);
+            Qvk3Ui.toast(a, "Музыка ВК не открылась: " + Qvk3Jobs.message(t));
+        }
+    }
 
     /**
      * Called (patch 0007) at the start of VK's MusicFragmentNavigator.a(Context) — the single launcher used by
@@ -23,7 +41,7 @@ public final class Qvk3MusicEntry {
      */
     public static boolean fromNavigator(Object navigator, Context ctx) {
         try {
-            if (navigator == null || ctx == null || !Qvk3MusicSettings.enabled(ctx)) return false;
+            if (navigator == null || ctx == null || !Qvk3MusicSettings.enabled(ctx) || classicWanted()) return false;
             if (navigator.getClass().getField("b").getBoolean(navigator)) return false; // podcasts / audiobooks
             Object builder = navigator.getClass().getField("a").get(navigator);
             android.os.Bundle args = (android.os.Bundle) builder.getClass().getField("W3").get(builder);
@@ -57,7 +75,7 @@ public final class Qvk3MusicEntry {
         try {
             Context c = inflater.getContext();
             Activity a = ProfileActions.activity(c);
-            if (a == null || !Qvk3MusicSettings.enabled(a)) return null;
+            if (a == null || !Qvk3MusicSettings.enabled(a) || classicWanted()) return null;
             Qvk3MusicScreen screen = new Qvk3MusicScreen(a, true, -1, false);
             tabs.put(fragment, screen);
             return screen;
@@ -122,7 +140,7 @@ public final class Qvk3MusicEntry {
     /** Returns true when QVK Music handled the navigation. Never throws into VK code. */
     public static boolean open(Activity a) {
         try {
-            if (a == null || !Qvk3MusicSettings.enabled(a)) return false;
+            if (a == null || !Qvk3MusicSettings.enabled(a) || classicWanted()) return false;
             long now = SystemClock.elapsedRealtime();
             if (now - lastOpen < 700) return true; // swallow double taps / re-entrant routing
             lastOpen = now;
