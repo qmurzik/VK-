@@ -162,16 +162,49 @@ public final class Qvk3CoverFlowView extends View {
         computeSide(w);
     }
 
+    /** Width of a fully turned (70°) side cover on screen. */
+    private float sideWidth() {
+        return (float) Math.cos(Math.toRadians(70)) * coverPx * 0.96f;
+    }
+
+    /**
+     * Centre of the first side cover. Spacing is tied to the cover size, not to pixels (BUG-0017): at the default
+     * setting a clear gap of 1/5 of the cover separates the centre cover from its neighbours.
+     */
+    private float gap() {
+        float k = spacingPercent / 62f;
+        return coverPx / 2f + coverPx * 0.20f * k + sideWidth() / 2f;
+    }
+
+    /** Distance between side covers: each is fully visible with a clear gap of 1/10 of the cover. */
+    private float step() {
+        float k = spacingPercent / 62f;
+        return sideWidth() + coverPx * 0.10f * k;
+    }
+
     private void computeSide(int w) {
-        float W = coverPx, gap = W * (0.50f + 0.20f * spacingPercent / 62f), step = W * (0.11f + 0.10f * spacingPercent / 62f);
-        // first index whose (turned, ~0.34 W wide) cover lies completely beyond the edge, plus one spare
-        side = Math.max(VISIBLE_SIDE, Math.min(30, (int) Math.ceil((w / 2f + 0.2f * W - gap) / step) + 2));
+        // first index whose turned cover lies completely beyond the edge, plus one spare
+        side = Math.max(VISIBLE_SIDE, Math.min(30, (int) Math.ceil((w / 2f + sideWidth() / 2f - gap()) / step()) + 2));
+    }
+
+    private boolean captionOnTop = true;
+
+    /** Album title above the covers (the finger does not hide it while flicking, BUG-0017). */
+    public void setCaptionOnTop(boolean top) {
+        captionOnTop = top;
+        invalidate();
+    }
+
+    private float coverTop() {
+        float textSpace = title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 28);
+        float free = getHeight() - coverPx * (1f + REFLECTION) - textSpace;
+        float base = Math.max(Qvk3Compat.dp(getContext(), 8), free / 2f);
+        return captionOnTop ? base + textSpace : base;
     }
 
     /** Where the centre cover is drawn (used by the flip animation). */
     public void centerCoverRect(RectF out) {
-        float textSpace = title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 28);
-        float top = Math.max(Qvk3Compat.dp(getContext(), 8), (getHeight() - coverPx * (1f + REFLECTION) - textSpace) / 2f);
+        float top = coverTop();
         float cx = getWidth() / 2f;
         out.set(cx - coverPx / 2f, top, cx + coverPx / 2f, top + coverPx);
     }
@@ -200,12 +233,13 @@ public final class Qvk3CoverFlowView extends View {
         List<Integer> order = new ArrayList<>();
         for (int i = from; i <= to; i++) order.add(i);
         java.util.Collections.sort(order, (a, b) -> Float.compare(Math.abs(b - pos), Math.abs(a - pos)));
-        float textSpace = title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 28);
-        float cx = getWidth() / 2f, top = Math.max(Qvk3Compat.dp(getContext(), 8), (getHeight() - coverPx * (1f + REFLECTION) - textSpace) / 2f);
+        float cx = getWidth() / 2f, top = coverTop();
         for (int i : order) drawCover(canvas, i, i - pos, cx, top);
         if (center >= 0 && center < items.size()) {
             Item it = items.get(center);
-            float y = top + coverPx * (1f + REFLECTION) + Qvk3Compat.dp(getContext(), 8) - title.ascent();
+            float y = captionOnTop
+                    ? top - Qvk3Compat.dp(getContext(), 16) - subtitle.getTextSize() - Qvk3Compat.dp(getContext(), 4) - title.descent()
+                    : top + coverPx * (1f + REFLECTION) + Qvk3Compat.dp(getContext(), 8) - title.ascent();
             canvas.drawText(ellipsize(it.title, title), cx, y, title);
             canvas.drawText(ellipsize(it.subtitle, subtitle), cx, y + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 4), subtitle);
         }
@@ -232,8 +266,7 @@ public final class Qvk3CoverFlowView extends View {
         float turn = Math.min(1f, ad);                       // 0 = facing us, 1 = fully turned
         float angle = (float) Math.toRadians(70f * turn);
         float W = coverPx;
-        float gap = W * (0.50f + 0.20f * spacingPercent / 62f);   // free space between the centre and the first side cover
-        float step = W * (0.11f + 0.10f * spacingPercent / 62f);  // tight stack beyond it
+        float gap = gap(), step = step();
         float off = ad <= 1f ? gap * ad : gap + (ad - 1f) * step;
         float x = cx + sign * off;
         float pw = (float) Math.max(0.05, Math.cos(angle)) * W * (1f - 0.04f * turn);
@@ -384,7 +417,7 @@ public final class Qvk3CoverFlowView extends View {
                 float dx = e.getX() - lastX;
                 if (!dragging && Math.abs(e.getX() - downX) > touchSlop) dragging = true;
                 if (dragging) {
-                    pos = Math.max(-0.3f, Math.min(items.size() - 0.7f, pos - dx / (spacing() * 0.8f)));
+                    pos = Math.max(-0.3f, Math.min(items.size() - 0.7f, pos - dx / step()));
                     lastX = e.getX();
                     invalidate();
                 }
@@ -398,7 +431,7 @@ public final class Qvk3CoverFlowView extends View {
                 } else if (Math.abs(vx) > minFling) {
                     // Inertia: a strong swipe travels many albums and keeps gliding (decelerating) for up to
                     // ~2.5 s; the end point is an exact album, so the motion always finishes centred.
-                    float itemsPerSecond = -vx / (spacing() * 0.8f);
+                    float itemsPerSecond = -vx / step();
                     float travel = Math.max(-120f, Math.min(120f, itemsPerSecond * 0.9f));
                     int target = Math.max(0, Math.min(items.size() - 1, Math.round(pos + travel)));
                     int start = Math.round(pos * UNIT);
@@ -430,14 +463,16 @@ public final class Qvk3CoverFlowView extends View {
     }
 
     private void tap(float x) {
-        float d = (x - getWidth() / 2f) / (spacing() * 0.9f);
-        if (Math.abs(d) < 0.6f) {
+        float dx = x - getWidth() / 2f, ad = Math.abs(dx);
+        if (ad < coverPx / 2f) {
             int c = selected();
             if (listener != null && c >= 0) listener.onItem(c, false);
             performClick();
-        } else {
-            smoothScrollTo(selected() + (d > 0 ? Math.max(1, Math.round(d)) : Math.min(-1, Math.round(d))));
+            return;
         }
+        // which side cover was hit: the first sits at gap(), the rest every step()
+        int n = 1 + Math.max(0, Math.round((ad - gap()) / step()));
+        smoothScrollTo(selected() + (dx > 0 ? n : -n));
     }
 
     @Override

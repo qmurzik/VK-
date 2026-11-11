@@ -75,12 +75,13 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         flow.setColors(WHITE, GREY, 0xFF2A2A2D);
         flow.setSpacingPercent(Qvk3MusicSettings.coverflowSpacing(a));
         flow.setCornerRadius(0);
+        flow.setCaptionOnTop(true);
         flow.setListener((index, settled) -> {
             Qvk3MusicSettings.prefs(a).edit().putInt(SELECTED, index).apply();
             if (!settled) flipOpen(index);
         });
         LayoutParams fl = new LayoutParams(-1, -1);
-        fl.topMargin = byRotation ? dp(30) : dp(52);   // room for the "now playing" line sideways
+        fl.topMargin = byRotation ? dp(4) : dp(52);
         fl.bottomMargin = dp(byRotation ? 8 : 64);
         addView(flow, fl);
 
@@ -129,8 +130,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         nowPlaying = Qvk3Ui.line(a, "", 12, 0x99FFFFFF, false);
         nowPlaying.setGravity(Gravity.CENTER);
         nowPlaying.setPadding(dp(72), 0, dp(72), 0);
-        LayoutParams nl = new LayoutParams(-1, -2, byRotation ? Gravity.TOP : Gravity.BOTTOM);
-        nl.topMargin = dp(10);
+        LayoutParams nl = new LayoutParams(-1, -2, Gravity.BOTTOM);   // the album title is on top now
         nl.bottomMargin = dp(26);
         addView(nowPlaying, nl);
 
@@ -227,12 +227,14 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         boolean land = getWidth() > getHeight();
         int w = getWidth(), h = getHeight();
         int cw = land ? Math.round(Math.min(w * 0.62f, h * 1.15f)) : Math.round(w * 0.9f);
-        int maxH = land ? Math.round(h * 0.86f) : Math.round(h * 0.72f);
-        int ch = Math.min(maxH, dp(70) + openTracks.size() * dp(45) + dp(8)); // short albums get a short card
+        // anchored to the top and running to the bottom; a short list simply fades out downwards (BUG-0017)
+        int top = byRotation ? dp(10) : dp(60), bottom = land ? 0 : dp(70);
+        int ch = Math.max(dp(160), h - top - bottom);
         card = new FrameLayout(a);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFF2E2E31, 0xFF111113});
-        bg.setCornerRadius(dp(6));
-        bg.setStroke(Math.max(1, dp(1)), 0x40FFFFFF);
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xF7303034, 0xF21B1B1E, 0xE6141416, 0x99111113, 0x00111113});
+        float r = dp(8);
+        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
         card.setBackground(bg);
         card.setClipToOutline(true);
         card.setElevation(dp(12));
@@ -284,9 +286,11 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         col.addView(lv, new LinearLayout.LayoutParams(-1, 0, 1));
         card.addView(col, new LayoutParams(-1, -1));
 
-        LayoutParams cl = new LayoutParams(cw, ch, Gravity.CENTER);
-        if (!byRotation) cl.topMargin = dp(26);
+        LayoutParams cl = new LayoutParams(cw, ch, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        cl.topMargin = top;
         addView(card, cl);
+        // while the list is open the covers behind it ignore touches; a sideways swipe closes the list instead
+        flow.setOnTouchListener((v, e) -> true);
         card.setVisibility(INVISIBLE);
         refreshRing();
     }
@@ -330,6 +334,49 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         });
     }
 
+    // ------------------------------------------------------------------ closing the list by a swipe (BUG-0017)
+
+    private float downX, downY;
+    private boolean downOutside;
+
+    /**
+     * While the track list is open, a sideways swipe anywhere closes it (the covers behind it would otherwise scroll
+     * unseen), and a tap outside the list closes it too. Vertical movement inside the list still scrolls the list.
+     */
+    @Override
+    public boolean onInterceptTouchEvent(android.view.MotionEvent ev) {
+        if (card == null || flipping) return false;
+        switch (ev.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                downX = ev.getX();
+                downY = ev.getY();
+                downOutside = ev.getX() < card.getLeft() || ev.getX() > card.getRight() || ev.getY() < card.getTop() || ev.getY() > card.getBottom();
+                return false;
+            case android.view.MotionEvent.ACTION_MOVE: {
+                float dx = ev.getX() - downX, dy = ev.getY() - downY;
+                int slop = android.view.ViewConfiguration.get(a).getScaledTouchSlop();
+                if (Math.abs(dx) > slop * 2 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    flipClose();
+                    return true;
+                }
+                return false;
+            }
+            case android.view.MotionEvent.ACTION_UP:
+                if (downOutside && Math.abs(ev.getX() - downX) < dp(10) && Math.abs(ev.getY() - downY) < dp(10)) {
+                    flipClose();
+                    return true;
+                }
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    @Override
+    public boolean onTouchEvent(android.view.MotionEvent ev) {
+        return card != null || super.onTouchEvent(ev);
+    }
+
     void flipClose() {
         if (card == null || flipping) return;
         flipping = true;
@@ -337,6 +384,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         c.animate().rotationY(90f).setDuration(170).setInterpolator(new android.view.animation.AccelerateInterpolator()).withEndAction(() -> {
             removeView(c);
             card = null;
+            flow.setOnTouchListener(null);
             adapter = null;
             ring = null;
             flow.animate().alpha(1f).setDuration(200).start();
