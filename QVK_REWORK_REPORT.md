@@ -383,3 +383,4 @@ APK: https://yadi.sk/d/WL3OEapl5YjaSg (зеркало buzzheavier), SHA-256 7a84
 
 ### alpha33 собрана вместо публикации alpha32 (alpha32 лежит на Диске, но не объявлялась)
 APK alpha33: https://yadi.sk/d/I_jt6g4iLLYomg (зеркало buzzheavier), SHA-256 7f7663c3538a16e7bfd4f999f4eab9f4f5906909271a39ad47dc15aeb004ba87.
+- IDEA-0019: «вес» альбомов в Cover Flow — взмах пролистывает несколько альбомов, даже очень сильный не больше ~12 (мягкое насыщение вместо 120), скольжение чуть дольше. alpha34 = alpha33 + эта правка.

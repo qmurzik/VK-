@@ -430,14 +430,17 @@ public final class Qvk3CoverFlowView extends View {
                 if (!dragging) {
                     tap(e.getX());
                 } else if (Math.abs(vx) > minFling) {
-                    // Inertia: a strong swipe travels many albums and keeps gliding (decelerating) for up to
-                    // ~2.5 s; the end point is an exact album, so the motion always finishes centred.
+                    // Inertia with weight (IDEA-0019): albums are heavy — a flick moves a few, even a very strong swipe
+                    // at most ~12 (a soft saturation curve instead of 120), and they glide a little longer.
+                    // The end point is an exact album, so the motion always finishes centred.
                     float itemsPerSecond = -vx / step();
-                    float travel = Math.max(-120f, Math.min(120f, itemsPerSecond * 0.9f));
+                    float raw = Math.abs(itemsPerSecond) * 0.3f, cap = 12f;
+                    float travel = Math.signum(itemsPerSecond) * cap * (1f - (float) Math.exp(-raw / cap));
+                    if (Math.abs(travel) < 1f) travel = Math.signum(itemsPerSecond);
                     int target = Math.max(0, Math.min(items.size() - 1, Math.round(pos + travel)));
                     int start = Math.round(pos * UNIT);
                     int dist = Math.round(target * UNIT) - start;
-                    int duration = (int) Math.min(3200, 500 + 300 * Math.sqrt(Math.abs(dist) / UNIT));
+                    int duration = (int) Math.min(2600, 520 + 420 * Math.sqrt(Math.abs(dist) / UNIT));
                     scroller.startScroll(start, 0, dist, 0, duration);
                     postInvalidateOnAnimation();
                 } else {
