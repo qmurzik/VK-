@@ -1,0 +1,14 @@
+--- a/smali_classes21/re/sova/qmods/QvkStartupActivity.smali	2026-11-11 20:43:36.892151256 +0000
++++ b/smali_classes21/re/sova/qmods/QvkStartupActivity.smali	2026-11-11 20:43:36.900725529 +0000
+@@ -863,6 +863,11 @@
+     const/16 v2, 0x1f4
+ 
+     :goto_9
++    # QVK 3.0 (IDEA-0014): weather under the logo; a little longer when it is shown
++    invoke-static {v0, v2}, Lre/sova/qmods/Qvk3SplashWeather;->show(Landroid/app/Activity;I)I
++
++    move-result v2
++
+     int-to-long v4, v2
+ 
+     invoke-virtual {v1, v3, v4, v5}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z

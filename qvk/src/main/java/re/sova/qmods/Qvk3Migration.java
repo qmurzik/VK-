@@ -22,6 +22,8 @@ final class Qvk3Migration {
             e.putString("qvk3_migrated_from", p.contains("qmods_seen_8.100-qvk-2.6.18") ? "8.100-qvk-2.6.18" : "чистая установка или ранее 2.6.18");
             e.putLong("qvk3_migrated_at", System.currentTimeMillis());
         }
+        // IDEA-0014: the QVK logo is the default launch screen; an illustration the user chose stays
+        if (!p.contains("qvk_splash_girl") && !p.contains("qvk_splash_scene")) e.putBoolean("qvk_splash_girl", false);
         e.putLong(DONE, current).apply();
         // index QVK 2.x music exports as local tracks of QVK Music (files are referenced, never moved)
         Qvk3Jobs.io(() -> {

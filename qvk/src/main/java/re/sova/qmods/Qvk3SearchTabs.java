@@ -29,6 +29,7 @@ public final class Qvk3SearchTabs {
     }
 
     public static void filter(Object response, String method) {
+        Qvk3CatalogAds.filter(response, method); // IDEA-0001: subscription offers in VK music
         try {
             if (method == null || !method.toLowerCase(java.util.Locale.ROOT).startsWith("catalog.getsearch")) return;
             if (prefs() == null || !(response instanceof JSONObject)) return;
