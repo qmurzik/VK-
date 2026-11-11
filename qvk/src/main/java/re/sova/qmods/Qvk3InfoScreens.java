@@ -56,8 +56,49 @@ final class Qvk3InfoScreens {
         });
     }
 
+    /** Logs screen: copy / save the app's own log without adb. */
+    static void logs(Activity a) {
+        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        LinearLayout col = new LinearLayout(a);
+        col.setOrientation(LinearLayout.VERTICAL);
+        TextView info = body(a, "Журнал считается...");
+        col.addView(info);
+        Runnable refresh = () -> Qvk3Jobs.io(() -> {
+            long n = Qvk3Logs.size(a);
+            String t = "Запись логов этого приложения (только QVK/ВК, других программ нет). Данные остаются на устройстве, никуда не отправляются. "
+                    + "Токены и пароли в тексте скрываются.\n\nСейчас сохранено: " + (n >> 10) + " КБ. Хранится прошлый запуск и текущий, поэтому после вылета журнал можно скопировать при следующем открытии.\n\n"
+                    + "«Копировать» кладёт в буфер последние ~300 КБ с описанием устройства и сбоями модулей (буфер обмена не принимает больше). Весь журнал целиком — «В файл» (Загрузки/QVK).";
+            Qvk3Jobs.main(() -> info.setText(t));
+        });
+        refresh.run();
+        Switch capture = new Switch(a);
+        capture.setText("Записывать логи");
+        capture.setChecked(Qvk3Logs.enabled(a));
+        capture.setPadding(Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 4));
+        capture.setOnCheckedChangeListener((v, on) -> {
+            Qvk3Logs.setEnabled(a, on);
+            Qvk3Ui.toast(a, on ? "Запись логов включена" : "Запись остановлена");
+        });
+        col.addView(capture);
+        LinearLayout row = new LinearLayout(a);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(Qvk3Ui.dp(a, 14), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 14), Qvk3Ui.dp(a, 8));
+        row.addView(Qvk3Ui.button(a, p, "Копировать", true, v -> Qvk3Logs.copy(a)), Qvk3Ui.weight(1));
+        row.addView(Qvk3Ui.button(a, p, "В файл", false, v -> Qvk3Logs.save(a)), Qvk3Ui.weight(1));
+        row.addView(Qvk3Ui.button(a, p, "Очистить", false, v -> {
+            Qvk3Logs.clear(a);
+            Qvk3Ui.toast(a, "Журнал очищен");
+            refresh.run();
+        }), Qvk3Ui.weight(1));
+        col.addView(row);
+        dialog(a, "Логи приложения", col, null, null);
+    }
+
     static void show(Activity a, String what) {
         switch (what) {
+            case "logs":
+                logs(a);
+                break;
             case "battery": {
                 PowerManager pm = a.getSystemService(PowerManager.class);
                 boolean ign = pm != null && pm.isIgnoringBatteryOptimizations(a.getPackageName());
@@ -104,7 +145,7 @@ final class Qvk3InfoScreens {
                 } catch (Throwable t) {
                     r = "Журнал недоступен: " + Qvk3Jobs.message(t);
                 }
-                dialog(a, "Журнал ошибок", body(a, "Компонент и число сбоев с запуска приложения. Модули QVK 3.0 начинаются с «qvk3.».\n\n" + r), null, null);
+                dialog(a, "Журнал ошибок", body(a, "Компонент и число сбоев с запуска приложения. Модули QVK 3.0 начинаются с «qvk3.». Полные логи с описанием устройства: «Логи приложения».\n\n" + r), null, null);
                 break;
             }
             default: {

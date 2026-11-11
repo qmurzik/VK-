@@ -6,3 +6,4 @@ re/sova/qmods/Qvk3Id3.java
 re/sova/qmods/Qvk3DesignTokens.java
 re/sova/qmods/Qvk3SettingsIndex.java
 re/sova/qmods/Qvk3UpdateManifest.java
+re/sova/qmods/Qvk3LogRedact.java

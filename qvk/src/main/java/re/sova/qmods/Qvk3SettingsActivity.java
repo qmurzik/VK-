@@ -224,6 +224,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 7, "Загрузки и место");
         idx.addScreen("qvk3:perf", "Облегчённый режим", "Без размытия и прозрачности — для слабых устройств", 7, "Производительность и батарея");
         idx.addScreen("qvk3:battery", "Фоновая работа и батарея", "Оптимизация батареи и ограничения Android", 7, "Производительность и батарея");
+        idx.addScreen("qvk3:logs", "Логи приложения", "Скопировать или сохранить журнал без logcat", 7, "Диагностика");
         idx.addScreen("qvk3:faults", "Журнал ошибок", "Сбои модулей с указанием компонента", 7, "Диагностика");
         idx.addScreen("qvk3:updates", "Проверить обновления", "Загрузка с докачкой, проверка подписи", 8, "Обновления");
         idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса, зеркала и ключи подписи", 8, "Обновления");
@@ -595,6 +596,7 @@ public final class Qvk3SettingsActivity extends Activity {
             case "storage":
             case "about":
             case "faults":
+            case "logs":
                 Qvk3InfoScreens.show(this, what);
                 break;
             case "updates":

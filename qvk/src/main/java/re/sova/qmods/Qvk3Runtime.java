@@ -40,6 +40,7 @@ public final class Qvk3Runtime extends ContentProvider {
         try {
             String proc = android.app.Application.getProcessName();
             if (proc != null && !proc.equals(c.getPackageName())) return; // services/guest processes: nothing to do
+            Qvk3Logs.start(c);
             Qvk3Migration.run(c);
             shortcuts(c);
             if (c instanceof android.app.Application) Qvk3MiniBar.install((android.app.Application) c);
