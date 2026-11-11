@@ -55,13 +55,19 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
     private List<Qvk3Track> openTracks = new ArrayList<>();
     private boolean flipping, albumQueued;
     private ImageView flipCover;
+    private final GradientDrawable glow;
+    private final TextView nowPlaying;
 
     Qvk3CoverFlowScreen(Activity a, boolean byRotation) {
         super(a);
         this.a = a;
         this.byRotation = byRotation;
         this.engine = Qvk3MusicEngine.get(a);
-        setBackgroundColor(Color.BLACK);
+        glow = new GradientDrawable();
+        glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glow.setColors(new int[]{0xFF2B2B31, 0xFF111114, 0xFF000000});
+        glow.setGradientCenter(0.5f, byRotation ? 0.36f : 0.42f);
+        setBackground(glow);   // soft light behind the centre cover, black at the edges
         setClickable(true);   // nothing below receives touches
         setFocusable(true);
 
@@ -74,7 +80,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
             if (!settled) flipOpen(index);
         });
         LayoutParams fl = new LayoutParams(-1, -1);
-        if (!byRotation) fl.topMargin = dp(52);
+        fl.topMargin = byRotation ? dp(30) : dp(52);   // room for the "now playing" line sideways
         fl.bottomMargin = dp(byRotation ? 8 : 64);
         addView(flow, fl);
 
@@ -104,6 +110,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
                 engine.toggle();
             }
         });
+        play.setBackground(circle());
         LayoutParams pl = new LayoutParams(dp(52), dp(52), Gravity.BOTTOM | Gravity.START);
         pl.leftMargin = dp(10);
         pl.bottomMargin = dp(8);
@@ -112,16 +119,40 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
             int c = flow.selected();
             if (c >= 0) flipOpen(c);
         });
+        list.setBackground(circle());
         LayoutParams ll = new LayoutParams(dp(52), dp(52), Gravity.BOTTOM | Gravity.END);
         ll.rightMargin = dp(10);
         ll.bottomMargin = dp(8);
         addView(list, ll);
+
+        // what is playing now, small and out of the way: top centre sideways, bottom centre upright
+        nowPlaying = Qvk3Ui.line(a, "", 12, 0x99FFFFFF, false);
+        nowPlaying.setGravity(Gravity.CENTER);
+        nowPlaying.setPadding(dp(72), 0, dp(72), 0);
+        LayoutParams nl = new LayoutParams(-1, -2, byRotation ? Gravity.TOP : Gravity.BOTTOM);
+        nl.topMargin = dp(10);
+        nl.bottomMargin = dp(26);
+        addView(nowPlaying, nl);
 
         load();
     }
 
     private int dp(float v) {
         return Qvk3Ui.dp(a, v);
+    }
+
+    private GradientDrawable circle() {
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(0x26FFFFFF);
+        g.setStroke(Math.max(1, dp(0.7f)), 0x1FFFFFFF);
+        return g;
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int ow, int oh) {
+        super.onSizeChanged(w, h, ow, oh);
+        glow.setGradientRadius(Math.max(w, h) * 0.62f);
     }
 
     void setOnClose(Runnable r) {
@@ -211,10 +242,20 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         col.setOrientation(LinearLayout.VERTICAL);
         LinearLayout head = new LinearLayout(a);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(16), dp(10), dp(8), dp(10));
+        head.setPadding(dp(12), dp(10), dp(8), dp(10));
         head.setBackground(Qvk3Ui.ripple(a, 0x14FFFFFF, 0x33FFFFFF, 0));
         head.setContentDescription("Перевернуть обратно к обложкам");
         head.setOnClickListener(v -> flipClose());
+        ImageView thumb = new ImageView(a);
+        thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumb.setBackgroundColor(0xFF2A2A2D);
+        Bitmap tb = Qvk3Images.get(a).cached(open.cover, 300);
+        if (tb != null) thumb.setImageBitmap(tb);
+        else if (open.cover != null && !open.cover.isEmpty()) Qvk3Images.get(a).load(open.cover, 300, thumb::setImageBitmap);
+        Qvk3Ui.clipRound(thumb, dp(4));
+        LinearLayout.LayoutParams thl = new LinearLayout.LayoutParams(dp(46), dp(46));
+        thl.rightMargin = dp(4);
+        head.addView(thumb, thl);
         LinearLayout texts = new LinearLayout(a);
         texts.setOrientation(LinearLayout.VERTICAL);
         cardTitle = Qvk3Ui.line(a, open.name, 17, WHITE, true);
@@ -420,6 +461,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         play.setContentDescription(playing ? "Пауза" : "Играть");
         Qvk3Track t = e.current();
         String k = t == null ? "" : t.key();
+        nowPlaying.setText(t == null ? "" : "♪  " + t.title + " — " + t.artist);
         if (!k.equals(lastPlaying)) {
             lastPlaying = k;
             if (adapter != null) adapter.notifyDataSetChanged();
@@ -479,6 +521,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
             tv[1].setText(t.title);
             tv[1].setTextColor(t.playable() || t.restricted == 0 ? WHITE : 0x66FFFFFF);
             tv[2].setText((t.local.isEmpty() ? "" : "⬇  ") + Qvk3Track.time(t.duration * 1000L));
+            row.setBackgroundColor(now ? 0x1F4DA3FF : (i % 2 == 1 ? 0x0AFFFFFF : 0));
             row.setContentDescription((i + 1) + ". " + t.title + ", " + Qvk3Track.time(t.duration * 1000L) + (t.local.isEmpty() ? "" : ", на устройстве"));
             return row;
         }

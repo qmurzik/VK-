@@ -157,7 +157,8 @@ public final class Qvk3CoverFlowView extends View {
         super.onSizeChanged(w, h, ow, oh);
         int textSpace = Math.round(title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 24));
         // cover + reflection + caption must fit the height; the cover never exceeds ~46% of the width
-        coverPx = Math.max(1, Math.min(Math.round(w * 0.46f), Math.round((h - textSpace) / (1f + REFLECTION))));
+        float share = h > w * 1.3f ? 0.58f : 0.46f;   // upright screens have height to spare: bigger covers
+        coverPx = Math.max(1, Math.min(Math.round(w * share), Math.round((h - textSpace) / (1f + REFLECTION))));
         computeSide(w);
     }
 
@@ -259,10 +260,10 @@ public final class Qvk3CoverFlowView extends View {
         matrix.setPolyToPoly(src, 0, dst, 0, 4);
         canvas.save();
         canvas.concat(matrix);
-        paintCover(canvas, b, a, false);
+        paintCover(canvas, b, a, false, sign, turn);
         canvas.restore();
 
-        // --- reflection: the cover flipped vertically under its bottom edge, squeezed and faded to black
+        // --- reflection: the cover flipped vertically under its bottom edge, squeezed and fading out
         float rl = hLeft * REFLECTION, rr = hRight * REFLECTION;
         dst[0] = left; dst[1] = cy + hLeft / 2f + rl; dst[2] = right; dst[3] = cy + hRight / 2f + rr;
         dst[4] = right; dst[5] = cy + hRight / 2f; dst[6] = left; dst[7] = cy + hLeft / 2f;
@@ -270,35 +271,69 @@ public final class Qvk3CoverFlowView extends View {
         matrix.setPolyToPoly(src, 0, dst, 0, 4);
         canvas.save();
         canvas.concat(matrix);
-        paintCover(canvas, b, Math.round(a * 0.5f), true);
+        paintCover(canvas, b, a, true);
         canvas.restore();
     }
 
     private void paintCover(Canvas canvas, Bitmap b, int alpha, boolean mirror) {
+        paintCover(canvas, b, alpha, mirror, 0f, 0f);
+    }
+
+    /**
+     * Draws one cover in its own (un-transformed) square. The reflection fades to transparent rather than to black,
+     * so it sits on any background. Turned covers get a shade that deepens towards the edge facing the centre,
+     * which gives the stack its depth; the centre cover gets a hairline highlight.
+     */
+    private void paintCover(Canvas canvas, Bitmap b, int alpha, boolean mirror, float sign, float turn) {
         rect.set(0, 0, coverPx, coverPx);
+        Shader mask = mirror ? new android.graphics.LinearGradient(0, 0, 0, coverPx, 0x00000000, 0x73000000, Shader.TileMode.CLAMP) : null;
         if (b != null) {
             BitmapShader sh = new BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             Matrix m = new Matrix();
             float s = Math.max(coverPx / (float) b.getWidth(), coverPx / (float) b.getHeight());
             m.setScale(s, s);
             sh.setLocalMatrix(m);
-            paint.setShader(sh);
+            paint.setShader(mask == null ? sh : new android.graphics.ComposeShader(sh, mask, android.graphics.PorterDuff.Mode.DST_IN));
             paint.setAlpha(alpha);
             canvas.drawRect(rect, paint); // square corners, like the original
             paint.setShader(null);
+            paint.setAlpha(255);
         } else {
             int base = placeholder.getAlpha();
-            placeholder.setAlpha(Math.round(base * alpha / 255f));
-            canvas.drawRect(rect, placeholder);
-            placeholder.setAlpha(base);
+            if (mask != null) {
+                Paint pm = new Paint(placeholder);
+                pm.setShader(new android.graphics.ComposeShader(new android.graphics.LinearGradient(0, 0, 0, coverPx, placeholder.getColor(), placeholder.getColor(), Shader.TileMode.CLAMP), mask, android.graphics.PorterDuff.Mode.DST_IN));
+                pm.setAlpha(Math.round(base * alpha / 255f));
+                canvas.drawRect(rect, pm);
+            } else {
+                placeholder.setAlpha(Math.round(base * alpha / 255f));
+                canvas.drawRect(rect, placeholder);
+                placeholder.setAlpha(base);
+                // a note glyph on empty covers instead of a flat square
+                Paint g = new Paint(Paint.ANTI_ALIAS_FLAG);
+                g.setColor(0x33FFFFFF);
+                g.setTextAlign(Paint.Align.CENTER);
+                g.setTextSize(coverPx * 0.38f);
+                canvas.drawText("♪", coverPx / 2f, coverPx / 2f - (g.ascent() + g.descent()) / 2f, g);
+            }
         }
-        if (mirror) {
-            // fade towards the far end of the reflection (src y = 0 after the flip): opaque black there
-            fade.setShader(new android.graphics.LinearGradient(0, 0, 0, coverPx, 0xFF000000, 0x66000000, Shader.TileMode.CLAMP));
+        if (!mirror && turn > 0.001f) {
+            int inner = Math.round(150 * turn), outer = Math.round(40 * turn);
+            int left = sign < 0 ? outer : inner, right = sign < 0 ? inner : outer;
+            fade.setShader(new android.graphics.LinearGradient(0, 0, coverPx, 0, left << 24, right << 24, Shader.TileMode.CLAMP));
+            fade.setAlpha(alpha);
             canvas.drawRect(rect, fade);
             fade.setShader(null);
+            fade.setAlpha(255);
+        } else if (!mirror) {
+            edge.setStyle(Paint.Style.STROKE);
+            edge.setStrokeWidth(Math.max(1f, coverPx / 300f));
+            edge.setColor(0x38FFFFFF);
+            canvas.drawRect(rect, edge);
         }
     }
+
+    private final Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private int coverBucket() {
         return coverPx > 600 ? 600 : 300;
