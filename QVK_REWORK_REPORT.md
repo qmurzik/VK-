@@ -382,3 +382,4 @@ APK: https://yadi.sk/d/WL3OEapl5YjaSg (зеркало buzzheavier), SHA-256 7a84
 - IDEA-0018: в списке треков альбома Cover Flow — кольцо прогресса у скачиваемого трека (заполняется по часовой), галочка у скачанного; если скачан весь альбом, галочка только у альбома (кольцо в шапке). `Qvk3MusicDownloads.PROGRESS/SAVED` и общий список слушателей; перерисовка не чаще ~6 раз в секунду. Проверено снимком Robolectric.
 
 ### alpha33 собрана вместо публикации alpha32 (alpha32 лежит на Диске, но не объявлялась)
+APK alpha33: https://yadi.sk/d/I_jt6g4iLLYomg (зеркало buzzheavier), SHA-256 7f7663c3538a16e7bfd4f999f4eab9f4f5906909271a39ad47dc15aeb004ba87.
