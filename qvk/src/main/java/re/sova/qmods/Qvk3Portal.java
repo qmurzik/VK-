@@ -331,6 +331,10 @@ public final class Qvk3Portal {
         return call(c, "POST", "/tickets/" + code + "/me-too", b, true);
     }
 
+    public static JSONObject meTooRemove(Context c, String code) throws IOException {
+        return call(c, "DELETE", "/tickets/" + code + "/me-too", null, true);
+    }
+
     public static JSONObject verify(Context c, String code, boolean fixed, String comment) throws Exception {
         JSONObject b = new JSONObject().put("result", fixed ? "fixed" : "not_fixed");
         if (comment != null && !comment.isEmpty()) b.put("comment", comment);

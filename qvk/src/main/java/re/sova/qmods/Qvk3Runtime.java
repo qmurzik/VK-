@@ -47,6 +47,7 @@ public final class Qvk3Runtime extends ContentProvider {
             if (c instanceof android.app.Application) Qvk3FeedNow.install((android.app.Application) c);
             if (c instanceof android.app.Application) Qvk3UpdatePrompt.install((android.app.Application) c);
             if (c instanceof android.app.Application) Qvk3PortalWatch.install((android.app.Application) c);
+            if (c instanceof android.app.Application) Qvk3Energy.install((android.app.Application) c);
             if (c instanceof android.app.Application) Qvk3Shell.install((android.app.Application) c);
             if (c instanceof android.app.Application) Qvk3Skin.install((android.app.Application) c);
             Qvk3Jobs.io(() -> Qvk3Updates.cleanup(c));

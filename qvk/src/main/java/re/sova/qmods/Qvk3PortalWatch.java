@@ -43,7 +43,8 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
     private WeakReference<Activity> resumed = new WeakReference<>(null);
     private SensorManager sensors;
     private long lastShake, firstJolt;
-    private boolean polling, crashAsked;
+    private boolean polling, crashAsked, whatsNewChecked;
+    static final String SEEN_VERSION = "qvk3_seen_version";
 
     static synchronized void install(Application app) {
         if (instance != null) return;
@@ -67,6 +68,14 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
                 if (acc != null) sensors.registerListener(this, acc, SensorManager.SENSOR_DELAY_UI);
             } catch (Throwable t) {
                 RuntimeFaults.record("qvk3.portal.shake", t);
+            }
+        }
+        if (!whatsNewChecked) {
+            whatsNewChecked = true;
+            long ver = Qvk3Updates.installedVersion(a), seen = p.getLong(SEEN_VERSION, 0);
+            if (ver > 0 && ver != seen) {
+                p.edit().putLong(SEEN_VERSION, ver).apply();
+                if (seen > 0 && ver > seen) a.getWindow().getDecorView().postDelayed(() -> whatsNew(a, ver), 1200); // updated, not a fresh install
             }
         }
         if (!crashAsked) {
@@ -104,6 +113,78 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
             } catch (Throwable ignored) {
             }
         }
+    }
+
+    // ------------------------------------------------------------------ what's new
+
+    /**
+     * First start of a new version: its notes (from the update manifest history) and — when a portal account is linked —
+     * the user's tickets waiting for «Требуется проверка», so a fix is confirmed or reopened right away.
+     */
+    static void whatsNew(Activity a, long ver) {
+        if (a.isFinishing() || a.isDestroyed()) return;
+        Context app = a.getApplicationContext();
+        Qvk3Jobs.io(() -> {
+            String notes = notes(app, ver);
+            if (notes.isEmpty()) {
+                try {
+                    Qvk3Updates.check(app); // refreshes the history with this version's notes
+                } catch (Throwable ignored) {
+                }
+                notes = notes(app, ver);
+            }
+            org.json.JSONArray verify = new org.json.JSONArray();
+            if (Qvk3Portal.linked(app)) {
+                for (String kind : new String[]{"bug", "idea"}) {
+                    try {
+                        org.json.JSONArray it = Qvk3Portal.tickets(app, "scope=mine&kind=" + kind + "&status=verify&limit=20").optJSONArray("items");
+                        if (it != null) for (int i = 0; i < it.length(); i++) verify.put(it.get(i));
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            final String n = notes;
+            final org.json.JSONArray v = verify;
+            if (n.isEmpty() && v.length() == 0) return;
+            Qvk3Jobs.main(() -> showWhatsNew(a, n, v));
+        });
+    }
+
+    static String notes(Context c, long ver) {
+        org.json.JSONArray h = Qvk3Updates.history(c);
+        for (int i = 0; i < h.length(); i++) {
+            org.json.JSONObject o = h.optJSONObject(i);
+            if (o != null && o.optLong("code") == ver) return o.optString("notes");
+        }
+        return "";
+    }
+
+    static void showWhatsNew(Activity a, String notes, org.json.JSONArray verify) {
+        if (a.isFinishing() || a.isDestroyed()) return;
+        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        android.widget.LinearLayout col = new android.widget.LinearLayout(a);
+        col.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Qvk3Ui.dp(a, 22);
+        col.setPadding(pad, Qvk3Ui.dp(a, 4), pad, Qvk3Ui.dp(a, 8));
+        if (!notes.isEmpty()) col.addView(Qvk3Ui.text(a, notes, 15, p.text, false));
+        android.app.AlertDialog[] d = new android.app.AlertDialog[1];
+        if (verify.length() > 0) {
+            android.widget.TextView h = Qvk3Ui.text(a, "Проверьте исправления ваших обращений:", 14, p.accent, true);
+            h.setPadding(0, Qvk3Ui.dp(a, notes.isEmpty() ? 0 : 14), 0, Qvk3Ui.dp(a, 4));
+            col.addView(h);
+            for (int i = 0; i < verify.length(); i++) {
+                org.json.JSONObject t = verify.optJSONObject(i);
+                String code = t.optString("code");
+                col.addView(Qvk3MyTickets.action(a, p, code + " · " + t.optString("title"), false, () -> {
+                    if (d[0] != null) d[0].dismiss();
+                    Qvk3MyTickets.card(a, code);
+                }));
+            }
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.addView(col);
+        d[0] = Qvk3Ui.dialog(a).setTitle("Что нового в QVK " + Qvk3Portal.appVersion(a)).setView(sv)
+                .setPositiveButton("Отлично", null).show();
     }
 
     // ------------------------------------------------------------------ crash

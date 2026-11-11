@@ -87,6 +87,7 @@ final class Qvk3InfoScreens {
             default:
                 cost = "низкий, если работают сервисы Google/RuStore";
         }
+        s.append(Qvk3Energy.summary(a)).append("\n\n");
         s.append("Что сейчас может расходовать батарею:\n\n");
         s.append("• Доставка уведомлений: ").append(label).append(" — ").append(cost).append(".\n");
         boolean bg = false;
@@ -111,7 +112,8 @@ final class Qvk3InfoScreens {
                     Qvk3Ui.toast(a, "Выключены непрерывные логи и мини-плеер поверх ВК. Доставку уведомлений выберите сами");
                 })
                 .setNeutralButton("Доставка уведомлений", (d, w) -> Qvk3NativeEditors.push(a))
-                .setNegativeButton("Закрыть", null).show();
+                .setNegativeButton("Сообщить о расходе", (d, w) -> Qvk3Report.open(a, null, null, "Расход батареи",
+                        "Цифры QVK:\n" + Qvk3Energy.summary(a) + "\n\nЧто замечаю: ", "performance")).show();
     }
 
     private static ScrollView wrapScroll(Activity a, android.view.View v) {

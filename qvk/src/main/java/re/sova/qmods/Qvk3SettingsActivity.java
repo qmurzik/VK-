@@ -243,6 +243,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:dayNight", "Светлая и тёмная тема", "Режим (как в системе, по времени) и цвета каждой темы", 0, "Темы и цвета");
         idx.addScreen("qvk3:report", "Сообщить о проблеме", "Баг или идея на портал бета-теста — с журналом, снимком экрана и версией", 7, "Портал бета-теста");
         idx.addScreen("qvk3:myTickets", "Мои обращения", "Статусы, ответы команды, проверка исправлений", 7, "Портал бета-теста");
+        idx.addScreen("qvk3:ideas", "Идеи тестировщиков", "Голосуйте за идеи других: «Хочу это» поднимает идею выше", 7, "Портал бета-теста");
         idx.addSwitch(Qvk3PortalWatch.SHAKE, "Встряхнуть — сообщить о проблеме", "На экранах ВК: встряхните телефон, чтобы отправить баг со снимком экрана", 7, "Портал бета-теста", true);
         idx.addScreen("qvk3:logs", "Логи приложения", "Скопировать или сохранить журнал без logcat", 7, "Диагностика");
         idx.addScreen("qvk3:faults", "Журнал ошибок", "Сбои модулей с указанием компонента", 7, "Диагностика");
@@ -584,6 +585,9 @@ public final class Qvk3SettingsActivity extends Activity {
             case "report":
                 Activity vk = Qvk3Skin.lastVkActivity();
                 Qvk3Report.open(this, vk == null || vk.isDestroyed() ? null : Qvk3Report.capture(vk), null);
+                break;
+            case "ideas":
+                Qvk3MyTickets.ideas(this);
                 break;
             case "channel":
                 Qvk3UpdatePrompt.channel(this);

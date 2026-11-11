@@ -68,22 +68,31 @@ final class Qvk3Report {
 
     /** Opens the form. screenshot and crash may be null; crash pre-fills a crash bug. */
     static void open(Activity a, Bitmap screenshot, String crash) {
+        open(a, screenshot, crash, null, null, null);
+    }
+
+    /** With a pre-filled bug (title, description, category), e.g. from the battery screen. */
+    static void open(Activity a, Bitmap screenshot, String crash, String title, String desc, String category) {
         Qvk3Jobs.io(() -> {
             try {
                 Qvk3Portal.meta(a.getApplicationContext()); // fresh categories; the form works from the cache if offline
             } catch (Exception ignored) {
             }
         });
-        Qvk3PortalLink.ensure(a, () -> form(a, screenshot, crash));
+        Qvk3PortalLink.ensure(a, () -> form(a, screenshot, crash, title, desc, category));
     }
 
     private static void form(Activity a, Bitmap screenshot, String crash) {
+        form(a, screenshot, crash, null, null, null);
+    }
+
+    private static void form(Activity a, Bitmap screenshot, String crash, String preTitle, String preDesc, String preCategory) {
         Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = Qvk3Ui.dp(a, 20);
         col.setPadding(pad, Qvk3Ui.dp(a, 4), pad, Qvk3Ui.dp(a, 8));
-        final String[] kind = {"bug"}, category = {crash != null ? "performance" : null}, frequency = {crash != null ? "once" : null};
+        final String[] kind = {"bug"}, category = {preCategory != null ? preCategory : crash != null ? "performance" : null}, frequency = {crash != null ? "once" : null};
 
         LinearLayout kinds = new LinearLayout(a);
         col.addView(kinds);
@@ -144,6 +153,11 @@ final class Qvk3Report {
         auto.setPadding(0, Qvk3Ui.dp(a, 8), 0, 0);
         col.addView(auto);
 
+        if (preTitle != null) title.setText(preTitle);
+        if (preDesc != null) {
+            desc.setText(preDesc);
+            desc.setSelection(desc.getText().length());
+        }
         if (crash != null) {
             title.setText(crashTitle(crash));
             desc.setText("QVK закрылся с ошибкой. Что я делал перед этим: ");

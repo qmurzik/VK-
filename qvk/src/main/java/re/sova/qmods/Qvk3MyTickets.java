@@ -151,7 +151,26 @@ final class Qvk3MyTickets {
                 verify(a, code, false);
             }));
         }
-        if (can != null && can.optBoolean("me_too") && !t.optBoolean("is_mine") && !t.optBoolean("me_too")) {
+        boolean idea = "idea".equals(t.optString("kind")) || code.startsWith("IDEA-");
+        if (idea && !t.optBoolean("is_mine")) {
+            JSONObject counts = t.optJSONObject("counts");
+            int votes = counts == null ? 0 : counts.optInt("votes");
+            boolean voted = t.optBoolean("me_too");
+            if (voted || (can != null && can.optBoolean("me_too"))) actions.addView(action(a, p, voted ? "Убрать голос (" + votes + ")" : "👍 Хочу это (" + votes + ")", !voted, () -> {
+                d.dismiss();
+                Qvk3Jobs.io(() -> {
+                    String m;
+                    try {
+                        if (voted) Qvk3Portal.meTooRemove(a, code);
+                        else Qvk3Portal.meToo(a, code, null, null);
+                        m = voted ? "Голос убран" : "Голос учтён — спасибо!";
+                    } catch (Exception e) {
+                        m = Qvk3Jobs.message(e);
+                    }
+                    Qvk3Ui.toast(a, m);
+                });
+            }));
+        } else if (can != null && can.optBoolean("me_too") && !t.optBoolean("is_mine") && !t.optBoolean("me_too")) {
             actions.addView(action(a, p, "У меня тоже (приложить журнал)", false, () -> {
                 d.dismiss();
                 Qvk3Jobs.io(() -> {
@@ -266,6 +285,43 @@ final class Qvk3MyTickets {
                     String code = items.optJSONObject(i).optString("ticket");
                     if (!code.isEmpty()) card(a, code);
                 }).setNegativeButton("Закрыть", null).show();
+            });
+        });
+    }
+
+    /** «Идеи тестировщиков»: open ideas of everyone, most wanted first; a card has «Хочу это». */
+    static void ideas(Activity a) {
+        Qvk3PortalLink.ensure(a, () -> {
+            AlertDialog wait = Qvk3Ui.dialog(a).setMessage("Загружаем идеи…").setCancelable(true).show();
+            Qvk3Jobs.io(() -> {
+                JSONArray items = null;
+                String err = null;
+                try {
+                    items = Qvk3Portal.tickets(a, "scope=all&kind=idea&status=open&sort=votes&limit=50").optJSONArray("items");
+                } catch (Exception e) {
+                    err = Qvk3Jobs.message(e);
+                }
+                final JSONArray it = items == null ? new JSONArray() : items;
+                final String e = err;
+                Qvk3Jobs.main(() -> {
+                    wait.dismiss();
+                    if (e != null) {
+                        Qvk3Ui.toast(a, e);
+                        return;
+                    }
+                    String[] labels = new String[it.length()];
+                    for (int i = 0; i < it.length(); i++) {
+                        JSONObject o = it.optJSONObject(i);
+                        JSONObject c = o.optJSONObject("counts");
+                        labels[i] = "👍 " + (c == null ? 0 : c.optInt("votes")) + (o.optBoolean("me_too") ? " · ваш голос" : "") + " · " + statusLine(o) + "\n" + o.optString("title");
+                    }
+                    AlertDialog.Builder b = Qvk3Ui.dialog(a).setTitle("Идеи тестировщиков")
+                            .setPositiveButton("Предложить", (x, w) -> Qvk3Report.open(a, null, null))
+                            .setNegativeButton("Закрыть", null);
+                    if (it.length() == 0) b.setMessage("Открытых идей нет — предложите свою.");
+                    else b.setItems(labels, (x, i) -> card(a, it.optJSONObject(i).optString("code")));
+                    b.show();
+                });
             });
         });
     }
