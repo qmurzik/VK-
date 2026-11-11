@@ -307,6 +307,14 @@ public final class Qvk3MusicSource {
         return p.length >= 2 ? p[0] + "_" + p[1] : s;
     }
 
+    /** BUG-0030: «+» — the track goes to «Моя музыка» of the signed-in account (VK audio.add). */
+    public static void addToMine(Qvk3Track t) throws Exception {
+        if (t.id == 0) throw new IOException("Этот трек — файл на устройстве, его нельзя добавить в ВК");
+        long me = account();
+        if (me > 0 && t.ownerId == me) throw new IOException("Трек уже в вашей музыке");
+        response("audio.add", args("owner_id", Long.toString(t.ownerId), "audio_id", Long.toString(t.id), "access_key", t.accessKey));
+    }
+
     public static Qvk3Lyrics lyrics(Qvk3Track t) throws Exception {
         Map<String, String> a = args("audio_id", t.ownerId + "_" + t.id);
         if (t.lyricsId > 0) a.put("lyrics_id", Long.toString(t.lyricsId));

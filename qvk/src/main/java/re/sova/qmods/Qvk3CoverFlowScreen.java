@@ -592,6 +592,19 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         return out;
     }
 
+    private static final int R_MARK = 0x51A6C0E1;
+
+    /** All playable tracks of the opened album are on the device. */
+    private boolean allSaved() {
+        int total = 0;
+        for (Qvk3Track t : openTracks) {
+            if (t.id == 0 && t.local.isEmpty()) continue;
+            total++;
+            if (t.local.isEmpty() && !Qvk3MusicDownloads.SAVED.contains(t.key())) return false;
+        }
+        return total > 0;
+    }
+
     private void downloadAlbum() {
         if (openTracks.isEmpty()) return;
         albumQueued = true;
@@ -623,16 +636,29 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
 
     // ------------------------------------------------------------------ engine
 
+    /** IDEA-0018: per-track download marks follow the download queue; repaint at most ~6 times a second. */
+    private long lastDlPaint;
+    private final Qvk3MusicDownloads.Listener dlListener = (key, percent, status) -> {
+        if (adapter == null || openTracks.isEmpty()) return;
+        long now = android.os.SystemClock.uptimeMillis();
+        if (percent < 0 || percent >= 100 || now - lastDlPaint > 160) {
+            lastDlPaint = now;
+            adapter.notifyDataSetChanged();
+        }
+    };
+
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         engine.addListener(this);
+        Qvk3MusicDownloads.addListener(dlListener);
         onState(engine);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         engine.removeListener(this);
+        Qvk3MusicDownloads.removeListener(dlListener);
         super.onDetachedFromWindow();
     }
 
@@ -689,14 +715,20 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
                 dur = Qvk3Ui.text(a, "", 14, GREY, false);
                 dur.setGravity(Gravity.END);   // durations always aligned to the right edge
                 dur.setMinWidth(dp(56));
+                Qvk3Ring mark = new Qvk3Ring(a, GREY, ACCENT);
+                mark.setClickable(false);
+                mark.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
                 row.addView(num);
                 row.addView(title, Qvk3Ui.weight(1));
+                row.addView(mark, new LinearLayout.LayoutParams(dp(22), dp(22)));
                 row.addView(dur);
                 row.setTag(new TextView[]{num, title, dur});
+                row.setTag(R_MARK, mark);
             } else {
                 row = (LinearLayout) v;
             }
             TextView[] tv = (TextView[]) row.getTag();
+            Qvk3Ring mk = (Qvk3Ring) row.getTag(R_MARK);
             Qvk3Track t = openTracks.get(i);
             Qvk3Track cur = engine.current();
             boolean now = cur != null && cur.key().equals(t.key());
@@ -704,7 +736,18 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
             tv[0].setTextColor(now ? ACCENT : GREY);
             tv[1].setText(t.title);
             tv[1].setTextColor(t.playable() || t.restricted == 0 ? WHITE : 0x66FFFFFF);
-            tv[2].setText((t.local.isEmpty() ? "" : "⬇  ") + Qvk3Track.time(t.duration * 1000L));
+            // IDEA-0018: ring while downloading, a check when saved; when the whole album is saved only the album ring shows it
+            Integer pr = Qvk3MusicDownloads.PROGRESS.get(t.key());
+            boolean saved1 = !t.local.isEmpty() || Qvk3MusicDownloads.SAVED.contains(t.key());
+            boolean allSaved = allSaved();
+            if (pr != null) {
+                mk.setVisibility(VISIBLE);
+                mk.set(Math.max(0.03f, pr / 100f), true);
+            } else if (saved1 && !allSaved) {
+                mk.setVisibility(VISIBLE);
+                mk.set(1f, false);
+            } else mk.setVisibility(INVISIBLE);
+            tv[2].setText(Qvk3Track.time(t.duration * 1000L));
             row.setBackgroundColor(now ? 0x1F4DA3FF : (i % 2 == 1 ? 0x0AFFFFFF : 0));
             row.setContentDescription((i + 1) + ". " + t.title + ", " + Qvk3Track.time(t.duration * 1000L) + (t.local.isEmpty() ? "" : ", на устройстве"));
             return row;

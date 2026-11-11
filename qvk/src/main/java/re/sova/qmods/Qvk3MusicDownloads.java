@@ -138,10 +138,32 @@ public final class Qvk3MusicDownloads {
         }
     }
 
+    /** IDEA-0018: progress of the track being downloaded (key → 0..99); removed when it is saved or failed. */
+    public static final java.util.concurrent.ConcurrentHashMap<String, Integer> PROGRESS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Keys saved during this run (the library knows them too; this avoids a lookup per list row). */
+    public static final java.util.Set<String> SAVED = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private static final java.util.concurrent.CopyOnWriteArrayList<Listener> extra = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public static void addListener(Listener l) {
+        if (l != null && !extra.contains(l)) extra.add(l);
+    }
+
+    public static void removeListener(Listener l) {
+        extra.remove(l);
+    }
+
     private static void report(String key, int percent, String s) {
         status = s;
+        if (percent >= 0 && percent < 100) PROGRESS.put(key, percent);
+        else {
+            PROGRESS.remove(key);
+            if (percent >= 100) SAVED.add(key);
+        }
         Listener l = listener;
-        if (l != null) Qvk3Jobs.main(() -> l.onProgress(key, percent, s));
+        if (l != null || !extra.isEmpty()) Qvk3Jobs.main(() -> {
+            if (l != null) l.onProgress(key, percent, s);
+            for (Listener x : extra) x.onProgress(key, percent, s);
+        });
     }
 
     private static String one(Context c, Qvk3Track t) throws Exception {

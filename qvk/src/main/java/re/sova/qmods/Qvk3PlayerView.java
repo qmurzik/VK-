@@ -370,7 +370,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     // ------------------------------------------------------------------ editable action row (IDEA-0004)
 
     static final String ACTIONS = "qvk3_player_actions";
-    private static final String[] DEFAULT_ACTIONS = {"lyrics", "timer", "speed", "eq", "queue"};
+    private static final String[] DEFAULT_ACTIONS = {"add", "lyrics", "timer", "speed", "eq", "queue"};
     private LinearLayout extra;
     private boolean editing;
     private final java.util.List<android.animation.Animator> jiggles = new java.util.ArrayList<>();
@@ -386,6 +386,8 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
 
     private View action(String key) {
         switch (key) {
+            case "add":
+                return Qvk3Ui.icon(a, Qvk3Icons.PLUS, fg2, 48, 24, "Добавить в мою музыку", v -> addToMine(v));
             case "lyrics":
                 return Qvk3Ui.icon(a, Qvk3Icons.LYRICS, fg2, 48, 22, "Текст песни", v -> toggleLyrics());
             case "timer":
@@ -566,6 +568,33 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                     }
             }
         }).show();
+    }
+
+    /** BUG-0030: «+» adds the playing track to «Моя музыка» in VK. */
+    private void addToMine(View button) {
+        Qvk3Track t = engine.current();
+        if (t == null) return;
+        button.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM);
+        Qvk3Jobs.io(() -> {
+            String m;
+            boolean ok = false;
+            try {
+                Qvk3MusicSource.addToMine(t);
+                m = "Добавлено в «Мою музыку»: " + t.title;
+                ok = true;
+            } catch (Exception e) {
+                m = Qvk3Jobs.message(e);
+            }
+            final boolean done = ok;
+            final String msg = m;
+            Qvk3Jobs.main(() -> {
+                Qvk3Ui.toast(a, msg);
+                if (done && button instanceof android.widget.ImageView) {
+                    Qvk3Ui.setIcon((android.widget.ImageView) button, Qvk3Icons.CHECK, fg2);
+                    Qvk3Motion.pop(button);
+                }
+            });
+        });
     }
 
     private void toggleFavorite() {
