@@ -79,10 +79,23 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         int m = Qvk3Ui.dp(a, 10);
         lp.setMargins(m, 0, m, Qvk3Ui.dp(a, 72)); // above VK's bottom navigation
         content.addView(bar, lp);
+        hideWithKeyboard(bar);
         bar.setAlpha(0f);
         bar.setTranslationY(Qvk3Ui.dp(a, 24));
         bar.animate().alpha(1f).translationY(0).setDuration(220).start();
         onState(e);
+    }
+
+    /** IDEA-0005: the bar steps aside while the keyboard is open (typing a message), and comes back after. */
+    static void hideWithKeyboard(View v) {
+        if (android.os.Build.VERSION.SDK_INT < 30) return;
+        v.setOnApplyWindowInsetsListener((view, in) -> {
+            boolean ime = in.isVisible(android.view.WindowInsets.Type.ime());
+            view.animate().cancel();
+            view.setVisibility(ime ? View.INVISIBLE : View.VISIBLE);
+            return in;
+        });
+        v.requestApplyInsets();
     }
 
     private void detach() {
