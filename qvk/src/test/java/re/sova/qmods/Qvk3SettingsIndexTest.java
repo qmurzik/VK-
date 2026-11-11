@@ -81,6 +81,7 @@ public class Qvk3SettingsIndexTest {
                 int n = 0;
                 for (Qvk3SettingsIndex.Item i : idx.section(s)) if (i.group.equals(g)) n++;
                 assertTrue(Qvk3SettingsIndex.SECTIONS[s] + " / " + g + ": " + n, n <= 25);
+                if (g.startsWith("QVK 2.x")) assertEquals("old screens live only in Система", 7, s);
             }
         assertFalse(idx.search("PIN", 5).isEmpty());
         assertFalse(idx.search("стикеры telegram", 5).isEmpty());

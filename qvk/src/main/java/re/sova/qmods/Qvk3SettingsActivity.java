@@ -532,6 +532,7 @@ public final class Qvk3SettingsActivity extends Activity {
         String t = it.target;
         try {
             if (t.startsWith("qvk3:")) qvk3(t.substring(5));
+            else if (Qvk3NativeEditors.handles(t)) Qvk3NativeEditors.open(this, t);
             else if (it.type == Qvk3SettingsIndex.SCREEN) SettingsHub.open(this, t);
             else Qvk3SettingsBridge.runClassicAction(this, t);
         } catch (Throwable e) {

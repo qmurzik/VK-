@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Index of every QVK setting for the new settings centre (pure Java, unit-tested).
@@ -83,8 +84,24 @@ public final class Qvk3SettingsIndex {
         return out;
     }
 
+    /** Section "Система" (7) holds every screen that is still a QVK 2.x screen, so no other section links to old UI. */
+    static final int CLASSIC_SECTION = 7;
+
+    /** Targets edited natively in the QVK 3.0 centre (see Qvk3NativeEditors). */
+    public static final Set<String> NATIVE = new java.util.HashSet<>(java.util.Arrays.asList("pushModes", "lock", "timeout", "folder", "deletedMark", "reset", "host"));
+
+    static boolean oldScreen(int type, String target) {
+        if (type == SWITCH || target == null) return false;
+        if (target.startsWith("qvk3:")) return false;
+        return !NATIVE.contains(target);
+    }
+
     void add(Item i) {
         if (byId.containsKey(i.id)) return;
+        if (oldScreen(i.type, i.target) && !(i.section == CLASSIC_SECTION && i.group.startsWith("QVK 2.x"))) {
+            // keep the original title; only the place changes: one card per former section
+            i = new Item(i.id, i.key, i.title, i.summary, CLASSIC_SECTION, "QVK 2.x · " + SECTIONS[i.section], i.type, i.target, i.def);
+        }
         // catalog entries with the same visible title and action (QVK lists some actions in two groups)
         if (i.type != SWITCH) for (Item o : items) if (o.type != SWITCH && o.section == i.section && normal(o.title).equals(normal(i.title))) return;
         items.add(i);
