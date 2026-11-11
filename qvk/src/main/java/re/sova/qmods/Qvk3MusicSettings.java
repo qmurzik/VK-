@@ -30,6 +30,8 @@ public final class Qvk3MusicSettings {
     public static final String COVERFLOW_SPACING = "qvk3_music_coverflow_spacing";
     /** Turning the phone sideways opens the album Cover Flow. */
     public static final String ROTATE_COVERFLOW = "qvk3_music_rotate_coverflow";
+    /** Swiping the mini player away: "stop" (default) stops the music, "hide" only hides the bar until the next track. */
+    public static final String MINI_SWIPE = "qvk3_music_mini_swipe";
     public static final String PROGRESS_STYLE = "qvk3_music_progress";
 
     public static final String[] LAYOUTS = {"modern", "classic", "amoled", "glass", "coverflow"};

@@ -287,6 +287,15 @@ public final class Qvk3MusicSettingsScreen {
                             + "\n" + Qvk3MusicLibrary.get(a).stats()));
                     c.addView(toggle(a, "QVK Music вместо раздела «Музыка» ВК", Qvk3MusicSettings.ENABLED, true, null));
                     c.addView(toggle(a, "Мини-плеер поверх экранов ВКонтакте", Qvk3MusicSettings.MINI_ON_VK, false, null));
+                    boolean hide = "hide".equals(Qvk3MusicSettings.prefs(a).getString(Qvk3MusicSettings.MINI_SWIPE, "stop"));
+                    c.addView(link(a, p, "Действие при смахивании мини-плеера: " + (hide ? "только скрыть" : "остановить музыку"), v -> {
+                        String[] l = {"Остановить музыку", "Только скрыть (до следующего трека)"};
+                        choose(a, "Смахивание мини-плеера вправо", l, hide ? 1 : 0, w -> {
+                            Qvk3SettingsHistory.before(a, Qvk3MusicSettings.MINI_SWIPE, "Смахивание мини-плеера: " + l[w]);
+                            Qvk3MusicSettings.prefs(a).edit().putString(Qvk3MusicSettings.MINI_SWIPE, w == 1 ? "hide" : "stop").apply();
+                            r.run();
+                        });
+                    }));
                     c.addView(toggle(a, "Играть треки из ленты и сообщений в QVK Music", Qvk3MusicSettings.TAKE_OVER, true, null));
                     c.addView(info(a, p, "Выключите, чтобы временно вернуться к штатному музыкальному разделу ВК (классический режим)."));
                 };

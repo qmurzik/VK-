@@ -82,6 +82,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
     @Override
     public void onActivityResumed(Activity a) {
         Qvk3DayNight.sync(a);
+        Qvk3Look.settingsOnTop = !stock(a);
         if (!stock(a)) return;
         lastVk = new WeakReference<>(a);
         Qvk3ElementPicker.maybeStart(a);

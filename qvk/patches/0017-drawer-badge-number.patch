@@ -1,0 +1,14 @@
+--- a/smali_classes21/re/sova/qmods/DrawerBadges.smali	2026-11-11 19:20:49.038715287 +0000
++++ b/smali_classes21/re/sova/qmods/DrawerBadges.smali	2026-11-11 19:20:49.052365948 +0000
+@@ -590,6 +590,11 @@
+ .method private static render(Landroid/widget/TextView;Ljava/lang/String;)V
+     .locals 1
+ 
++    # QVK 3.0: VK 8.100 passes a phrase ("6 непрочитанных чатов"); keep only the number (BUG-0023)
++    invoke-static {p1}, Lre/sova/qmods/Qvk3BadgeText;->number(Ljava/lang/String;)Ljava/lang/String;
++
++    move-result-object p1
++
+     .line 42
+     invoke-virtual {p0, p1}, Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V
+ 

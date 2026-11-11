@@ -9,10 +9,16 @@ package re.sova.qmods;
  */
 public final class Qvk3Look {
     public static final String KEY = "qvk3_unified_look";
+    /**
+     * True while a QVK settings screen is on top. MenuUi is also used by QVK 2.x inside VK's own screens (the side
+     * drawer), where forcing cards inset the whole menu away from the screen edge (BUG-0023); there the original
+     * IosAppearance answer applies. Kept up to date from the activity callbacks in Qvk3Skin.
+     */
+    static volatile boolean settingsOnTop;
 
     public static boolean part(String name) {
         try {
-            if (("cards".equals(name) || "headers".equals(name) || "typography".equals(name))
+            if (settingsOnTop && ("cards".equals(name) || "headers".equals(name) || "typography".equals(name))
                     && RuntimeBridge.prefs != null && RuntimeBridge.prefs.getBoolean(KEY, true)) return true;
         } catch (Throwable ignored) {
             // fall through to the original check

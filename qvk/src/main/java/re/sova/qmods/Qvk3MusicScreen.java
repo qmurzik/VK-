@@ -72,6 +72,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private Qvk3CoverFlowScreen coverFlow;
     private Qvk3NowButton nowButton;
     private boolean imeShown;
+    private String miniHiddenFor = "";
     /** Called when the standalone player-only host should close. */
     Runnable onPlayerClosed;
 
@@ -586,10 +587,16 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         mt.addView(miniTitle);
         mt.addView(miniArtist);
         mini.addView(mt, Qvk3Ui.weight(1));
-        miniPlay = Qvk3Ui.icon(a, Qvk3Icons.PLAY, Color.WHITE, 48, 24, "Играть", v -> engine.toggle());
-        mini.addView(miniPlay);
         mini.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, Color.WHITE, 44, 20, "Следующий трек", v -> engine.next()));
+        miniPlay = Qvk3Ui.icon(a, Qvk3Icons.PLAY, Color.WHITE, 48, 24, "Играть", v -> engine.toggle());
+        mini.addView(miniPlay);   // play/pause at the very right (BUG-0022)
         miniWrap.setOnClickListener(v -> openPlayer());
+        Qvk3MiniSwipe.attach(miniWrap, () -> {
+            Qvk3Track cur = engine.current();
+            miniHiddenFor = cur == null ? "" : cur.key();
+            if (Qvk3MiniSwipe.stops(a)) engine.stop();
+            onState(engine);
+        });
         miniWrap.setContentDescription("Мини-плеер. Нажмите, чтобы открыть плеер");
         miniWrap.addView(mini, Qvk3Ui.match());
         miniProgress = new android.widget.ProgressBar(a, null, android.R.attr.progressBarStyleHorizontal);
@@ -1191,7 +1198,9 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
         // inside VK's tab the floating QVK mini-player (Qvk3MiniBar) is shown instead of this one
-        miniBox.setVisibility(t == null || imeShown ? View.GONE : View.VISIBLE);
+        if (t != null && !t.key().equals(miniHiddenFor)) miniHiddenFor = "";
+        boolean swiped = t != null && t.key().equals(miniHiddenFor);
+        miniBox.setVisibility(t == null || imeShown || swiped ? View.GONE : View.VISIBLE);
         nowButton.setVisibility(t != null && imeShown ? View.VISIBLE : View.GONE);
         if (t != null && imeShown) nowButton.set(e.duration() > 0 ? e.position() / (float) e.duration() : 0f, e.isPlaying());
         if (t == null) return;

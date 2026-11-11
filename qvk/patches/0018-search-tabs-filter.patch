@@ -1,0 +1,12 @@
+--- a/smali_classes21/re/sova/qmods/NetworkBridge.smali	2026-11-11 19:22:11.452795331 +0000
++++ b/smali_classes21/re/sova/qmods/NetworkBridge.smali	2026-11-11 19:22:11.467788925 +0000
+@@ -848,6 +848,9 @@
+         }
+     .end annotation
+ 
++    # QVK 3.0: hide the search sections the user switched off (IDEA-0009)
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3SearchTabs;->filter(Ljava/lang/Object;Ljava/lang/String;)V
++
+     .line 506
+     sget-object v0, Ljava/util/Locale;->ROOT:Ljava/util/Locale;
+ 

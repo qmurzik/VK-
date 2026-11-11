@@ -60,6 +60,7 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         if (e == null) return;
         engineCreated(e);
         if (e.current() == null || e.state() == Qvk3MusicEngine.IDLE) return;
+        if (e.current().key().equals(hiddenFor)) return; // swiped away in "hide" mode
         attach(a, e);
     }
 
@@ -139,13 +140,16 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         t.addView(title);
         t.addView(artist);
         l.addView(t, Qvk3Ui.weight(1));
+        // BUG-0022: next on the left, play/pause at the very right; swipe right closes the bar
+        l.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, Color.WHITE, 44, 20, "Следующий трек", v -> e.next()));
         play = Qvk3Ui.icon(a, Qvk3Icons.PLAY, Color.WHITE, 48, 24, "Играть", v -> e.toggle());
         l.addView(play);
-        l.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, Color.WHITE, 44, 20, "Следующий трек", v -> e.next()));
-        l.addView(Qvk3Ui.icon(a, Qvk3Icons.CLOSE, 0x99FFFFFF, 40, 16, "Закрыть мини-плеер", v -> {
-            e.stop();
+        Qvk3MiniSwipe.attach(l, () -> {
+            Qvk3Track cur = e.current();
+            hiddenFor = cur == null ? "" : cur.key();
+            if (Qvk3MiniSwipe.stops(a)) e.stop();
             detach();
-        }));
+        });
         l.setOnClickListener(v -> a.startActivity(new android.content.Intent(a, Qvk3MusicActivity.class)
                 .putExtra(Qvk3MusicActivity.EXTRA_PLAYER_ONLY, true)
                 ));
@@ -153,9 +157,14 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         return l;
     }
 
+    /** Track the bar was swiped away on in "hide" mode; it comes back with the next track. */
+    private String hiddenFor = "";
+
     @Override
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
+        if (t != null && t.key().equals(hiddenFor)) return;
+        if (t != null) hiddenFor = "";
         if (bar == null) {
             // playback started while a VK screen is on top: show the bar right away
             Activity top = resumed.get();
