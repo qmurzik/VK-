@@ -49,7 +49,7 @@ public final class Qvk3Images {
 
     private Qvk3Images(Context c) {
         app = c;
-        int kb = (int) (Runtime.getRuntime().maxMemory() / 1024 / 8);
+        int kb = (int) (Runtime.getRuntime().maxMemory() / 1024 / 6);
         memory = new LruCache<String, Bitmap>(kb) {
             @Override
             protected int sizeOf(String key, Bitmap value) {
@@ -70,7 +70,34 @@ public final class Qvk3Images {
     }
 
     static String key(String url, int size) {
-        return size + ":" + url;
+        return size + ":" + stable(url);
+    }
+
+    /**
+     * BUG-0025: VK image links carry a per-request signature and a random server (sun9-12…, ?sign=…&quality=…), so the same
+     * cover got a new cache key every time the album list was refreshed and was downloaded again. The image itself is the path
+     * plus its size parameter; that is the key for memory and disk.
+     */
+    public static String stable(String url) {
+        if (url == null) return "";
+        try {
+            java.net.URI u = new java.net.URI(url);
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.ROOT);
+            if (!(host.endsWith("userapi.com") || host.endsWith("vk.com") || host.endsWith("vkuser.net") || host.endsWith("vk-cdn.net"))) return url;
+            String size = "";
+            if (u.getRawQuery() != null) for (String p : u.getRawQuery().split("&")) if (p.startsWith("size=") || p.startsWith("type=")) size += "&" + p;
+            return "vkimg:" + u.getRawPath() + size;
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
+    /** Any cached size of this cover (a smaller one is a better placeholder than an empty frame). */
+    public Bitmap cachedAny(String url, int prefer) {
+        if (url == null || url.isEmpty()) return null;
+        Bitmap b = memory.get(key(url, prefer));
+        if (b == null) b = memory.get(key(url, prefer == 600 ? 300 : 600));
+        return b;
     }
 
     public Bitmap cached(String url, int size) {
@@ -123,35 +150,21 @@ public final class Qvk3Images {
         if (cached(url, size) == null) load(url, size, null);
     }
 
+    /** Downloads the cover file into the disk cache only (no decoding, no memory): album lists of 150 covers. */
+    public void warmDisk(String url) {
+        if (url == null || url.isEmpty()) return;
+        pool.execute(() -> {
+            try {
+                file(url);
+            } catch (Throwable ignored) {
+                // a missing cover is not an error worth recording
+            }
+        });
+    }
+
     private Bitmap fetch(String url, int size) throws Exception {
-        File f = new File(dir, hash(url));
-        if (!f.isFile()) {
-            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(8000);
-            c.setReadTimeout(12000);
-            c.setInstanceFollowRedirects(true);
-            if (c.getResponseCode() != 200) {
-                c.disconnect();
-                return null;
-            }
-            File tmp = new File(dir, f.getName() + ".part");
-            try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(tmp)) {
-                byte[] buf = new byte[16384];
-                long total = 0;
-                int r;
-                while ((r = in.read(buf)) != -1) {
-                    total += r;
-                    if (total > 8 << 20) throw new java.io.IOException("cover too large");
-                    out.write(buf, 0, r);
-                }
-            } finally {
-                c.disconnect();
-            }
-            if (!tmp.renameTo(f)) tmp.delete();
-            trim();
-        } else {
-            f.setLastModified(System.currentTimeMillis());
-        }
+        File f = file(url);
+        if (f == null) return null;
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(f.getPath(), o);
@@ -159,7 +172,41 @@ public final class Qvk3Images {
         while (o.outWidth / (sample * 2) >= size && o.outHeight / (sample * 2) >= size) sample *= 2;
         o = new BitmapFactory.Options();
         o.inSampleSize = sample;
+        o.inPreferredConfig = Bitmap.Config.RGB_565; // covers have no transparency: half the memory, twice as many stay cached
         return BitmapFactory.decodeFile(f.getPath(), o);
+    }
+
+    /** The cover file in the disk cache, downloaded if missing; null when the server has no image. */
+    private File file(String url) throws Exception {
+        File f = new File(dir, hash(stable(url)));
+        if (f.isFile()) {
+            f.setLastModified(System.currentTimeMillis());
+            return f;
+        }
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(12000);
+        c.setInstanceFollowRedirects(true);
+        if (c.getResponseCode() != 200) {
+            c.disconnect();
+            return null;
+        }
+        File tmp = new File(dir, f.getName() + "." + Thread.currentThread().getId() + ".part");
+        try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[16384];
+            long total = 0;
+            int r;
+            while ((r = in.read(buf)) != -1) {
+                total += r;
+                if (total > 8 << 20) throw new java.io.IOException("cover too large");
+                out.write(buf, 0, r);
+            }
+        } finally {
+            c.disconnect();
+        }
+        if (!tmp.renameTo(f)) tmp.delete();
+        trim();
+        return f.isFile() ? f : null;
     }
 
     /** Keeps the disk cache under the user's cache limit by removing least recently used files. */

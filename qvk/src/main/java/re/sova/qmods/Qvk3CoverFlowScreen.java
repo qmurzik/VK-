@@ -233,8 +233,16 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         });
         // IDEA-0007: covers are fetched once into the on-device cover cache (bounded by the cache limit), so
         // flicking through albums later costs no traffic
+        // BUG-0025: in the bucket the view really draws (600 on large screens), after layout has measured it
         Qvk3Images img = Qvk3Images.get(a);
-        for (int i = 0; i < groups.size() && i < 150; i++) img.prefetch(groups.get(i).cover, 300);
+        flow.post(() -> {
+            int bucket = flow.coverBucket();
+            // the first screenfuls go to memory in the drawn size; the rest only to the disk cache
+            for (int i = 0; i < groups.size() && i < 150; i++) {
+                if (i < 12) img.prefetch(groups.get(i).cover, bucket);
+                else img.warmDisk(groups.get(i).cover);
+            }
+        });
     }
 
     private java.io.File cacheFile() {

@@ -283,7 +283,7 @@ public final class Qvk3CoverFlowView extends View {
         }
         src[0] = 0; src[1] = 0; src[2] = W; src[3] = 0; src[4] = W; src[5] = W; src[6] = 0; src[7] = W;
         Item it = items.get(i);
-        Bitmap b = fastFling ? Qvk3Images.get(getContext()).cached(it.cover, coverBucket()) : bitmapFor(it, ad < 1.5f);
+        Bitmap b = fastFling ? Qvk3Images.get(getContext()).cachedAny(it.cover, coverBucket()) : bitmapFor(it, ad < 1.5f);
         int a = Math.round(alpha * 255);
 
         // --- cover
@@ -368,7 +368,8 @@ public final class Qvk3CoverFlowView extends View {
 
     private final Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private int coverBucket() {
+    /** Size bucket the covers are drawn at; the screen prefetches in the same bucket (BUG-0025). */
+    int coverBucket() {
         return coverPx > 600 ? 600 : 300;
     }
 
@@ -378,7 +379,7 @@ public final class Qvk3CoverFlowView extends View {
         if (b == null && it.cover != null && !it.cover.isEmpty() && (urgent || scroller.isFinished())) {
             img.load(it.cover, coverBucket(), bmp -> invalidate());
         }
-        return b;
+        return b != null ? b : img.cachedAny(it.cover, coverBucket()); // smaller cached copy instead of an empty frame
     }
 
     private void settle() {
