@@ -57,11 +57,33 @@ final class Qvk3SkinScreen {
         for (Qvk3Skin.Rule r : rules) labels.add("#" + r.id + (r.hide ? " · скрыт" : (r.radius >= 0 ? " · скругление " + r.radius : "") + (r.bg != 0 ? " · цвет" : "") + (r.opacity < 100 ? " · " + r.opacity + "%" : "") + (r.margin >= 0 ? " · отступ " + r.margin : "")));
         labels.add("＋ Новое правило по имени элемента");
         labels.add("Как найти имя элемента (Инспектор)");
+        labels.add("Набор: убрать тени у шапки чата и панели");
+        labels.add("Набор: полупрозрачная кнопка «Написать»");
         Qvk3Ui.dialog(a).setTitle("Правила интерфейса ВК").setItems(labels.toArray(new String[0]), (d, i) -> {
             if (i < rules.size()) edit(a, rules, i);
             else if (i == rules.size()) edit(a, rules, -1);
-            else inspector(a);
+            else if (i == rules.size() + 1) inspector(a);
+            else if (i == rules.size() + 2) preset(a, rules, true, "dialog_shadow", "bottom_navigation_shadow");
+            else preset(a, rules, false, "vkim_fab");
         }).setNegativeButton("Закрыть", null).show();
+    }
+
+    /** Ready-made rule sets; names come from VK's own layouts (dialog_shadow, vkim_fab), rules replace same-id ones. */
+    static void preset(Activity a, List<Qvk3Skin.Rule> rules, boolean hide, String... ids) {
+        for (String id : ids) {
+            Qvk3Skin.Rule r = null;
+            for (Qvk3Skin.Rule x : rules) if (x.id.equals(id)) r = x;
+            if (r == null) {
+                r = new Qvk3Skin.Rule();
+                r.id = id;
+                rules.add(r);
+            }
+            r.hide = hide;
+            if (!hide) r.opacity = 80;
+        }
+        Qvk3Skin.saveRules(a, rules);
+        Qvk3Skin.refresh();
+        rules(a);
     }
 
     static void edit(Activity a, List<Qvk3Skin.Rule> rules, int index) {
