@@ -70,7 +70,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private Feed feed;
     private String miniCoverFor = "";
     private Qvk3CoverFlowScreen coverFlow;
-    private ImageView nowButton;
+    private Qvk3NowButton nowButton;
     private boolean imeShown;
     /** Called when the standalone player-only host should close. */
     Runnable onPlayerClosed;
@@ -465,9 +465,15 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         screenTitle.setPadding(Qvk3Ui.dp(a, 6), 0, 0, 0);
         header.addView(screenTitle, Qvk3Ui.weight(1));
         // IDEA-0005: while the keyboard is open the mini player steps aside and this button opens the player instead
-        nowButton = Qvk3Ui.icon(a, Qvk3Icons.PLAY, p.accent, 48, 24, "Открыть плеер", v -> openPlayer());
+        nowButton = new Qvk3NowButton(a, p.text, p.accent);
+        nowButton.setOnClickListener(v -> engine.toggle());
+        nowButton.setOnLongClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            openPlayer();
+            return true;
+        });
         nowButton.setVisibility(View.GONE);
-        header.addView(nowButton);
+        header.addView(nowButton, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 48), Qvk3Ui.dp(a, 48)));
         header.addView(Qvk3Ui.icon(a, Qvk3Icons.TUNE, p.text, 48, 22, "Настройки QVK Music", v -> Qvk3MusicSettingsScreen.show(a)));
         col.addView(header, Qvk3Ui.match());
 
@@ -1180,6 +1186,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         // inside VK's tab the floating QVK mini-player (Qvk3MiniBar) is shown instead of this one
         miniBox.setVisibility(t == null || imeShown ? View.GONE : View.VISIBLE);
         nowButton.setVisibility(t != null && imeShown ? View.VISIBLE : View.GONE);
+        if (t != null && imeShown) nowButton.set(e.duration() > 0 ? e.position() / (float) e.duration() : 0f, e.isPlaying());
         if (t == null) return;
         miniProgress.setProgress(e.duration() > 0 ? (int) (e.position() * 1000 / e.duration()) : 0);
         miniTitle.setText(t.title);

@@ -285,9 +285,10 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         public int bg;               // ARGB, 0 = untouched
         public int opacity = 100;    // %
         public int margin = -1;      // dp on every side, -1 = untouched
+        public int vmargin = -1;     // dp above and below only (spacing between messages / posts), -1 = untouched
 
         public JSONObject json() throws org.json.JSONException {
-            return new JSONObject().put("id", id).put("hide", hide).put("radius", radius).put("bg", bg).put("opacity", opacity).put("margin", margin);
+            return new JSONObject().put("id", id).put("hide", hide).put("radius", radius).put("bg", bg).put("opacity", opacity).put("margin", margin).put("vmargin", vmargin);
         }
 
         static Rule from(JSONObject o) {
@@ -298,6 +299,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
             r.bg = o.optInt("bg");
             r.opacity = o.optInt("opacity", 100);
             r.margin = o.optInt("margin", -1);
+            r.vmargin = o.optInt("vmargin", -1);
             return r;
         }
     }
@@ -417,6 +419,16 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
                 int mm = dp(a, r.margin);
                 if (m.leftMargin != mm || m.topMargin != mm || m.rightMargin != mm || m.bottomMargin != mm) {
                     m.setMargins(mm, mm, mm, mm);
+                    v.setLayoutParams(m);
+                }
+            } else if (r.vmargin >= 0 && v.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+                // even spacing between repeated items (messages, posts): half above, half below each one
+                ViewGroup.MarginLayoutParams m = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+                if (o.margins == null) o.margins = new int[]{m.leftMargin, m.topMargin, m.rightMargin, m.bottomMargin};
+                int half = dp(a, r.vmargin) / 2;
+                if (m.topMargin != half || m.bottomMargin != half) {
+                    m.topMargin = half;
+                    m.bottomMargin = half;
                     v.setLayoutParams(m);
                 }
             }

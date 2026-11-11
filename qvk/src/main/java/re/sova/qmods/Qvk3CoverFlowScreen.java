@@ -164,14 +164,116 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         onSync = r;
     }
 
-    /** (Re)reads albums from the library index; keeps the playing / last opened album centred. */
+    /** VK playlist behind a cover (albums and playlists from VK), or none for a group built from the local index. */
+    private final Map<Qvk3MusicLibrary.Group, Qvk3MusicSource.Playlist> sources = new HashMap<>();
+
+    /**
+     * What Cover Flow shows (BUG-0021): the user's real albums from VK first, then their playlists — not one "album"
+     * per track built from track tags, which gave hundreds of single-song albums. The last list is cached on the
+     * device, so it appears instantly and works offline; it is refreshed from VK in the background. Only without VK
+     * (offline, never loaded) does it fall back to the local index, and then only to albums with 2+ tracks.
+     */
     void load() {
         Qvk3Jobs.io(() -> {
             Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
-            List<Qvk3MusicLibrary.Group> list = lib.albums("my");
             Set<String> done = lib.albumsSaved("my");
-            Qvk3Jobs.main(() -> show(list, done));
+            List<Qvk3MusicSource.Playlist> cached = readCache();
+            List<Qvk3MusicLibrary.Group> local = new ArrayList<>();
+            for (Qvk3MusicLibrary.Group g : lib.albums("my")) if (g.count >= 2) local.add(g);
+            if (!cached.isEmpty()) post(cached, done);
+            else Qvk3Jobs.main(() -> {
+                // first start: something to flick through at once while VK's album list loads
+                sources.clear();
+                if (!local.isEmpty()) show(local, done);
+                else {
+                    flow.setVisibility(GONE);
+                    empty.setVisibility(VISIBLE);
+                    empty.setText("Загружаем альбомы из ВК…");
+                }
+            });
+            List<Qvk3MusicSource.Playlist> fresh = new ArrayList<>();
+            try {
+                for (int off = 0; off < 500; ) {
+                    Qvk3MusicSource.Page<Qvk3MusicSource.Playlist> pg = Qvk3MusicSource.playlists(off);
+                    fresh.addAll(pg.items);
+                    if (pg.items.isEmpty() || fresh.size() >= pg.total) break;
+                    off += pg.items.size();
+                }
+            } catch (Throwable e) {
+                RuntimeFaults.record("qvk3.coverflow.playlists", e);
+            }
+            if (!fresh.isEmpty()) {
+                writeCache(fresh);
+                if (!sameKeys(cached, fresh)) post(fresh, done);
+                return;
+            }
+            if (!cached.isEmpty()) return;
+            Qvk3Jobs.main(() -> {
+                sources.clear();
+                show(local, done);
+            });
         });
+    }
+
+    private void post(List<Qvk3MusicSource.Playlist> pls, Set<String> done) {
+        List<Qvk3MusicLibrary.Group> groups = new ArrayList<>();
+        Map<Qvk3MusicLibrary.Group, Qvk3MusicSource.Playlist> map = new HashMap<>();
+        for (int pass = 0; pass < 2; pass++) {
+            for (Qvk3MusicSource.Playlist pl : pls) {
+                if (pl.album != (pass == 0) || pl.count <= 0) continue;   // albums first, then playlists
+                Qvk3MusicLibrary.Group g = new Qvk3MusicLibrary.Group(pl.title, pl.subtitle.isEmpty() ? (pl.album ? "Альбом" : "Плейлист") : pl.subtitle, pl.cover, pl.count);
+                groups.add(g);
+                map.put(g, pl);
+            }
+        }
+        Qvk3Jobs.main(() -> {
+            sources.clear();
+            sources.putAll(map);
+            show(groups, done);
+        });
+        // IDEA-0007: covers are fetched once into the on-device cover cache (bounded by the cache limit), so
+        // flicking through albums later costs no traffic
+        Qvk3Images img = Qvk3Images.get(a);
+        for (int i = 0; i < groups.size() && i < 150; i++) img.prefetch(groups.get(i).cover, 300);
+    }
+
+    private java.io.File cacheFile() {
+        long acc;
+        try {
+            acc = Qvk3MusicSource.account();
+        } catch (Throwable t) {
+            acc = 0;
+        }
+        return new java.io.File(a.getCacheDir(), "qvk3_coverflow_" + acc + ".json");
+    }
+
+    private List<Qvk3MusicSource.Playlist> readCache() {
+        List<Qvk3MusicSource.Playlist> out = new ArrayList<>();
+        try {
+            java.io.File f = cacheFile();
+            if (!f.isFile() || f.length() > (8 << 20)) return out;
+            org.json.JSONArray arr = new org.json.JSONArray(new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8"));
+            for (int i = 0; i < arr.length(); i++) out.add(new Qvk3MusicSource.Playlist(new org.json.JSONObject(arr.getString(i))));
+        } catch (Exception e) {
+            RuntimeFaults.record("qvk3.coverflow.cache", e);
+        }
+        return out;
+    }
+
+    private void writeCache(List<Qvk3MusicSource.Playlist> pls) {
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (Qvk3MusicSource.Playlist pl : pls) arr.put(pl.raw);
+            java.nio.file.Files.write(cacheFile().toPath(), arr.toString().getBytes("UTF-8"));
+        } catch (Exception e) {
+            RuntimeFaults.record("qvk3.coverflow.cache", e);
+        }
+    }
+
+    private static boolean sameKeys(List<Qvk3MusicSource.Playlist> x, List<Qvk3MusicSource.Playlist> y) {
+        if (x.size() != y.size()) return false;
+        for (int i = 0; i < x.size(); i++) if (!x.get(i).key().equals(y.get(i).key()) || x.get(i).count != y.get(i).count) return false;
+        return true;
     }
 
     private void show(List<Qvk3MusicLibrary.Group> list, Set<String> done) {
@@ -213,10 +315,31 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         if (flipping || card != null || index < 0 || index >= albums.size()) return;
         open = albums.get(index);
         flipping = true;
+        final Qvk3MusicSource.Playlist pl = sources.get(open);
         Qvk3Jobs.io(() -> {
-            List<Qvk3Track> tracks = Qvk3MusicLibrary.get(a).group("my", "album", open.name);
+            List<Qvk3Track> tracks = new ArrayList<>();
+            if (pl != null) {
+                try {
+                    for (int off = 0; off < 2000; ) {
+                        Qvk3MusicSource.Page<Qvk3Track> pg = Qvk3MusicSource.playlistTracks(pl, off);
+                        for (Qvk3Track t : pg.items) tracks.add(Qvk3MusicLibrary.get(a).withDownload(t));
+                        if (pg.items.isEmpty() || tracks.size() >= pg.total) break;
+                        off += pg.items.size();
+                    }
+                } catch (Exception e) {
+                    Qvk3Ui.toast(a, "Не удалось загрузить треки: " + Qvk3Jobs.message(e));
+                }
+            } else {
+                tracks = Qvk3MusicLibrary.get(a).group("my", "album", open.name);
+            }
+            final List<Qvk3Track> got = tracks;
             Qvk3Jobs.main(() -> {
-                openTracks = tracks;
+                if (got.isEmpty()) {
+                    flipping = false;
+                    return;
+                }
+                List<Qvk3Track> tracks2 = got;
+                openTracks = tracks2;
                 buildCard();
                 animateOpen();
             });

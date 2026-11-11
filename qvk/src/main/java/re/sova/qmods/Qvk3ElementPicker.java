@@ -223,7 +223,18 @@ final class Qvk3ElementPicker extends FrameLayout {
         int mi = 0;
         for (int i = 0; i < ms.length; i++) if (r != null && r.margin == ms[i]) mi = i;
         final int nextM = ms[(mi + 1) % ms.length];
-        row.addView(chip("Отступ: " + (r == null || r.margin < 0 ? "нет" : r.margin + " dp"), () -> change(x -> x.margin = nextM)));
+        row.addView(chip("Отступ: " + (r == null || r.margin < 0 ? "нет" : r.margin + " dp"), () -> change(x -> {
+            x.margin = nextM;
+            x.vmargin = -1;
+        })));
+        int[] vs = {-1, 4, 8, 12, 16};
+        int vi = 0;
+        for (int i = 0; i < vs.length; i++) if (r != null && r.vmargin == vs[i]) vi = i;
+        final int nextV = vs[(vi + 1) % vs.length];
+        row.addView(chip("Интервал: " + (r == null || r.vmargin < 0 ? "штатный" : r.vmargin + " dp"), () -> change(x -> {
+            x.vmargin = nextV;
+            x.margin = -1;
+        })));
         panel.addView(scroll(row), Qvk3Ui.match());
 
         LinearLayout colors = chips();

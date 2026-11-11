@@ -54,9 +54,11 @@ final class Qvk3SkinScreen {
     static void rules(Activity a) {
         List<Qvk3Skin.Rule> rules = Qvk3Skin.rules(a);
         List<String> labels = new ArrayList<>();
-        for (Qvk3Skin.Rule r : rules) labels.add("#" + r.id + (r.hide ? " · скрыт" : (r.radius >= 0 ? " · скругление " + r.radius : "") + (r.bg != 0 ? " · цвет" : "") + (r.opacity < 100 ? " · " + r.opacity + "%" : "") + (r.margin >= 0 ? " · отступ " + r.margin : "")));
+        for (Qvk3Skin.Rule r : rules) labels.add("#" + r.id + (r.hide ? " · скрыт" : (r.radius >= 0 ? " · скругление " + r.radius : "") + (r.bg != 0 ? " · цвет" : "") + (r.opacity < 100 ? " · " + r.opacity + "%" : "") + (r.margin >= 0 ? " · отступ " + r.margin : "") + (r.vmargin >= 0 ? " · интервал " + r.vmargin : "")));
         labels.add("☝ Настроить элемент касанием на экране ВК");
         labels.add("＋ Новое правило по имени элемента");
+        labels.add("⇪ Поделиться оформлением (код в буфер)");
+        labels.add("⇩ Вставить оформление из буфера");
         labels.add("Как найти имя элемента (Инспектор)");
         labels.add("Набор: убрать тени у шапки чата и панели");
         labels.add("Набор: полупрозрачная кнопка «Написать»");
@@ -67,10 +69,12 @@ final class Qvk3SkinScreen {
             if (i < rules.size()) edit(a, rules, i);
             else if (k == 0) Qvk3ElementPicker.arm(a);
             else if (k == 1) edit(a, rules, -1);
-            else if (k == 2) inspector(a);
-            else if (k == 3) preset(a, rules, true, "dialog_shadow", "bottom_navigation_shadow");
-            else if (k == 4) preset(a, rules, false, "vkim_fab");
-            else if (k == 5) preset(a, rules, true, "shadow", "shadow_view", "app_bar_shadow_view", "header_shadow", "divider", "separator", "top_divider", "bottom_divider", "tool_bar_divider", "dialog_shadow", "bottom_navigation_shadow");
+            else if (k == 2) Qvk3LookShare.share(a);
+            else if (k == 3) Qvk3LookShare.paste(a);
+            else if (k == 4) inspector(a);
+            else if (k == 5) preset(a, rules, true, "dialog_shadow", "bottom_navigation_shadow");
+            else if (k == 6) preset(a, rules, false, "vkim_fab");
+            else if (k == 7) preset(a, rules, true, "shadow", "shadow_view", "app_bar_shadow_view", "header_shadow", "divider", "separator", "top_divider", "bottom_divider", "tool_bar_divider", "dialog_shadow", "bottom_navigation_shadow");
             else {
                 rules.clear();
                 Qvk3Skin.saveRules(a, rules);

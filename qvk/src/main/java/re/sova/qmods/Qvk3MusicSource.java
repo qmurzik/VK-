@@ -39,8 +39,15 @@ public final class Qvk3MusicSource {
         public final String subtitle;
         public final int count;
         public final String cover;
+        /** A real album of an artist (VK type 1 or with main artists), not a user playlist. */
+        public final boolean album;
+        /** The original VK object, kept so a list can be cached and rebuilt offline. */
+        public final String raw;
 
-        Playlist(JSONObject o) {
+        public Playlist(JSONObject o) {
+            raw = o.toString();
+            JSONArray ma = o.optJSONArray("main_artists");
+            album = o.optInt("type") == 1 || (ma != null && ma.length() > 0) || !o.optString("album_type").isEmpty();
             ownerId = o.optLong("owner_id");
             id = o.optLong("id");
             accessKey = o.optString("access_key");
