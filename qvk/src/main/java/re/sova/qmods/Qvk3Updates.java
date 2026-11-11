@@ -111,7 +111,8 @@ public final class Qvk3Updates {
 
     public static String installedName(Context c) {
         try {
-            return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
+            String n = c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
+            return n == null ? "?" : n;
         } catch (Exception e) {
             return "?";
         }
