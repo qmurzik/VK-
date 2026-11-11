@@ -1,0 +1,66 @@
+--- a/smali_classes21/re/sova/qmods/ScreenRuntime$State.smali	2026-11-11 17:03:17.396038605 +0000
++++ b/smali_classes21/re/sova/qmods/ScreenRuntime$State.smali	2026-11-11 17:03:17.416587365 +0000
+@@ -552,6 +552,8 @@
+ 
+     invoke-static {v0}, Lre/sova/qmods/PostButtonColors;->dirty(Landroid/view/View;)V
+ 
++    invoke-static {v0}, Lre/sova/qmods/Qvk3UiThrottle;->input(Ljava/lang/Object;)V
++
+     .line 188
+     iget-object v0, p0, Lre/sova/qmods/ScreenRuntime$State;->scroll:Lre/sova/qmods/UiScrollGate;
+ 
+@@ -621,7 +623,10 @@
+ 
+     sub-long/2addr v2, v4
+ 
+-    const-wide/16 v4, 0x50
++    # QVK 3.0 battery: adaptive spacing instead of a fixed 80 ms (self-caused layouts back off)
++    invoke-static {v1, v2, v3}, Lre/sova/qmods/Qvk3UiThrottle;->interval(Ljava/lang/Object;J)J
++
++    move-result-wide v4
+ 
+     sub-long/2addr v4, v2
+ 
+@@ -662,7 +667,8 @@
+ 
+     if-eqz v0, :cond_0
+ 
+-    invoke-virtual {v0}, Landroid/view/View;->invalidate()V
++    # QVK 3.0 battery: run the pass directly instead of redrawing the whole window to reach onPreDraw
++    invoke-virtual {p0}, Lre/sova/qmods/ScreenRuntime$State;->onPreDraw()Z
+ 
+     .line 178
+     :cond_0
+--- a/smali_classes21/re/sova/qmods/BackgroundMessagesService.smali	2026-11-11 17:03:17.399089513 +0000
++++ b/smali_classes21/re/sova/qmods/BackgroundMessagesService.smali	2026-11-11 17:03:17.416861541 +0000
+@@ -1853,7 +1853,7 @@
+     move-result-object p1
+ 
+     .line 224
+-    const-string p2, "&wait=25&mode=2&version=3"
++    const-string p2, "&wait=90&mode=2&version=3"
+ 
+     invoke-virtual {p1, p2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+ 
+@@ -1894,7 +1894,8 @@
+     invoke-virtual {p1, v0}, Ljava/net/HttpURLConnection;->setConnectTimeout(I)V
+ 
+     .line 230
+-    const v0, 0x88b8
++    # QVK 3.0 battery: Long Poll waits 90 s (VK's maximum) instead of 25 s: ~3.6x fewer radio wake-ups
++    const v0, 0x186a0
+ 
+     invoke-virtual {p1, v0}, Ljava/net/HttpURLConnection;->setReadTimeout(I)V
+ 
+--- a/smali_classes21/re/sova/qmods/QModsSupport.smali	2026-11-11 17:03:17.401652583 +0000
++++ b/smali_classes21/re/sova/qmods/QModsSupport.smali	2026-11-11 17:03:17.417015386 +0000
+@@ -1194,7 +1194,8 @@
+     move-result-object p0
+ 
+     .line 246
+-    const-wide/32 v1, 0xdbba0
++    # QVK 3.0 battery: QMods announcements every 6 h instead of every 15 min (QVK 3.0 has its own updater)
++    const-wide/32 v1, 0x1499700
+ 
+     invoke-virtual {p0, v1, v2}, Landroid/app/job/JobInfo$Builder;->setPeriodic(J)Landroid/app/job/JobInfo$Builder;
+ 

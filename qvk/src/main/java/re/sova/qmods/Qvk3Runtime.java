@@ -48,8 +48,26 @@ public final class Qvk3Runtime extends ContentProvider {
             if (c instanceof android.app.Application) Qvk3Skin.install((android.app.Application) c);
             Qvk3Jobs.io(() -> Qvk3Updates.cleanup(c));
             Qvk3Jobs.io(() -> Qvk3Growth.sample(c));
+            Qvk3Jobs.io(() -> slowDownQmodsJob(c));
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.runtime.start", t);
+        }
+    }
+
+    /**
+     * QVK 2.x scheduled its announcements job (QModsSupport, id 81949) every 15 minutes with network. Patch 0011 makes
+     * new schedules 6-hourly, but an already persisted job keeps its old period: replace it once.
+     */
+    static void slowDownQmodsJob(Context c) {
+        try {
+            android.app.job.JobScheduler js = c.getSystemService(android.app.job.JobScheduler.class);
+            android.app.job.JobInfo j = js == null ? null : js.getPendingJob(81949);
+            if (j != null && j.isPeriodic() && j.getIntervalMillis() < 6 * 3_600_000L) {
+                js.cancel(81949);
+                QModsSupport.schedule(c);
+            }
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.runtime.jobs", t);
         }
     }
 
