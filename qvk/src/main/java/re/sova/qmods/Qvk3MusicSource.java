@@ -192,6 +192,96 @@ public final class Qvk3MusicSource {
         throw new IOException("ВК не вернул трек " + t.label());
     }
 
+    /** A section of VK's music home: «Джемы», «Для вас», «Новинки», mixes, charts… */
+    public static final class Block {
+        public final String title;
+        public final List<Qvk3Track> tracks;
+        public final List<Playlist> playlists;
+
+        Block(String title, List<Qvk3Track> tracks, List<Playlist> playlists) {
+            this.title = title;
+            this.tracks = tracks;
+            this.playlists = playlists;
+        }
+    }
+
+    /**
+     * BUG-0010: VK's own music home («Главная» of VK music: джемы, рекомендованные плейлисты, подборки, чарты) as data — the
+     * catalog.getAudio answer — so QVK Music shows it in its own interface with its own player instead of opening the whole
+     * stock VK music section. Blocks without tracks or playlists (banners, links, offers) are skipped.
+     */
+    public static List<Block> vkHome() throws Exception {
+        JSONObject r = response("catalog.getAudio", args("need_blocks", "1"));
+        JSONObject sec = r.optJSONObject("section");
+        if (sec == null || sec.optJSONArray("blocks") == null || sec.optJSONArray("blocks").length() == 0) {
+            JSONObject cat = r.optJSONObject("catalog");
+            String def = cat == null ? "" : cat.optString("default_section");
+            if (def.isEmpty() && cat != null && cat.optJSONArray("sections") != null && cat.optJSONArray("sections").length() > 0)
+                def = cat.optJSONArray("sections").optJSONObject(0).optString("id");
+            if (def.isEmpty()) throw new IOException("ВК не прислал разделы музыки");
+            r = response("catalog.getSection", args("section_id", def));
+            sec = r.optJSONObject("section");
+        }
+        return blocks(r, sec);
+    }
+
+    static List<Block> blocks(JSONObject r, JSONObject sec) {
+        Map<String, Qvk3Track> audios = new LinkedHashMap<>();
+        JSONArray a = r.optJSONArray("audios");
+        if (a != null) for (int i = 0; i < a.length(); i++) {
+            JSONObject o = a.optJSONObject(i);
+            if (o != null && o.optLong("id") != 0) audios.put(o.optLong("owner_id") + "_" + o.optLong("id"), Qvk3Track.fromVk(o));
+        }
+        Map<String, Playlist> lists = new LinkedHashMap<>();
+        JSONArray pl = r.optJSONArray("playlists");
+        if (pl != null) for (int i = 0; i < pl.length(); i++) {
+            JSONObject o = pl.optJSONObject(i);
+            if (o != null) {
+                Playlist p = new Playlist(o);
+                lists.put(p.key(), p);
+            }
+        }
+        List<Block> out = new ArrayList<>();
+        JSONArray bl = sec == null ? null : sec.optJSONArray("blocks");
+        if (bl == null) return out;
+        String pendingTitle = "";
+        for (int i = 0; i < bl.length() && out.size() < 14; i++) {
+            JSONObject b = bl.optJSONObject(i);
+            if (b == null) continue;
+            JSONObject layout = b.optJSONObject("layout");
+            String title = layout == null ? "" : layout.optString("title");
+            if (title.isEmpty()) title = b.optString("title");
+            // VK sends a section title as its own "header" block before the content block
+            if (layout != null && layout.optString("name").contains("header")) {
+                if (!title.isEmpty()) pendingTitle = title;
+                continue;
+            }
+            List<Qvk3Track> tracks = new ArrayList<>();
+            List<Playlist> playlists = new ArrayList<>();
+            JSONArray ids = b.optJSONArray("audios_ids");
+            if (ids != null) for (int k = 0; k < ids.length() && tracks.size() < 10; k++) {
+                Qvk3Track t = audios.get(baseId(ids.optString(k)));
+                if (t != null) tracks.add(t);
+            }
+            ids = b.optJSONArray("playlists_ids");
+            if (ids != null) for (int k = 0; k < ids.length() && playlists.size() < 12; k++) {
+                Playlist p = lists.get(baseId(ids.optString(k)));
+                if (p != null) playlists.add(p);
+            }
+            if (tracks.isEmpty() && playlists.isEmpty()) continue;
+            if (title.isEmpty()) title = pendingTitle;
+            pendingTitle = "";
+            out.add(new Block(title.isEmpty() ? (tracks.isEmpty() ? "Плейлисты" : "Треки") : title, tracks, playlists));
+        }
+        return out;
+    }
+
+    /** "ownerId_id_accessKey" → "ownerId_id". */
+    static String baseId(String s) {
+        String[] p = s.split("_");
+        return p.length >= 2 ? p[0] + "_" + p[1] : s;
+    }
+
     public static Qvk3Lyrics lyrics(Qvk3Track t) throws Exception {
         Map<String, String> a = args("audio_id", t.ownerId + "_" + t.id);
         if (t.lyricsId > 0) a.put("lyrics_id", Long.toString(t.lyricsId));

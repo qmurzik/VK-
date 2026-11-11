@@ -346,7 +346,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 if (e1 == null || e2 == null) return false;
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
                 boolean lyricsScrollable = lyricsMode && lyricsList != null && lyricsList.getVisibility() == VISIBLE && lyricsList.canScrollVertically(-1);
-                if (dy > dp(90) && Math.abs(dy) > Math.abs(dx) * 1.6f && vy > 900 && e1.getY() < getHeight() * 0.72f && !lyricsScrollable) {
+                if (dy > dp(70) && Math.abs(dy) > Math.abs(dx) * 1.6f && vy > 700 && e1.getY() < getHeight() * 0.72f && !lyricsScrollable) {
                     if (onClose != null) onClose.run(); // swipe down collapses the player
                     return true;
                 }
@@ -468,11 +468,52 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         fillExtra();
     }
 
-    /** Observes touches (never consumes them) to detect swipe-down-to-collapse and swipe-on-cover track changes. */
+    private float downX, downY;
+    private boolean downValid;
+
+    /**
+     * Observes every touch of the player (BUG-0009: onInterceptTouchEvent stopped seeing the gesture when it began on an empty
+     * area or a scrolling child took it) to detect swipe-down-to-collapse and swipe-on-cover track changes. A quick flick or a
+     * slow drag of a quarter of the screen both collapse the player; nothing is consumed unless the player collapses.
+     */
     @Override
-    public boolean onInterceptTouchEvent(android.view.MotionEvent ev) {
-        if (gestures != null) gestures.onTouchEvent(ev);
-        return false;
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (gestures != null && gestures.onTouchEvent(ev) && ev.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
+            downValid = false;
+            cancelChildren(ev);
+            return true;
+        }
+        switch (ev.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                downX = ev.getX();
+                downY = ev.getY();
+                downValid = downY < getHeight() * 0.72f;
+                break;
+            case android.view.MotionEvent.ACTION_UP:
+                float dx = ev.getX() - downX, dy = ev.getY() - downY;
+                boolean lyricsScrollable = lyricsMode && lyricsList != null && lyricsList.getVisibility() == VISIBLE && lyricsList.canScrollVertically(-1);
+                if (downValid && dy > getHeight() * 0.25f && dy > Math.abs(dx) * 2f && !lyricsScrollable && onClose != null) {
+                    downValid = false;
+                    cancelChildren(ev);
+                    onClose.run(); // slow drag down collapses the player too
+                    return true;
+                }
+                downValid = false;
+                break;
+            case android.view.MotionEvent.ACTION_POINTER_DOWN:
+                downValid = false;
+                break;
+            default:
+                break;
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    private void cancelChildren(android.view.MotionEvent ev) {
+        android.view.MotionEvent c = android.view.MotionEvent.obtain(ev);
+        c.setAction(android.view.MotionEvent.ACTION_CANCEL);
+        super.dispatchTouchEvent(c);
+        c.recycle();
     }
 
     @Override

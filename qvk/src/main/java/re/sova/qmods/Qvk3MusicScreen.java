@@ -627,14 +627,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     }
 
     void selectTab(int i) {
-        if (i == 5) {
-            // IDEA-0008: VK's own music home (джемы, предложенные плейлисты, подборки) — opened as is, so VK's
-            // changes never break it. Tracks started there still play in QVK Music.
-            Qvk3MusicEntry.openClassic(a);
-            highlightTab();
-            return;
-        }
-        tab = Math.max(0, Math.min(TABS.length - 2, i));
+        tab = Math.max(0, Math.min(TABS.length - 1, i));
         highlightTab();
         searchRow.setVisibility(tab == 3 || tab == 1 ? View.VISIBLE : View.GONE);
         switch (tab) {
@@ -656,6 +649,9 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 break;
             case 4:
                 go(this::showDownloads);
+                break;
+            case 5:
+                go(this::showVkHome);
                 break;
             default:
                 go(this::showHome);
@@ -796,6 +792,43 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                             () -> push(() -> showCachedList(l.list, l.title)), () -> confirmDeleteList(l)));
                 }
                 rows.set(r);
+            });
+        });
+    }
+
+    /**
+     * BUG-0010 / IDEA-0008: «Музыка ВК» — VK's own music home (джемы, подборки, плейлисты дня, чарты) inside QVK Music, with
+     * the QVK player and mini-player. Opening the whole stock section hid the QVK player and brought back the old interface.
+     */
+    private void showVkHome() {
+        screenTitle.setText("Музыка ВК");
+        List<Row> r = new ArrayList<>();
+        r.add(note("Загружаем главную музыки ВК…", null));
+        rows.set(r);
+        Qvk3Jobs.io(() -> {
+            List<Qvk3MusicSource.Block> blocks = null;
+            String err = null;
+            try {
+                blocks = Qvk3MusicSource.vkHome();
+            } catch (Exception e) {
+                err = Qvk3Jobs.message(e);
+            }
+            final List<Qvk3MusicSource.Block> bl = blocks;
+            final String e = err;
+            Qvk3Jobs.main(() -> {
+                if (tab != 5 || !back.isEmpty()) return;
+                List<Row> out = new ArrayList<>();
+                if (bl == null || bl.isEmpty()) out.add(note(e != null ? "Не удалось загрузить: " + e : "ВК не прислал подборок для этого аккаунта", this::showVkHome));
+                if (bl != null) for (Qvk3MusicSource.Block b : bl) {
+                    out.add(header(b.title));
+                    for (Qvk3MusicSource.Playlist pl : b.playlists) {
+                        out.add(new Row(Row.ITEM, pl.title, (pl.subtitle.isEmpty() ? "Плейлист" : pl.subtitle) + (pl.count > 0 ? " · " + pl.count + " треков" : ""),
+                                "", pl.cover, null, false, () -> push(() -> showPlaylist(pl)), null));
+                    }
+                    for (int i = 0; i < b.tracks.size(); i++) out.add(trackRow(b.tracks, i));
+                }
+                out.add(note("Открыть штатную музыку ВК целиком →", () -> Qvk3MusicEntry.openClassic(a)));
+                rows.set(out);
             });
         });
     }
