@@ -42,6 +42,8 @@ public final class Qvk3SettingsActivity extends Activity {
     private EditText search;
     private TextView title, subtitle;
     private View back;
+    /** Animation for the next screen built: 1 forward (slide from the right), -1 back, 2 light (search), 0 none (refresh). */
+    private int pendingAnim = 2;
     private int section = -1;
     private Object backCallback;
 
@@ -129,6 +131,20 @@ public final class Qvk3SettingsActivity extends Activity {
         content.setPadding(dp(16), dp(4), dp(16), dp(32));
         scroll.addView(content);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        // large title that shrinks as the list scrolls (iOS-like), subtitle fades out, header gets a hairline
+        View hairline = new View(this);
+        hairline.setBackgroundColor(p.divider);
+        hairline.setAlpha(0f);
+        root.addView(hairline, root.indexOfChild(scroll), new LinearLayout.LayoutParams(-1, Math.max(1, dp(0.6f))));
+        scroll.setOnScrollChangeListener((v, x, y, ox, oy) -> {
+            float f = Math.max(0f, Math.min(1f, y / (float) dp(70)));
+            title.setPivotX(0f);
+            title.setPivotY(title.getHeight());
+            title.setScaleX(1f - 0.28f * f);
+            title.setScaleY(1f - 0.28f * f);
+            subtitle.setAlpha(1f - f);
+            hairline.setAlpha(f);
+        });
         setContentView(root);
 
         if (state != null) section = state.getInt("section", -1);
@@ -187,6 +203,7 @@ public final class Qvk3SettingsActivity extends Activity {
             return;
         }
         if (section >= 0) {
+            pendingAnim = -1;
             showHome();
             return;
         }
@@ -351,16 +368,8 @@ public final class Qvk3SettingsActivity extends Activity {
         return r;
     }
 
-    private Switch toggle(boolean checked) {
-        Switch s = new Switch(this);
-        s.setChecked(checked);
-        s.setClickable(false);
-        s.setFocusable(false);
-        s.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        int[][] st = {{android.R.attr.state_checked}, {}};
-        s.setThumbTintList(new ColorStateList(st, new int[]{Color.WHITE, p.dark ? 0xFFB9BBC2 : Color.WHITE}));
-        s.setTrackTintList(new ColorStateList(st, new int[]{0xFF34C759, p.dark ? 0xFF3A3B40 : 0xFFD9DAE0}));
-        return s;
+    private Qvk3Toggle toggle(boolean checked) {
+        return new Qvk3Toggle(this, checked, 0xFF34C759, p.dark ? 0xFF3A3B40 : 0xFFDDDEE3);
     }
 
     private void itemRow(LinearLayout card, Qvk3SettingsIndex.Item it, boolean showSection) {
@@ -370,7 +379,10 @@ public final class Qvk3SettingsActivity extends Activity {
         String t = (fav ? "★ " : "") + it.title;
         if (it.type == Qvk3SettingsIndex.SWITCH) {
             boolean on = value(it);
-            LinearLayout r = row(card, null, 0, t, sum, toggle(on), () -> flip(it), () -> toggleFavorite(it));
+            Qvk3Toggle tg = toggle(on);
+            LinearLayout[] holder = new LinearLayout[1];
+            holder[0] = row(card, null, 0, t, sum, tg, () -> flip(it, tg, holder[0]), () -> toggleFavorite(it));
+            LinearLayout r = holder[0];
             r.setContentDescription(it.title + ". " + (on ? "Включено" : "Выключено") + ". " + it.summary);
         } else {
             row(card, null, 0, t, sum, null, () -> open(it), () -> toggleFavorite(it));
@@ -379,10 +391,22 @@ public final class Qvk3SettingsActivity extends Activity {
 
     private void begin(String heading, String sub, boolean home) {
         content.removeAllViews();
+        boolean changed = !heading.contentEquals(title.getText());
         title.setText(heading);
         subtitle.setText(sub);
         back.setVisibility(home ? View.GONE : View.VISIBLE);
         scroll.scrollTo(0, 0);
+        int anim = pendingAnim;
+        pendingAnim = 0;
+        if (anim == 0) return;
+        if (changed && anim != 2) {
+            title.setAlpha(0f);
+            title.animate().alpha(1f).setDuration(220).start();
+        }
+        content.post(() -> {
+            if (anim == 1 || anim == -1) Qvk3Motion.slideIn(content, anim == 1);
+            Qvk3Motion.stagger(content, anim == 2 && !home);
+        });
     }
 
     // ------------------------------------------------------------------ screens
@@ -395,6 +419,7 @@ public final class Qvk3SettingsActivity extends Activity {
             return;
         }
         List<Qvk3SettingsIndex.Item> found = index.search(q, 60);
+        pendingAnim = 2;
         begin("Поиск", found.isEmpty() ? "Ничего не найдено" : "Найдено: " + found.size(), false);
         if (found.isEmpty()) return;
         LinearLayout c = card();
@@ -406,19 +431,27 @@ public final class Qvk3SettingsActivity extends Activity {
         if (search.length() > 0) search.setText("");
         begin("Настройки", version(), true);
 
-        // appearance card
+        // appearance hero: a gradient in the colours of the current style, its swatches and the three main actions
         Qvk3DesignTokens t = Qvk3Appearance.current(this);
-        LinearLayout look = card();
-        look.setPadding(dp(16), dp(16), dp(16), dp(14));
+        LinearLayout look = new LinearLayout(this);
+        look.setOrientation(LinearLayout.VERTICAL);
+        look.setPadding(dp(18), dp(18), dp(18), dp(16));
+        int a1 = t.accent, a2 = Qvk3Ui.deep(t.accent, 0.55f);
+        android.graphics.drawable.GradientDrawable hero = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[]{a1, a2});
+        hero.setCornerRadius(dp(24));
+        look.setBackground(hero);
+        look.setElevation(dp(6));
+        content.addView(look, Qvk3Ui.match());
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout sw = new LinearLayout(this);
-        for (int col : new int[]{t.accent, Qvk3DesignTokens.over(t.page, 0xFF000000), Qvk3DesignTokens.over(t.content, 0xFF000000), Qvk3DesignTokens.over(t.outgoing, 0xFF000000)}) {
+        for (int col : new int[]{Qvk3DesignTokens.over(t.page, 0xFF000000), Qvk3DesignTokens.over(t.content, 0xFF000000), Qvk3DesignTokens.over(t.outgoing, 0xFF000000), t.accent}) {
             View dot = new View(this);
             android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
             g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
             g.setColor(col);
-            g.setStroke(dp(2), p.surface);
+            g.setStroke(dp(2), 0xCCFFFFFF);
             dot.setBackground(g);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
             lp.leftMargin = sw.getChildCount() == 0 ? 0 : -dp(9);
@@ -428,18 +461,20 @@ public final class Qvk3SettingsActivity extends Activity {
         LinearLayout lt = new LinearLayout(this);
         lt.setOrientation(LinearLayout.VERTICAL);
         lt.setPadding(dp(14), 0, 0, 0);
-        lt.addView(Qvk3Ui.text(this, "Оформление", 13, p.text2, false));
-        lt.addView(Qvk3Ui.line(this, Qvk3Appearance.currentTitle(this), 18, p.text, true));
+        lt.addView(Qvk3Ui.text(this, "Оформление", 13, 0xCCFFFFFF, false));
+        lt.addView(Qvk3Ui.line(this, Qvk3Appearance.currentTitle(this), 20, Color.WHITE, true));
         top.addView(lt, Qvk3Ui.weight(1));
         look.addView(top);
         LinearLayout chips = new LinearLayout(this);
-        chips.setPadding(0, dp(14), 0, 0);
-        chips.addView(chip("Стили", true, this::styles), Qvk3Ui.weight(1));
+        chips.setPadding(0, dp(16), 0, 0);
+        chips.addView(heroChip("Стили", true, this::styles), Qvk3Ui.weight(1));
         chips.addView(gap());
-        chips.addView(chip("Сценарии", false, this::scenarios), Qvk3Ui.weight(1));
+        chips.addView(heroChip("Сценарии", false, this::scenarios), Qvk3Ui.weight(1));
         chips.addView(gap());
-        chips.addView(chip("День/ночь", false, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
+        chips.addView(heroChip("День/ночь", false, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
         look.addView(chips);
+        Qvk3Motion.press(look);
+        look.setOnClickListener(v -> styles());
 
         // scenario
         Qvk3Scenarios.Scenario sc = Qvk3Scenarios.find(this, Qvk3Scenarios.active(this));
@@ -480,28 +515,86 @@ public final class Qvk3SettingsActivity extends Activity {
                 Qvk3SettingsHistory.Entry e = hist.get(i);
                 Qvk3SettingsIndex.Item it = index.get(e.key);
                 TextView when = Qvk3Ui.text(this, df.format(new java.util.Date(e.time)), 12, p.text2, false);
-                LinearLayout hrow = row(c, null, 0, e.title, null, when, it == null ? null : () -> showSection(it.section), null);
+                LinearLayout hrow = row(c, null, 0, e.title, null, when, it == null ? null : () -> openSection(it.section), null);
                 hrow.setMinimumHeight(dp(40));   // BUG-0004: the "recent changes" card was too tall for what it shows
                 hrow.setPadding(dp(16), dp(5), dp(12), dp(5));
             }
 
         }
 
-        // categories
-        int[][] groups = {{0, 1}, {2, 3, 6}, {4, 5}, {7, 8}};
-        for (int[] g : groups) {
-            LinearLayout c = card();
-            ((LinearLayout.LayoutParams) c.getLayoutParams()).topMargin = dp(18);
-            for (int s : g) {
-                final int sec = s;
-                row(c, Qvk3SettingsIndex.SECTION_ICONS[s], Qvk3SettingsIndex.SECTION_COLORS[s], Qvk3SettingsIndex.SECTIONS[s],
-                        Qvk3SettingsIndex.SECTION_HINTS[s], null, () -> showSection(sec), null);
-            }
+        // sections as a grid of tiles
+        header("Разделы");
+        int[] order = {0, 1, 2, 4, 5, 6, 3, 7, 8};
+        for (int k = 0; k < order.length; k += 2) {
+            LinearLayout line = new LinearLayout(this);
+            LinearLayout.LayoutParams ll = Qvk3Ui.match();
+            if (k > 0) ll.topMargin = dp(10);
+            line.addView(sectionTile(order[k]), Qvk3Ui.weight(1));
+            line.addView(gap());
+            if (k + 1 < order.length) line.addView(sectionTile(order[k + 1]), Qvk3Ui.weight(1));
+            else line.addView(new View(this), Qvk3Ui.weight(1));
+            content.addView(line, ll);
         }
         TextView hint = Qvk3Ui.text(this, "Удерживайте настройку, чтобы добавить её в избранное.", 13, p.text2, false);
         hint.setGravity(Gravity.CENTER);
         hint.setPadding(dp(16), dp(18), dp(16), 0);
         content.addView(hint);
+    }
+
+    static String plural(int n, String one, String few, String many) {
+        int m10 = n % 10, m100 = n % 100;
+        String w = m10 == 1 && m100 != 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+        return n + " " + w;
+    }
+
+    /** Section colours tuned for dark backgrounds (the dark grey of «Приватность» becomes readable). */
+    static int brighten(int c) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(c, hsv);
+        hsv[2] = Math.max(hsv[2], 0.85f);
+        if (hsv[1] < 0.15f) hsv[2] = 0.75f;
+        return Color.HSVToColor(hsv);
+    }
+
+    private void openSection(int s) {
+        pendingAnim = 1;
+        showSection(s);
+    }
+
+    private TextView heroChip(String label, boolean primary, Runnable r) {
+        TextView b = Qvk3Ui.text(this, label, 14, primary ? Qvk3Ui.deep(Qvk3Appearance.current(this).accent, 0.45f) : Color.WHITE, true);
+        b.setGravity(Gravity.CENTER);
+        b.setSingleLine(true);
+        b.setPadding(dp(8), dp(10), dp(8), dp(10));
+        b.setMinHeight(dp(44));
+        b.setBackground(Qvk3Ui.ripple(this, primary ? Color.WHITE : 0x33FFFFFF, 0x33000000, dp(14)));
+        b.setOnClickListener(v -> r.run());
+        Qvk3Motion.press(b);
+        return b;
+    }
+
+    /** A section as a tile: coloured icon, name, two-line hint; sinks when pressed. */
+    private View sectionTile(int s) {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setPadding(dp(14), dp(14), dp(12), dp(14));
+        t.setBackground(Qvk3Ui.ripple(this, p.surface, p.dark ? 0x22FFFFFF : 0x14000000, dp(20)));
+        t.setMinimumHeight(dp(124));
+        View icon = Qvk3Ui.tile(this, Qvk3SettingsIndex.SECTION_ICONS[s], Qvk3SettingsIndex.SECTION_COLORS[s], 40);
+        t.addView(icon);
+        TextView name = Qvk3Ui.text(this, Qvk3SettingsIndex.SECTIONS[s], 16, p.text, true);
+        name.setPadding(0, dp(12), 0, dp(2));
+        name.setMaxLines(1);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(name);
+        TextView hint = Qvk3Ui.text(this, Qvk3SettingsIndex.SECTION_HINTS[s], 12, p.text2, false);
+        hint.setMaxLines(2);
+        hint.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(hint);
+        t.setContentDescription(Qvk3SettingsIndex.SECTIONS[s] + ". " + Qvk3SettingsIndex.SECTION_HINTS[s]);
+        t.setOnClickListener(v -> openSection(s));
+        Qvk3Motion.press(t);
+        return t;
     }
 
     private View gap() {
@@ -524,9 +617,34 @@ public final class Qvk3SettingsActivity extends Activity {
     private void showSection(int s) {
         section = s;
         begin(Qvk3SettingsIndex.SECTIONS[s], Qvk3SettingsIndex.SECTION_HINTS[s], false);
+        // section hero: its icon on a soft wash of the section colour and what is inside
+        int col = Qvk3SettingsIndex.SECTION_COLORS[s];
+        int nScreens = 0, nToggles = 0;
+        for (Qvk3SettingsIndex.Item it : index.section(s)) {
+            if (it.type == Qvk3SettingsIndex.SWITCH) nToggles++;
+            else nScreens++;
+        }
+        LinearLayout hero = new LinearLayout(this);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(dp(16), dp(14), dp(16), dp(14));
+        android.graphics.drawable.GradientDrawable wash = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, new int[]{(col & 0x00FFFFFF) | 0x40000000, (col & 0x00FFFFFF) | 0x0A000000});
+        wash.setCornerRadius(dp(20));
+        hero.setBackground(wash);
+        hero.addView(Qvk3Ui.tile(this, Qvk3SettingsIndex.SECTION_ICONS[s], col, 48));
+        LinearLayout ht = new LinearLayout(this);
+        ht.setOrientation(LinearLayout.VERTICAL);
+        ht.setPadding(dp(14), 0, 0, 0);
+        ht.addView(Qvk3Ui.text(this, plural(index.groups(s).size(), "группа", "группы", "групп") + " · " + plural(nScreens, "экран", "экрана", "экранов") + " · " + plural(nToggles, "переключатель", "переключателя", "переключателей"), 13, p.text2, false));
+        ht.addView(Qvk3Ui.text(this, "Удерживайте пункт, чтобы добавить в избранное", 12, p.text2, false));
+        hero.addView(ht, Qvk3Ui.weight(1));
+        LinearLayout.LayoutParams hl = Qvk3Ui.match();
+        hl.topMargin = dp(6);
+        content.addView(hero, hl);
         Qvk3SettingsIndex.Item first = null;
         for (String g : index.groups(s)) {
             header(g);
+            ((TextView) content.getChildAt(content.getChildCount() - 1)).setTextColor(Qvk3Ui.night(this) ? brighten(col) : col);
             LinearLayout c = card();
             List<Qvk3SettingsIndex.Item> screens = new ArrayList<>(), switches = new ArrayList<>();
             for (Qvk3SettingsIndex.Item it : index.section(s)) {
@@ -547,6 +665,11 @@ public final class Qvk3SettingsActivity extends Activity {
     // ------------------------------------------------------------------ actions
 
     private void flip(Qvk3SettingsIndex.Item it) {
+        flip(it, null, null);
+    }
+
+    /** Toggles in place: the switch animates, the screen is not rebuilt (no jump, no flicker). */
+    private void flip(Qvk3SettingsIndex.Item it, Qvk3Toggle tg, View row) {
         boolean now = !value(it);
         if (it.key.equals("enablePin") && now && !Qvk3MusicSettings.prefs(this).contains("qmods_pin_hash")) {
             SettingsEditorActivity.open(this, "pin");
@@ -558,6 +681,14 @@ public final class Qvk3SettingsActivity extends Activity {
             SettingsRuntime.toggle(it.key, now);
         } catch (Throwable e) {
             Qvk3MusicSettings.prefs(this).edit().putBoolean(it.key, now).apply();
+        }
+        if (tg != null) {
+            boolean v = value(it);
+            tg.setChecked(v, true);
+            tg.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            if (row != null) row.setContentDescription(it.title + ". " + (v ? "Включено" : "Выключено") + ". " + it.summary);
+            if (v != now) Qvk3Ui.toast(this, "Не удалось переключить «" + it.title + "»");
+            return;
         }
         int y = scroll.getScrollY();
         refresh();
