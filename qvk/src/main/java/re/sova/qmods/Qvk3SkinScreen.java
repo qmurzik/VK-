@@ -59,12 +59,21 @@ final class Qvk3SkinScreen {
         labels.add("Как найти имя элемента (Инспектор)");
         labels.add("Набор: убрать тени у шапки чата и панели");
         labels.add("Набор: полупрозрачная кнопка «Написать»");
+        labels.add("Набор: плоский вид (убрать разделители и тени везде)");
+        labels.add("Сбросить все правила");
         Qvk3Ui.dialog(a).setTitle("Правила интерфейса ВК").setItems(labels.toArray(new String[0]), (d, i) -> {
             if (i < rules.size()) edit(a, rules, i);
             else if (i == rules.size()) edit(a, rules, -1);
             else if (i == rules.size() + 1) inspector(a);
             else if (i == rules.size() + 2) preset(a, rules, true, "dialog_shadow", "bottom_navigation_shadow");
-            else preset(a, rules, false, "vkim_fab");
+            else if (i == rules.size() + 3) preset(a, rules, false, "vkim_fab");
+            else if (i == rules.size() + 4) preset(a, rules, true, "shadow", "shadow_view", "app_bar_shadow_view", "header_shadow", "divider", "separator", "top_divider", "bottom_divider", "tool_bar_divider", "dialog_shadow", "bottom_navigation_shadow");
+            else {
+                rules.clear();
+                Qvk3Skin.saveRules(a, rules);
+                Qvk3Skin.refresh();
+                rules(a);
+            }
         }).setNegativeButton("Закрыть", null).show();
     }
 
