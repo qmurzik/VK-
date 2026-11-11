@@ -217,6 +217,8 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:updates", "Проверить обновления", "Загрузка с докачкой, проверка подписи", 8, "Обновления");
         idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса, зеркала и ключи подписи", 8, "Обновления");
         idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 8, "О QVK");
+        idx.addScreen("qvk3:shell", "Открыть оболочку QVK", "Чаты и музыка в стиле iOS", 1, "Оболочка QVK");
+        idx.addScreen("qvk3:shellToggle", "Запускать оболочку QVK при старте", "Вместо главного экрана ВКонтакте; выключите, чтобы вернуть штатный запуск", 1, "Оболочка QVK");
         idx.addScreen("qvk3:classic", "Классические настройки QVK", "Прежний экран настроек QVK 2.x", 8, "О QVK");
         idx.addScreen("qvk3:classicDefault", "Открывать классические настройки", "Вернуть прежний экран вместо этого центра", 8, "О QVK");
         idx.addCatalog(catalog(a));
@@ -580,6 +582,17 @@ public final class Qvk3SettingsActivity extends Activity {
             case "updateSources":
                 Qvk3InfoScreens.updateSources(this);
                 break;
+            case "shell":
+                startActivity(new Intent(this, Qvk3ShellActivity.class));
+                break;
+            case "shellToggle": {
+                SharedPreferences pr = Qvk3MusicSettings.prefs(this);
+                boolean on = !pr.getBoolean(Qvk3ShellActivity.ENABLED, true);
+                Qvk3SettingsHistory.before(this, Qvk3ShellActivity.ENABLED, on ? "Оболочка QVK при старте включена" : "Оболочка QVK при старте выключена");
+                pr.edit().putBoolean(Qvk3ShellActivity.ENABLED, on).apply();
+                Qvk3Ui.toast(this, on ? "При запуске будет открываться оболочка QVK" : "При запуске будет открываться штатный ВКонтакте");
+                break;
+            }
             case "classic":
                 startActivity(new Intent(this, QModsActivity.class));
                 break;

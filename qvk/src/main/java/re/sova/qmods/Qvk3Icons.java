@@ -20,7 +20,7 @@ public final class Qvk3Icons extends Drawable {
             PALETTE = "palette", BELL = "bell", LOCK = "lock", CHAT = "chat", NAV = "nav", IMAGE = "image",
             FOLDER = "folder", BATTERY = "battery", CLOUD = "cloud", UPDATE = "update", PULSE = "pulse", INFO = "info",
             STAR = "star", HOME = "home", LIST = "list", UNDO = "undo", EQ = "eq", CHECK = "check", PLUS = "plus",
-            GRID = "grid", USER = "user", LAYERS = "layers", WAND = "wand", SLIDERS = "sliders", CLOSE = "close";
+            GRID = "grid", SEND = "send", USER = "user", LAYERS = "layers", WAND = "wand", SLIDERS = "sliders", CLOSE = "close";
 
     private final String name;
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -397,6 +397,13 @@ public final class Qvk3Icons extends Drawable {
                 p.moveTo(4.5f, 12.5f);
                 p.lineTo(9.5f, 17.5f);
                 p.lineTo(19.5f, 6.5f);
+                c.drawPath(p, stroke);
+                break;
+            case SEND:
+                line(c, 12, 19, 12, 5.5f);
+                p.moveTo(6, 11);
+                p.lineTo(12, 5);
+                p.lineTo(18, 11);
                 c.drawPath(p, stroke);
                 break;
             case PLUS:

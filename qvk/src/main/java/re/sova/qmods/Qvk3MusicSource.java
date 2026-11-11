@@ -73,11 +73,11 @@ public final class Qvk3MusicSource {
     }
 
     /** Test seam: the default implementation calls VK through NetworkBridge. */
-    interface Api {
+    public interface Api {
         JSONObject call(String method, Map<String, String> args) throws Throwable;
     }
 
-    static Api api = (method, args) -> NetworkBridge.apiVersioned(method, args, V);
+    public static Api api = (method, args) -> NetworkBridge.apiVersioned(method, args, V);
 
     static JSONObject response(String method, Map<String, String> args) throws Exception {
         JSONObject r;
@@ -148,6 +148,15 @@ public final class Qvk3MusicSource {
     public static Page<Qvk3Track> playlistTracks(Playlist p, int offset) throws Exception {
         return tracks(response("audio.get", args("owner_id", Long.toString(p.ownerId), "playlist_id", Long.toString(p.id),
                 "access_key", p.accessKey, "count", Integer.toString(PAGE), "offset", Integer.toString(offset))));
+    }
+
+    /** "Для вас": VK's own suggestions (джемы / рекомендованные треки), when the account has them. */
+    public static List<Qvk3Track> recommendations(int count) throws Exception {
+        return tracks(response("audio.getRecommendations", args("count", Integer.toString(count), "shuffle", "1"))).items;
+    }
+
+    public static List<Qvk3Track> popular(int count) throws Exception {
+        return tracks(response("audio.getPopular", args("count", Integer.toString(count)))).items;
     }
 
     public static Page<Qvk3Track> search(String q, boolean artistOnly, int offset) throws Exception {

@@ -43,6 +43,7 @@ public final class Qvk3Runtime extends ContentProvider {
             Qvk3Migration.run(c);
             shortcuts(c);
             if (c instanceof android.app.Application) Qvk3MiniBar.install((android.app.Application) c);
+            if (c instanceof android.app.Application) Qvk3Shell.install((android.app.Application) c);
             Qvk3Jobs.io(() -> Qvk3Updates.cleanup(c));
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.runtime.start", t);
@@ -60,6 +61,9 @@ public final class Qvk3Runtime extends ContentProvider {
         list.add(new ShortcutInfo.Builder(c, "qvk3_settings").setShortLabel("Настройки QVK").setLongLabel("Центр настроек QVK")
                 .setIcon(Icon.createWithResource(c, android.R.drawable.ic_menu_preferences))
                 .setIntent(new Intent(c, Qvk3SettingsActivity.class).setAction(Intent.ACTION_VIEW)).build());
+        list.add(new ShortcutInfo.Builder(c, "qvk3_shell").setShortLabel("QVK").setLongLabel("Оболочка QVK: чаты и музыка")
+                .setIcon(Icon.createWithResource(c, android.R.drawable.sym_action_chat))
+                .setIntent(new Intent(c, Qvk3ShellActivity.class).setAction(Intent.ACTION_VIEW)).build());
         list.add(new ShortcutInfo.Builder(c, "qvk3_music").setShortLabel("QVK Music").setLongLabel("Открыть QVK Music")
                 .setIcon(Icon.createWithResource(c, android.R.drawable.ic_media_play))
                 .setIntent(new Intent(c, Qvk3MusicActivity.class).setAction(Intent.ACTION_VIEW)).build());

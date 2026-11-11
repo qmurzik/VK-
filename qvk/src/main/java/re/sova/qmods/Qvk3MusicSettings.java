@@ -12,6 +12,8 @@ public final class Qvk3MusicSettings {
     public static final String ENABLED = "qvk3_music_enabled";
     /** Play tracks started anywhere in VK (feed, messages, profiles) with the QVK Music engine. */
     public static final String TAKE_OVER = "qvk3_music_take_over";
+    /** Floating QVK mini-player on stock VK screens (off by default: it was too intrusive). */
+    public static final String MINI_ON_VK = "qvk3_music_mini_on_vk";
     public static final String GAPLESS = "qvk3_music_gapless";
     public static final String CROSSFADE = "qvk3_music_crossfade";
     public static final String PAUSE_ON_UNPLUG = "qvk3_music_pause_unplug";
@@ -77,7 +79,7 @@ public final class Qvk3MusicSettings {
     }
 
     public static int lyricsSizeSp(Context c) {
-        return Math.max(12, Math.min(32, prefs(c).getInt(LYRICS_SIZE, 18)));
+        return Math.max(12, Math.min(32, prefs(c).getInt(LYRICS_SIZE, 15)));
     }
 
     public static boolean lyricsOverCover(Context c) {

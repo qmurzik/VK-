@@ -282,6 +282,7 @@ public final class Qvk3MusicSettingsScreen {
                             + "\nАккаунт: " + (Qvk3MusicLibrary.account() > 0 ? "вход выполнен" : "нет входа")
                             + "\n" + Qvk3MusicLibrary.get(a).stats()));
                     c.addView(toggle(a, "QVK Music вместо раздела «Музыка» ВК", Qvk3MusicSettings.ENABLED, true, null));
+                    c.addView(toggle(a, "Мини-плеер поверх экранов ВКонтакте", Qvk3MusicSettings.MINI_ON_VK, false, null));
                     c.addView(toggle(a, "Играть треки из ленты и сообщений в QVK Music", Qvk3MusicSettings.TAKE_OVER, true, null));
                     c.addView(info(a, p, "Выключите, чтобы временно вернуться к штатному музыкальному разделу ВК (классический режим)."));
                 };

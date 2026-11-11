@@ -476,7 +476,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         });
         if (embedded) {
             list.setClipToPadding(false);
-            list.setPadding(0, 0, 0, Qvk3Ui.dp(a, 150)); // room for the floating mini-player and VK's bottom bar
+            list.setPadding(0, 0, 0, Qvk3Ui.dp(a, 8)); // room for the floating mini-player and VK's bottom bar
         }
         col.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -664,7 +664,19 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
             List<Qvk3Track> recent = lib.recent(8), favs = lib.favorites(0, 8), latest = lib.page("my", 0, 10);
             List<Qvk3MusicLibrary.LocalList> locals = lib.localPlaylists();
+            // suggestions come from VK; when the account has none (or offline) the sections are simply absent
+            List<Qvk3Track> reco = new ArrayList<>(), popular = new ArrayList<>();
+            try {
+                reco = Qvk3MusicSource.recommendations(15);
+            } catch (Exception ignored) {
+            }
+            try {
+                popular = Qvk3MusicSource.popular(15);
+            } catch (Exception ignored) {
+            }
+            final List<Qvk3Track> fReco = reco, fPopular = popular;
             Qvk3Jobs.main(() -> {
+                List<Qvk3Track> reco2 = fReco, popular2 = fPopular;
                 if (tab != 0 || !back.isEmpty()) return;
                 if (!recent.isEmpty()) {
                     r.add(header("Недавно прослушанное"));
@@ -674,6 +686,14 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                     r.add(header("Избранное QVK"));
                     for (int i = 0; i < favs.size(); i++) r.add(trackRow(favs, i));
                     r.add(note("Всё избранное →", () -> push(this::showFavorites)));
+                }
+                if (!reco2.isEmpty()) {
+                    r.add(header("Для вас"));
+                    for (int i = 0; i < reco2.size(); i++) r.add(trackRow(reco2, i));
+                }
+                if (!popular2.isEmpty()) {
+                    r.add(header("Популярное"));
+                    for (int i = 0; i < popular2.size(); i++) r.add(trackRow(popular2, i));
                 }
                 r.add(header("Последние добавленные"));
                 if (latest.isEmpty()) r.add(note("Откройте «Моя музыка», чтобы загрузить медиатеку", () -> selectTab(1)));
@@ -765,7 +785,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         if (Qvk3MusicSettings.layout(a).equals("coverflow") && !albums.isEmpty()) {
             Qvk3CoverFlowView cf = new Qvk3CoverFlowView(a);
             cf.setId(View.generateViewId());
-            cf.setColors(p.text, p.text2, p.surface2);
+            cf.setColors(0xFFFFFFFF, 0xB3FFFFFF, 0x33FFFFFF); // on black, like the iPhone
             cf.setSpacingPercent(Qvk3MusicSettings.coverflowSpacing(a));
             cf.setCornerRadius(Qvk3Ui.dp(a, Qvk3MusicSettings.coverRadiusDp(a)));
             List<Qvk3CoverFlowView.Item> items = new ArrayList<>();
@@ -790,9 +810,9 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             head.setGravity(Gravity.CENTER_HORIZONTAL);
             // soft gradient behind the opened album
             head.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{Qvk3DesignTokens.mix(p.bg, p.accent, p.dark ? 0.22f : 0.12f), p.bg}));
+                    new int[]{0xFF000000, 0xFF000000, Qvk3DesignTokens.mix(0xFF000000, p.accent, 0.25f)}));
             head.addView(cf, new LinearLayout.LayoutParams(-1, h));
-            albumRing = new Qvk3Ring(a, p.text, p.accent);
+            albumRing = new Qvk3Ring(a, 0xFFFFFFFF, p.accent);
             albumRing.setOnClickListener(v -> downloadAlbum());
             LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 48), Qvk3Ui.dp(a, 48));
             rl.bottomMargin = Qvk3Ui.dp(a, 6);
@@ -1174,7 +1194,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
         // inside VK's tab the floating QVK mini-player (Qvk3MiniBar) is shown instead of this one
-        miniBox.setVisibility(t == null || embedded ? View.GONE : View.VISIBLE);
+        miniBox.setVisibility(t == null ? View.GONE : View.VISIBLE);
         if (t == null) return;
         miniProgress.setProgress(e.duration() > 0 ? (int) (e.position() * 1000 / e.duration()) : 0);
         miniTitle.setText(t.title);

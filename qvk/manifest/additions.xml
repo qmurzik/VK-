@@ -13,3 +13,8 @@
     android:exported="false" android:initOrder="-100" />
 <activity android:name="re.sova.qmods.Qvk3StylesActivity" android:exported="false" android:label="Оформление"
     android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+<activity android:name="re.sova.qmods.Qvk3ShellActivity" android:exported="false" android:label="QVK"
+    android:launchMode="singleTop" android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+    android:windowSoftInputMode="adjustResize" />
+<activity android:name="re.sova.qmods.Qvk3ChatActivity" android:exported="false" android:label="Чат"
+    android:theme="@android:style/Theme.DeviceDefault.NoActionBar" android:windowSoftInputMode="adjustResize" />

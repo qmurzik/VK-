@@ -54,6 +54,8 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     private String coverFor = "";
     private Runnable onClose;
     private GradientDrawable gradient;
+    private boolean land, lastLand;
+    private android.view.GestureDetector gestures;
 
     public Qvk3PlayerView(Activity a) {
         super(a);
@@ -73,7 +75,9 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
 
     public void rebuild() {
         removeAllViews();
-        layout = Qvk3MusicSettings.layout(a);
+        land = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        layout = land ? "coverflow" : Qvk3MusicSettings.layout(a); // rotating the phone shows Cover Flow, like the iPhone
+        lastLand = land;
         Qvk3Ui.Palette p = Qvk3Ui.palette(a, layout.equals("classic") ? "classic" : "modern");
         onDark = !layout.equals("classic") || p.dark;
         fg = onDark ? Color.WHITE : p.text;
@@ -83,7 +87,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         lastLine = -2;
 
         gradient = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFF2B3140, 0xFF0D0F14});
-        if (layout.equals("amoled")) setBackgroundColor(Color.BLACK);
+        if (layout.equals("amoled") || layout.equals("coverflow")) setBackgroundColor(Color.BLACK); // Cover Flow sits on black
         else if (layout.equals("classic")) setBackgroundColor(p.bg);
         else setBackground(gradient);
 
@@ -130,11 +134,10 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         tt.addView(sub, Qvk3Ui.match());
         top.addView(tt, Qvk3Ui.weight(1));
         top.addView(Qvk3Ui.icon(a, Qvk3Icons.MORE, fg, 48, 24, "Ещё", v -> more()));
-        col.addView(top, Qvk3Ui.match());
+        if (!land) col.addView(top, Qvk3Ui.match());
 
         // stage: cover / coverflow / lyrics
         FrameLayout stage = new FrameLayout(a);
-        boolean land = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         if (layout.equals("coverflow")) {
             flow = new Qvk3CoverFlowView(a);
             flow.setId(View.generateViewId());
@@ -189,7 +192,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             }
         });
         lyricsList.setOnItemClickListener((parent, view, position, id) -> {
-            if (lyrics != null && lyrics.synced && position < lyrics.lines.size()) engine.seekTo(lyrics.lines.get(position).time);
+            showLyrics(false); // a tap on the text hides it
         });
         lyricsList.setOnItemLongClickListener((parent, view, position, id) -> {
             if (lyrics == null) return false;
@@ -211,6 +214,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             stage.addView(lyricsList, new LayoutParams(-1, -1));
         }
         col.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
+        if (land) stage.addView(top, new LayoutParams(-1, -2, Gravity.TOP)); // landscape: header floats over the Cover Flow
 
         // title + favourite
         LinearLayout meta = new LinearLayout(a);
@@ -219,9 +223,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         LinearLayout texts = new LinearLayout(a);
         texts.setOrientation(LinearLayout.VERTICAL);
         title = Qvk3Ui.line(a, "", 22, fg, true);
-        title.setEllipsize(TextUtils.TruncateAt.MARQUEE);
-        title.setMarqueeRepeatLimit(-1);
-        title.setSelected(true);
+        title.setEllipsize(TextUtils.TruncateAt.END); // no marquee: it made the text shake
         artist = Qvk3Ui.line(a, "", 16, fg2, false);
         artist.setOnClickListener(v -> {
             Qvk3Track t = engine.current();
@@ -235,11 +237,11 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         meta.addView(texts, Qvk3Ui.weight(1));
         heart = Qvk3Ui.icon(a, Qvk3Icons.HEART, fg, 48, 26, "В избранное", v -> toggleFavorite());
         meta.addView(heart);
-        col.addView(meta, Qvk3Ui.match());
+        if (!land) col.addView(meta, Qvk3Ui.match());
 
         info = Qvk3Ui.line(a, "", 12, fg2, false);
         info.setPadding(dp(8), dp(2), dp(8), 0);
-        col.addView(info, Qvk3Ui.match());
+        if (!land) col.addView(info, Qvk3Ui.match());
 
         seek = new SeekBar(a);
         seek.setContentDescription("Позиция воспроизведения");
@@ -287,11 +289,12 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         circle.setColor(onDark ? Color.WHITE : accent);
         playBg.setBackground(circle);
         playBg.setElevation(dp(6));
-        playBox.addView(playBg, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
-        play = Qvk3Ui.icon(a, Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE, 72, 34, "Играть", v -> engine.toggle());
+        int ps = land ? 52 : 72;
+        playBox.addView(playBg, new FrameLayout.LayoutParams(dp(ps), dp(ps), Gravity.CENTER));
+        play = Qvk3Ui.icon(a, Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE, ps, land ? 26 : 34, "Играть", v -> engine.toggle());
         play.setElevation(dp(7));
-        playBox.addView(play, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
-        controls.addView(playBox, weightBox(80));
+        playBox.addView(play, new FrameLayout.LayoutParams(dp(ps), dp(ps), Gravity.CENTER));
+        controls.addView(playBox, weightBox(land ? 56 : 80));
         controls.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, fg, 60, 32, "Следующий трек", v -> engine.next()), weightBox(60));
         controls.addView(repeat, weightBox(52));
         col.addView(controls, Qvk3Ui.match());
@@ -311,10 +314,47 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         extra.addView(speedLabel, weightBox(48));
         extra.addView(Qvk3Ui.icon(a, Qvk3Icons.EQ, fg2, 48, 22, "Звук и эквалайзер", v -> Qvk3SoundDialog.show(a)), weightBox(48));
         extra.addView(Qvk3Ui.icon(a, Qvk3Icons.QUEUE, fg2, 48, 22, "Очередь", v -> Qvk3QueueDialog.show(a)), weightBox(48));
-        col.addView(extra, Qvk3Ui.match());
+        if (!land) col.addView(extra, Qvk3Ui.match());
 
+        gestures = new android.view.GestureDetector(a, new android.view.GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
+                if (e1 == null || e2 == null) return false;
+                float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
+                boolean lyricsScrollable = lyricsMode && lyricsList != null && lyricsList.getVisibility() == VISIBLE && lyricsList.canScrollVertically(-1);
+                if (dy > dp(90) && Math.abs(dy) > Math.abs(dx) * 1.6f && vy > 900 && e1.getY() < getHeight() * 0.72f && !lyricsScrollable) {
+                    if (onClose != null) onClose.run(); // swipe down collapses the player
+                    return true;
+                }
+                if (cover != null && Math.abs(dx) > dp(70) && Math.abs(dx) > Math.abs(dy) * 1.6f && Math.abs(vx) > 700) {
+                    int[] loc = new int[2];
+                    cover.getLocationOnScreen(loc);
+                    float x = e1.getRawX(), y = e1.getRawY();
+                    if (x >= loc[0] && x <= loc[0] + cover.getWidth() && y >= loc[1] && y <= loc[1] + cover.getHeight()) {
+                        if (dx < 0) engine.next();
+                        else engine.previous();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
         if (lyricsMode) showLyrics(true);
         onState(engine);
+    }
+
+    /** Observes touches (never consumes them) to detect swipe-down-to-collapse and swipe-on-cover track changes. */
+    @Override
+    public boolean onInterceptTouchEvent(android.view.MotionEvent ev) {
+        if (gestures != null) gestures.onTouchEvent(ev);
+        return false;
+    }
+
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration c) {
+        super.onConfigurationChanged(c);
+        boolean nowLand = c.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        if (nowLand != lastLand) rebuild();
     }
 
     private LinearLayout.LayoutParams weightBox(int dpSize) {
@@ -532,7 +572,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 boolean synced = lyrics != null && lyrics.synced;
                 boolean active = synced && position == lyrics.lineAt(engine.position());
                 tv.setTextColor(active ? fg : synced ? (fg & 0x00FFFFFF) | 0x66000000 : fg);
-                tv.setTextSize(size + (active ? 3 : 0));
+                tv.setTextSize(size + (active ? 1 : 0));
                 return tv;
             }
         };

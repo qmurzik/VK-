@@ -144,8 +144,9 @@ public final class Qvk3CoverFlowView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int ow, int oh) {
         super.onSizeChanged(w, h, ow, oh);
-        int textSpace = Math.round(title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 28));
-        coverPx = Math.max(1, Math.min(Math.round(w * 0.55f), h - textSpace));
+        int textSpace = Math.round(title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 24));
+        // cover + reflection + caption must fit the height; the cover never exceeds ~46% of the width
+        coverPx = Math.max(1, Math.min(Math.round(w * 0.46f), Math.round((h - textSpace) / (1f + REFLECTION))));
     }
 
     private float spacing() {
@@ -169,11 +170,11 @@ public final class Qvk3CoverFlowView extends View {
         for (int i = from; i <= to; i++) order.add(i);
         java.util.Collections.sort(order, (a, b) -> Float.compare(Math.abs(b - pos), Math.abs(a - pos)));
         float textSpace = title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 28);
-        float cx = getWidth() / 2f, top = Math.max(Qvk3Compat.dp(getContext(), 8), (getHeight() - coverPx - textSpace) / 2f);
+        float cx = getWidth() / 2f, top = Math.max(Qvk3Compat.dp(getContext(), 8), (getHeight() - coverPx * (1f + REFLECTION) - textSpace) / 2f);
         for (int i : order) drawCover(canvas, i, i - pos, cx, top);
         if (center >= 0 && center < items.size()) {
             Item it = items.get(center);
-            float y = top + coverPx + Qvk3Compat.dp(getContext(), 10) - title.ascent();
+            float y = top + coverPx * (1f + REFLECTION) + Qvk3Compat.dp(getContext(), 8) - title.ascent();
             canvas.drawText(ellipsize(it.title, title), cx, y, title);
             canvas.drawText(ellipsize(it.subtitle, subtitle), cx, y + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 4), subtitle);
         }
@@ -184,42 +185,67 @@ public final class Qvk3CoverFlowView extends View {
     }
 
     private final float[] src = new float[8], dst = new float[8];
+    private final Paint fade = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private static final float REFLECTION = 0.42f; // reflection height as a share of the cover
 
     /**
-     * Perspective by mapping the square cover onto a trapezoid (Matrix.setPolyToPoly): the near edge keeps its
-     * height, the far edge shrinks, the projected width follows cos(angle). Pure matrix maths — no 3D Camera.
+     * iPhone (Cover Flow) geometry: the centre cover faces the viewer; covers on either side are turned about 70°
+     * towards the centre and stacked closely; each cover has a faded mirror reflection. The edge towards the centre
+     * is further away (shorter), the outer edge nearer (taller). Perspective is a Matrix.setPolyToPoly trapezoid.
      */
     private void drawCover(Canvas canvas, int i, float d, float cx, float top) {
         float ad = Math.abs(d);
         if (ad > VISIBLE_SIDE + 0.999f) return;
         float alpha = ad <= VISIBLE_SIDE - 1 ? 1f : Math.max(0f, VISIBLE_SIDE - ad);
-        float angle = (float) Math.toRadians(Math.min(1f, ad) * 58f);
-        float sign = Math.signum(d);
-        float scale = 1f - Math.min(ad, 3f) * 0.08f;
-        float w = coverPx * scale, h = coverPx * scale;
-        // steady step between side covers + a clearly larger free gap around the centre album
-        float x = cx + d * spacing() * 0.6f + sign * Math.min(ad, 1f) * spacing() * 0.95f;
-        float cy = top + coverPx / 2f;
-        float pw = (float) (w * Math.cos(angle)) * (ad > 0.01f ? 0.92f : 1f);
-        float far = 1f - 0.22f * (float) Math.sin(angle);
-        float nearH = h, farH = h * far;
+        float sign = d < 0 ? -1f : 1f;
+        float turn = Math.min(1f, ad);                       // 0 = facing us, 1 = fully turned
+        float angle = (float) Math.toRadians(70f * turn);
+        float W = coverPx;
+        float gap = W * (0.50f + 0.20f * spacingPercent / 62f);   // free space between the centre and the first side cover
+        float step = W * (0.11f + 0.10f * spacingPercent / 62f);  // tight stack beyond it
+        float off = ad <= 1f ? gap * ad : gap + (ad - 1f) * step;
+        float x = cx + sign * off;
+        float pw = (float) Math.max(0.05, Math.cos(angle)) * W * (1f - 0.04f * turn);
+        float inner = 1f - 0.20f * (float) Math.sin(angle);       // far (inner) edge is shorter
+        float cy = top + W / 2f;
         float left = x - pw / 2f, right = x + pw / 2f;
-        float lh = sign > 0 ? nearH : farH, rh = sign > 0 ? farH : nearH;
-        if (ad < 0.01f) lh = rh = h;
-        src[0] = 0; src[1] = 0; src[2] = coverPx; src[3] = 0; src[4] = coverPx; src[5] = coverPx; src[6] = 0; src[7] = coverPx;
-        dst[0] = left; dst[1] = cy - lh / 2f; dst[2] = right; dst[3] = cy - rh / 2f;
-        dst[4] = right; dst[5] = cy + rh / 2f; dst[6] = left; dst[7] = cy + lh / 2f;
+        float hLeft, hRight;
+        if (sign < 0) {            // left covers: inner edge is the right one
+            hLeft = W; hRight = W * inner;
+        } else if (sign > 0 && ad > 0.001f) {
+            hLeft = W * inner; hRight = W;
+        } else {
+            hLeft = hRight = W;
+        }
+        src[0] = 0; src[1] = 0; src[2] = W; src[3] = 0; src[4] = W; src[5] = W; src[6] = 0; src[7] = W;
+        Item it = items.get(i);
+        Bitmap b = fastFling ? Qvk3Images.get(getContext()).cached(it.cover, coverBucket()) : bitmapFor(it, ad < 1.5f);
+        int a = Math.round(alpha * 255);
+
+        // --- cover
+        dst[0] = left; dst[1] = cy - hLeft / 2f; dst[2] = right; dst[3] = cy - hRight / 2f;
+        dst[4] = right; dst[5] = cy + hRight / 2f; dst[6] = left; dst[7] = cy + hLeft / 2f;
         matrix.reset();
         matrix.setPolyToPoly(src, 0, dst, 0, 4);
         canvas.save();
         canvas.concat(matrix);
+        paintCover(canvas, b, a, false);
+        canvas.restore();
+
+        // --- reflection: the cover flipped vertically under its bottom edge, squeezed and faded to black
+        float rl = hLeft * REFLECTION, rr = hRight * REFLECTION;
+        dst[0] = left; dst[1] = cy + hLeft / 2f + rl; dst[2] = right; dst[3] = cy + hRight / 2f + rr;
+        dst[4] = right; dst[5] = cy + hRight / 2f; dst[6] = left; dst[7] = cy + hLeft / 2f;
+        matrix.reset();
+        matrix.setPolyToPoly(src, 0, dst, 0, 4);
+        canvas.save();
+        canvas.concat(matrix);
+        paintCover(canvas, b, Math.round(a * 0.5f), true);
+        canvas.restore();
+    }
+
+    private void paintCover(Canvas canvas, Bitmap b, int alpha, boolean mirror) {
         rect.set(0, 0, coverPx, coverPx);
-        Item it = items.get(i);
-        Bitmap b = fastFling ? Qvk3Images.get(getContext()).cached(it.cover, coverBucket())
-                : bitmapFor(it, ad < 1.5f);
-        int a = Math.round(alpha * 255);
-        // side covers are slightly dimmed so the centre album stands out
-        int dim = Math.round(255 * (1f - Math.min(ad, 2f) * 0.18f));
         if (b != null) {
             BitmapShader sh = new BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             Matrix m = new Matrix();
@@ -227,18 +253,21 @@ public final class Qvk3CoverFlowView extends View {
             m.setScale(s, s);
             sh.setLocalMatrix(m);
             paint.setShader(sh);
-            paint.setAlpha(a);
-            paint.setColorFilter(new android.graphics.PorterDuffColorFilter(Color.argb(255 - dim, 0, 0, 0), android.graphics.PorterDuff.Mode.SRC_ATOP));
-            canvas.drawRoundRect(rect, radius, radius, paint);
+            paint.setAlpha(alpha);
+            canvas.drawRect(rect, paint); // square corners, like the original
             paint.setShader(null);
-            paint.setColorFilter(null);
         } else {
             int base = placeholder.getAlpha();
-            placeholder.setAlpha(Math.round(base * alpha));
-            canvas.drawRoundRect(rect, radius, radius, placeholder);
+            placeholder.setAlpha(Math.round(base * alpha / 255f));
+            canvas.drawRect(rect, placeholder);
             placeholder.setAlpha(base);
         }
-        canvas.restore();
+        if (mirror) {
+            // fade towards the far end of the reflection (src y = 0 after the flip): opaque black there
+            fade.setShader(new android.graphics.LinearGradient(0, 0, 0, coverPx, 0xFF000000, 0x66000000, Shader.TileMode.CLAMP));
+            canvas.drawRect(rect, fade);
+            fade.setShader(null);
+        }
     }
 
     private int coverBucket() {
