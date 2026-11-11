@@ -306,20 +306,10 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         col.addView(controls, Qvk3Ui.match());
 
         // secondary actions
-        LinearLayout extra = new LinearLayout(a);
+        extra = new LinearLayout(a);
         extra.setGravity(Gravity.CENTER);
-        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.LYRICS, fg2, 48, 22, "Текст песни", v -> toggleLyrics()), weightBox(48));
-        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.TIMER, fg2, 48, 22, "Таймер сна", v -> sleepDialog()), weightBox(48));
-        speedLabel = Qvk3Ui.text(a, "1×", 15, fg2, true);
-        speedLabel.setGravity(Gravity.CENTER);
-        speedLabel.setMinWidth(dp(48));
-        speedLabel.setMinHeight(dp(48));
-        speedLabel.setContentDescription("Скорость воспроизведения");
-        speedLabel.setBackground(Qvk3Ui.ripple(a, 0, 0x33888888, dp(24)));
-        speedLabel.setOnClickListener(v -> speedDialog());
-        extra.addView(speedLabel, weightBox(48));
-        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.EQ, fg2, 48, 22, "Звук и эквалайзер", v -> Qvk3SoundDialog.show(a)), weightBox(48));
-        extra.addView(Qvk3Ui.icon(a, Qvk3Icons.QUEUE, fg2, 48, 22, "Очередь", v -> Qvk3QueueDialog.show(a)), weightBox(48));
+        editing = false;
+        fillExtra();
         if (!land) col.addView(extra, Qvk3Ui.match());
 
         gestures = new android.view.GestureDetector(a, new android.view.GestureDetector.SimpleOnGestureListener() {
@@ -347,6 +337,107 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         });
         if (lyricsMode) showLyrics(true);
         onState(engine);
+    }
+
+    // ------------------------------------------------------------------ editable action row (IDEA-0004)
+
+    static final String ACTIONS = "qvk3_player_actions";
+    private static final String[] DEFAULT_ACTIONS = {"lyrics", "timer", "speed", "eq", "queue"};
+    private LinearLayout extra;
+    private boolean editing;
+    private final java.util.List<android.animation.Animator> jiggles = new java.util.ArrayList<>();
+
+    private java.util.List<String> actionOrder() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String k : Qvk3MusicSettings.prefs(a).getString(ACTIONS, "").split(",")) {
+            if (java.util.Arrays.asList(DEFAULT_ACTIONS).contains(k) && !out.contains(k)) out.add(k);
+        }
+        for (String k : DEFAULT_ACTIONS) if (!out.contains(k)) out.add(k); // new actions appear at the end
+        return out;
+    }
+
+    private View action(String key) {
+        switch (key) {
+            case "lyrics":
+                return Qvk3Ui.icon(a, Qvk3Icons.LYRICS, fg2, 48, 22, "Текст песни", v -> toggleLyrics());
+            case "timer":
+                return Qvk3Ui.icon(a, Qvk3Icons.TIMER, fg2, 48, 22, "Таймер сна", v -> sleepDialog());
+            case "eq":
+                return Qvk3Ui.icon(a, Qvk3Icons.EQ, fg2, 48, 22, "Звук и эквалайзер", v -> Qvk3SoundDialog.show(a));
+            case "queue":
+                return Qvk3Ui.icon(a, Qvk3Icons.QUEUE, fg2, 48, 22, "Очередь", v -> Qvk3QueueDialog.show(a));
+            default:
+                speedLabel = Qvk3Ui.text(a, speedLabel == null ? "1×" : speedLabel.getText(), 15, fg2, true);
+                speedLabel.setGravity(Gravity.CENTER);
+                speedLabel.setMinWidth(dp(48));
+                speedLabel.setMinHeight(dp(48));
+                speedLabel.setContentDescription("Скорость воспроизведения");
+                speedLabel.setBackground(Qvk3Ui.ripple(a, 0, 0x33888888, dp(24)));
+                speedLabel.setOnClickListener(v -> speedDialog());
+                return speedLabel;
+        }
+    }
+
+    /**
+     * Holding any icon starts editing, as on a phone's home screen: the icons wiggle and can be dragged onto each
+     * other's place; a tap on any icon finishes. The order is saved for every player layout.
+     */
+    private void fillExtra() {
+        for (android.animation.Animator j : jiggles) j.cancel();
+        jiggles.clear();
+        extra.removeAllViews();
+        int n = 0;
+        for (String key : actionOrder()) {
+            View v = action(key);
+            v.setTag(key);
+            if (editing) {
+                v.setOnClickListener(x -> setEditing(false));
+                v.setOnLongClickListener(x -> drag(x));
+                android.animation.ObjectAnimator j = android.animation.ObjectAnimator.ofFloat(v, View.ROTATION, -2f, 2f);
+                j.setDuration(130 + (n % 2) * 20);
+                j.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                j.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+                j.start();
+                jiggles.add(j);
+            } else {
+                v.setOnLongClickListener(x -> {
+                    setEditing(true);
+                    return true;
+                });
+            }
+            v.setOnDragListener((target, ev) -> {
+                if (ev.getAction() == android.view.DragEvent.ACTION_DROP && ev.getLocalState() instanceof String) {
+                    move((String) ev.getLocalState(), (String) target.getTag());
+                }
+                return true;
+            });
+            extra.addView(v, weightBox(48));
+            n++;
+        }
+    }
+
+    private void setEditing(boolean on) {
+        if (editing == on) return;
+        editing = on;
+        fillExtra();
+        if (on) Qvk3Ui.toast(a, "Перетащите значки. Коснитесь любого, чтобы закончить");
+    }
+
+    private boolean drag(View v) {
+        android.content.ClipData data = android.content.ClipData.newPlainText("qvk3-action", String.valueOf(v.getTag()));
+        v.startDragAndDrop(data, new View.DragShadowBuilder(v), v.getTag(), 0);
+        return true;
+    }
+
+    private void move(String from, String to) {
+        if (from.equals(to)) return;
+        java.util.List<String> order = actionOrder();
+        int i = order.indexOf(from), j = order.indexOf(to);
+        if (i < 0 || j < 0) return;
+        order.remove(i);
+        order.add(j, from);
+        Qvk3MusicSettings.prefs(a).edit().putString(ACTIONS, android.text.TextUtils.join(",", order)).apply();
+        fillExtra();
     }
 
     /** Observes touches (never consumes them) to detect swipe-down-to-collapse and swipe-on-cover track changes. */
