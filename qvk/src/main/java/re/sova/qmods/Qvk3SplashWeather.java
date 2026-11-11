@@ -32,6 +32,8 @@ import java.util.Locale;
 public final class Qvk3SplashWeather {
     public static final String PREF = "qvk3_splash_weather";
     static final String TEMP = "qvk3_weather_temp", CODE = "qvk3_weather_code", AT = "qvk3_weather_at";
+    /** BUG-0028: a city typed by the user when Android has no last known location (or location is not allowed). */
+    static final String CITY = "qvk3_weather_city", CITY_LAT = "qvk3_weather_lat", CITY_LON = "qvk3_weather_lon";
     static final long FRESH = 30 * 60_000L, SHOW_MAX_AGE = 6 * 3_600_000L;
     private static volatile boolean loading;
 
@@ -138,6 +140,18 @@ public final class Qvk3SplashWeather {
     }
 
     static Location lastLocation(Context c) {
+        SharedPreferences p = prefs(c);
+        if (p.contains(CITY_LAT)) {
+            Location l = new Location("qvk-city");
+            l.setLatitude(p.getFloat(CITY_LAT, 0f));
+            l.setLongitude(p.getFloat(CITY_LON, 0f));
+            l.setTime(System.currentTimeMillis());
+            return l;
+        }
+        return systemLocation(c);
+    }
+
+    static Location systemLocation(Context c) {
         boolean coarse = c.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         boolean fine = c.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         if (!coarse && !fine) return null;
@@ -171,23 +185,65 @@ public final class Qvk3SplashWeather {
         }
     }
 
-    /** Settings: switch with an honest explanation; turning it on asks Android for location if VK never got it. */
+    /** Settings: on/off with an honest explanation, and a city instead of the phone's location (BUG-0028). */
     static void settings(Activity a) {
         SharedPreferences p = prefs(a);
         boolean on = p.getBoolean(PREF, false);
-        String msg = "Под логотипом QVK при запуске с иконки — температура, а в дождь, снег или грозу ещё и подпись.\n\n"
-                + "Для этого QVK берёт последнее известное Android местоположение (GPS не включается) и отправляет округлённые "
-                + "координаты (около 10 км) в сервис погоды Open-Meteo, без аккаунта и без ключа. Обновление — не чаще раза в 30 минут, "
-                + "в фоне; запуск не ждёт сеть.\n\nЛоготип QVK вместо иллюстрации: Оформление → Экран запуска.";
+        String city = p.getString(CITY, "");
+        long at = p.getLong(AT, 0);
+        String state = !on ? "Сейчас выключено." : at > 0 ? "Последняя погода: " + temperature(p.getFloat(TEMP, 0f)) + " " + sky(p.getInt(CODE, -1))
+                + (city.isEmpty() ? "" : " · " + city) : (city.isEmpty() && systemLocation(a) == null
+                ? "Погоды пока нет: Android не знает местоположения. Укажите город." : "Погода загрузится в фоне и появится при следующем запуске.");
+        String msg = state + "\n\nПод логотипом QVK при запуске с иконки — температура, в дождь, снег или грозу — подпись.\n\n"
+                + "Откуда берётся: " + (city.isEmpty() ? "последнее известное Android местоположение (GPS не включается)" : "город «" + city + "»")
+                + ". Округлённые координаты (около 10 км) уходят в сервис погоды Open-Meteo, без аккаунта и ключа. Обновление — не чаще раза в 30 минут, в фоне; запуск сеть не ждёт.";
         Qvk3Ui.dialog(a).setTitle("Погода на экране запуска").setMessage(msg)
                 .setPositiveButton(on ? "Выключить" : "Включить", (d, w) -> {
                     p.edit().putBoolean(PREF, !on).apply();
                     if (!on) {
-                        if (a.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                        if (p.getString(CITY, "").isEmpty() && a.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
                             a.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 7314);
                         refresh(a.getApplicationContext(), true);
                         Qvk3Ui.toast(a, "Погода появится при следующем запуске с иконки");
                     }
-                }).setNegativeButton("Закрыть", null).show();
+                })
+                .setNeutralButton(city.isEmpty() ? "Указать город" : "Город: " + city, (d, w) -> askCity(a))
+                .setNegativeButton("Закрыть", null).show();
+    }
+
+    static void askCity(Activity a) {
+        android.widget.EditText e = new android.widget.EditText(a);
+        e.setHint("Например, Казань");
+        e.setText(prefs(a).getString(CITY, ""));
+        e.setSingleLine(true);
+        android.widget.FrameLayout f = new android.widget.FrameLayout(a);
+        int pad = Qvk3Ui.dp(a, 20);
+        f.setPadding(pad, Qvk3Ui.dp(a, 8), pad, 0);
+        f.addView(e);
+        Qvk3Ui.dialog(a).setTitle("Город для погоды").setView(f)
+                .setPositiveButton("Сохранить", (d, w) -> {
+                    String q = e.getText().toString().trim();
+                    Context app = a.getApplicationContext();
+                    Qvk3Jobs.io(() -> {
+                        try {
+                            JSONObject r = new JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?count=1&language=ru&name="
+                                    + java.net.URLEncoder.encode(q, "UTF-8")));
+                            org.json.JSONArray res = r.optJSONArray("results");
+                            if (res == null || res.length() == 0) {
+                                Qvk3Ui.toast(app, "Город «" + q + "» не найден");
+                                return;
+                            }
+                            JSONObject c = res.getJSONObject(0);
+                            prefs(app).edit().putString(CITY, c.optString("name", q)).putFloat(CITY_LAT, (float) c.getDouble("latitude"))
+                                    .putFloat(CITY_LON, (float) c.getDouble("longitude")).putBoolean(PREF, true).remove(AT).apply();
+                            refresh(app, true);
+                            Qvk3Ui.toast(app, "Погода для «" + c.optString("name", q) + "» появится при следующем запуске");
+                        } catch (Exception ex) {
+                            Qvk3Ui.toast(app, "Не удалось найти город: " + Qvk3Jobs.message(ex));
+                        }
+                    });
+                })
+                .setNeutralButton("По местоположению", (d, w) -> prefs(a).edit().remove(CITY).remove(CITY_LAT).remove(CITY_LON).remove(AT).apply())
+                .setNegativeButton("Отмена", null).show();
     }
 }

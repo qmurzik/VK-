@@ -232,6 +232,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:rules", "Правила интерфейса ВК", "Скрыть, скруглить, перекрасить любой элемент по его имени", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:inspect", "Инспектор интерфейса", "Снять список элементов экрана ВК — для правил и для разработчика", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
+        idx.addSwitch(Qvk3MusicService.KEEP_AFTER_CLOSE, "Музыка играет после закрытия приложения", "Если выключено — смахивание QVK из недавних останавливает музыку и завершает приложение", 4, "QVK Music", false);
         idx.addSwitch(Qvk3CatalogAds.PREF, "Скрывать предложения подписки", "Баннеры «Целый месяц — 0 ₽ … Подключить» в музыке ВК", 4, "QVK Music", true);
         idx.addSwitch(Qvk3FeedNow.PREF, "Кнопка музыки в шапках ВК", "Кольцо с паузой в шапке «Главной», «Мессенджера», «Сообществ», «Поиска», «Сервисов», пока играет QVK Music; удержание — плеер", 4, "QVK Music", true);
         idx.addScreen("qvk3:musicSettings", "Настройки QVK Music", "Воспроизведение, звук, плеер, офлайн, тексты", 4, "QVK Music");

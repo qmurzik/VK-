@@ -140,9 +140,15 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        // Swiping QVK away from recents keeps music playing; when paused, the service goes away with the task.
-        if (!engine.isPlaying()) stopSelf();
+        // BUG-0027: closing QVK from recents stops the music and lets the process end, as users expect. Keeping music
+        // after closing is a setting («Музыка играет после закрытия приложения», off by default).
+        if (engine.isPlaying() && Qvk3MusicSettings.prefs(this).getBoolean(KEEP_AFTER_CLOSE, false)) return;
+        engine.stop();
+        stopForegroundCompat(true);
+        stopSelf();
     }
+
+    public static final String KEEP_AFTER_CLOSE = "qvk3_music_keep_after_close";
 
     @Override
     public void onDestroy() {
