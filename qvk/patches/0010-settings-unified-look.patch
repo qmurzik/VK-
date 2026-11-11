@@ -1,0 +1,112 @@
+--- a/smali_classes21/re/sova/qmods/MenuUi.smali
++++ b/smali_classes21/re/sova/qmods/MenuUi.smali
+@@ -71,7 +71,7 @@
+     .line 21
+     const-string v0, "cards"
+ 
+-    invoke-static {v0}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v0}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v0
+ 
+@@ -330,7 +330,7 @@
+     .line 125
+     const-string v0, "cards"
+ 
+-    invoke-static {v0}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v0}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v0
+ 
+@@ -682,7 +682,7 @@
+     .line 82
+     const-string v1, "cards"
+ 
+-    invoke-static {v1}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v1}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v1
+ 
+@@ -917,7 +917,7 @@
+     .line 73
+     const-string p1, "typography"
+ 
+-    invoke-static {p1}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {p1}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result p1
+ 
+@@ -1503,7 +1503,7 @@
+ 
+     if-eqz v5, :cond_9
+ 
+-    invoke-static {v4}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v4}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v8
+ 
+@@ -1614,7 +1614,7 @@
+     invoke-direct {v2, v3, v7}, Landroid/widget/LinearLayout$LayoutParams;-><init>(II)V
+ 
+     .line 207
+-    invoke-static {v4}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v4}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v3
+ 
+@@ -1791,7 +1791,7 @@
+     :cond_0
+     const-string v0, "cards"
+ 
+-    invoke-static {v0}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v0}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v0
+ 
+--- a/smali_classes21/re/sova/qmods/SettingsScaffold.smali
++++ b/smali_classes21/re/sova/qmods/SettingsScaffold.smali
+@@ -129,7 +129,7 @@
+     .line 34
+     const-string v1, "headers"
+ 
+-    invoke-static {v1}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v1}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v2
+ 
+@@ -241,7 +241,7 @@
+     iget-object p2, p0, Lre/sova/qmods/SettingsScaffold;->title:Landroid/widget/TextView;
+ 
+     .line 50
+-    invoke-static {v1}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v1}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result v3
+ 
+@@ -267,7 +267,7 @@
+     invoke-virtual {p2, v3}, Landroid/widget/TextView;->setTypeface(Landroid/graphics/Typeface;)V
+ 
+     .line 53
+-    invoke-static {v1}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v1}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result p2
+ 
+@@ -325,7 +325,7 @@
+     invoke-virtual {p2, v3, v5}, Landroid/widget/LinearLayout;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
+ 
+     .line 59
+-    invoke-static {v1}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {v1}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result p2
+ 
+@@ -940,7 +940,7 @@
+     .line 136
+     const-string p2, "cards"
+ 
+-    invoke-static {p2}, Lre/sova/qmods/IosAppearance;->part(Ljava/lang/String;)Z
++    invoke-static {p2}, Lre/sova/qmods/Qvk3Look;->part(Ljava/lang/String;)Z
+ 
+     move-result p2
+ 

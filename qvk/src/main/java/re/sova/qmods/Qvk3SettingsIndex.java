@@ -98,12 +98,7 @@ public final class Qvk3SettingsIndex {
 
     void add(Item i) {
         if (byId.containsKey(i.id)) return;
-        if (oldScreen(i.type, i.target) && !(i.section == CLASSIC_SECTION && i.group.startsWith("QVK 2.x"))) {
-            // keep the original title; only the place changes: one card per former section
-            i = new Item(i.id, i.key, i.title, i.summary, CLASSIC_SECTION, "QVK 2.x · " + SECTIONS[i.section], i.type, i.target, i.def);
-        }
-        // catalog entries with the same visible title and action (QVK lists some actions in two groups)
-        if (i.type != SWITCH) for (Item o : items) if (o.type != SWITCH && o.section == i.section && normal(o.title).equals(normal(i.title))) return;
+        // Older QVK 2.x screens stay in their real section: with patch 0010 (Qvk3Look) they share this centre's look.
         items.add(i);
         byId.put(i.id, i);
     }

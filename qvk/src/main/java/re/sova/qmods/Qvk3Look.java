@@ -1,0 +1,22 @@
+package re.sova.qmods;
+
+/**
+ * One look for every QVK settings screen. QVK 2.x screens are built by MenuUi / SettingsScaffold, which switch to
+ * rounded cards on the page background, centred iOS-style headers and iOS typography only when VK-wide iOS mode is
+ * on. Patch 0010 routes their IosAppearance.part(...) checks here: inside settings screens these three parts are
+ * always on (the stock VK screens are not affected, no other class asks), so all ~70 older screens look like the QVK
+ * 3.0 centre. Switch off with qvk3_unified_look = false.
+ */
+public final class Qvk3Look {
+    public static final String KEY = "qvk3_unified_look";
+
+    public static boolean part(String name) {
+        try {
+            if (("cards".equals(name) || "headers".equals(name) || "typography".equals(name))
+                    && RuntimeBridge.prefs != null && RuntimeBridge.prefs.getBoolean(KEY, true)) return true;
+        } catch (Throwable ignored) {
+            // fall through to the original check
+        }
+        return IosAppearance.part(name);
+    }
+}

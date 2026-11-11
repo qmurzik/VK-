@@ -52,7 +52,15 @@ public final class Qvk3SettingsActivity extends Activity {
         super.onCreate(state);
         boolean dark = Qvk3Ui.night(this);
         int accent = Qvk3Ui.accent(this);
-        p = dark ? new Qvk3Ui.Palette(true, 0xFF0E0F12, 0xFF1C1D21, 0xFF2A2B30, 0xFFF2F3F5, 0xFF8E9199, accent, Color.WHITE, 0xFF2C2D32)
+        Qvk3Ui.Palette themed = null;
+        try {
+            // same colours as the older screens (MenuUi): VK's current theme, so styles and themes apply everywhere
+            MenuUi mu = new MenuUi(this);
+            themed = new Qvk3Ui.Palette(mu.dark, mu.background, mu.surface, mu.soft, mu.text, mu.secondary, mu.accent, Color.WHITE, mu.line);
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.settings.palette", t);
+        }
+        p = themed != null ? themed : dark ? new Qvk3Ui.Palette(true, 0xFF0E0F12, 0xFF1C1D21, 0xFF2A2B30, 0xFFF2F3F5, 0xFF8E9199, accent, Color.WHITE, 0xFF2C2D32)
                 : new Qvk3Ui.Palette(false, 0xFFF2F3F7, Color.WHITE, 0xFFE9EAEE, 0xFF0B0B0D, 0xFF7C7F87, accent, Color.WHITE, 0xFFE4E5EA);
         Qvk3Ui.bars(this, p);
         index = buildIndex(this);
