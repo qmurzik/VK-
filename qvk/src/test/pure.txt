@@ -10,3 +10,4 @@ re/sova/qmods/Qvk3LogRedact.java
 re/sova/qmods/Qvk3UiThrottle.java
 re/sova/qmods/Qvk3GifQuant.java
 re/sova/qmods/Qvk3BadgeText.java
+re/sova/qmods/Qvk3SettingsCode.java

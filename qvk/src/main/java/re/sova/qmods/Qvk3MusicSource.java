@@ -198,7 +198,7 @@ public final class Qvk3MusicSource {
         public final List<Qvk3Track> tracks;
         public final List<Playlist> playlists;
 
-        Block(String title, List<Qvk3Track> tracks, List<Playlist> playlists) {
+        public Block(String title, List<Qvk3Track> tracks, List<Playlist> playlists) {
             this.title = title;
             this.tracks = tracks;
             this.playlists = playlists;
@@ -210,19 +210,42 @@ public final class Qvk3MusicSource {
      * catalog.getAudio answer — so QVK Music shows it in its own interface with its own player instead of opening the whole
      * stock VK music section. Blocks without tracks or playlists (banners, links, offers) are skipped.
      */
+    /** What the last vkHome() call saw — for the log when the screen stays empty (BUG-0010). */
+    public static volatile String lastHomeTrace = "";
+
     public static List<Block> vkHome() throws Exception {
+        StringBuilder trace = new StringBuilder();
         JSONObject r = response("catalog.getAudio", args("need_blocks", "1"));
+        trace.append("getAudio keys=").append(keys(r));
         JSONObject sec = r.optJSONObject("section");
-        if (sec == null || sec.optJSONArray("blocks") == null || sec.optJSONArray("blocks").length() == 0) {
+        List<Block> out = sec == null ? new ArrayList<>() : blocks(r, sec);
+        trace.append(" section=").append(sec == null ? "-" : sec.optString("id")).append(" blocks=").append(out.size());
+        if (out.isEmpty()) {
+            // the home section by its id, then the first sections of the catalog until one has content
             JSONObject cat = r.optJSONObject("catalog");
-            String def = cat == null ? "" : cat.optString("default_section");
-            if (def.isEmpty() && cat != null && cat.optJSONArray("sections") != null && cat.optJSONArray("sections").length() > 0)
-                def = cat.optJSONArray("sections").optJSONObject(0).optString("id");
-            if (def.isEmpty()) throw new IOException("ВК не прислал разделы музыки");
-            r = response("catalog.getSection", args("section_id", def));
-            sec = r.optJSONObject("section");
+            List<String> ids = new ArrayList<>();
+            if (cat != null && !cat.optString("default_section").isEmpty()) ids.add(cat.optString("default_section"));
+            JSONArray secs = cat == null ? null : cat.optJSONArray("sections");
+            if (secs != null) for (int i = 0; i < secs.length() && ids.size() < 4; i++) {
+                String id = secs.optJSONObject(i) == null ? "" : secs.optJSONObject(i).optString("id");
+                if (!id.isEmpty() && !ids.contains(id)) ids.add(id);
+            }
+            for (String id : ids) {
+                JSONObject rs = response("catalog.getSection", args("section_id", id));
+                out = blocks(rs, rs.optJSONObject("section"));
+                trace.append(" | getSection ").append(id.length() > 12 ? id.substring(0, 12) : id).append(" keys=").append(keys(rs)).append(" blocks=").append(out.size());
+                if (!out.isEmpty()) break;
+            }
         }
-        return blocks(r, sec);
+        lastHomeTrace = trace.toString();
+        return out;
+    }
+
+    static String keys(JSONObject o) {
+        StringBuilder b = new StringBuilder();
+        java.util.Iterator<String> it = o.keys();
+        while (it.hasNext() && b.length() < 160) b.append(it.next()).append(',');
+        return b.toString();
     }
 
     static List<Block> blocks(JSONObject r, JSONObject sec) {
@@ -259,11 +282,13 @@ public final class Qvk3MusicSource {
             List<Qvk3Track> tracks = new ArrayList<>();
             List<Playlist> playlists = new ArrayList<>();
             JSONArray ids = b.optJSONArray("audios_ids");
+            if (ids == null) ids = b.optJSONArray("audio_ids");
             if (ids != null) for (int k = 0; k < ids.length() && tracks.size() < 10; k++) {
                 Qvk3Track t = audios.get(baseId(ids.optString(k)));
                 if (t != null) tracks.add(t);
             }
             ids = b.optJSONArray("playlists_ids");
+            if (ids == null) ids = b.optJSONArray("playlist_ids");
             if (ids != null) for (int k = 0; k < ids.length() && playlists.size() < 12; k++) {
                 Playlist p = lists.get(baseId(ids.optString(k)));
                 if (p != null) playlists.add(p);

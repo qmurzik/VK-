@@ -72,7 +72,26 @@ public final class Qvk3SettingsActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(p.bg);
-        root.setFitsSystemWindows(true);
+        // BUG-0029: no fitsSystemWindows — on HyperOS the keyboard inset could stay on the whole screen after the keyboard
+        // closed, leaving an empty screen under the last item. Status/navigation bars pad the root; the keyboard only the list.
+        root.setOnApplyWindowInsetsListener((v, in) -> {
+            int top = in.getSystemWindowInsetTop(), bottomBars = in.getStableInsetBottom();
+            int ime = 0;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = in.getInsets(android.view.WindowInsets.Type.systemBars());
+                top = bars.top;
+                bottomBars = bars.bottom;
+                ime = in.isVisible(android.view.WindowInsets.Type.ime()) ? Math.max(0, in.getInsets(android.view.WindowInsets.Type.ime()).bottom - bars.bottom) : 0;
+            } else {
+                ime = Math.max(0, in.getSystemWindowInsetBottom() - bottomBars);
+            }
+            v.setPadding(in.getSystemWindowInsetLeft(), top, in.getSystemWindowInsetRight(), bottomBars);
+            if (scroll != null) scroll.setPadding(0, 0, 0, ime);
+            return in;
+        });
+        root.setFocusableInTouchMode(true); // nothing (the search box) takes focus — and the keyboard — on opening
+        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
@@ -146,6 +165,7 @@ public final class Qvk3SettingsActivity extends Activity {
             hairline.setAlpha(f);
         });
         setContentView(root);
+        root.requestFocus();
 
         if (state != null) section = state.getInt("section", -1);
         if (state != null && !state.getString("query", "").isEmpty()) search.setText(state.getString("query"));
@@ -241,6 +261,7 @@ public final class Qvk3SettingsActivity extends Activity {
         // QVK 3.0 items first so they lead their cards
         idx.addScreen("qvk3:styles", "Стили и конструктор", "8 стилей, цвета, форма, шрифт, плотность — с живым предпросмотром", 0, "QVK 3.0");
         idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
+        idx.addScreen("qvk3:settingsCode", "Код настроек", "Все переключатели QVK одной короткой строкой: скопировать, поделиться, вставить", 7, "Резервные копии");
         idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
         idx.addScreen("qvk3:dock", "Нижняя панель ВК", "Плавающая, скруглённая, полупрозрачная — настоящая панель ВК", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:searchTabs", "Разделы поиска ВК", "Скрыть ненужные вкладки поиска: игры, клипы, товары, сервисы", 1, "Интерфейс ВК");
@@ -721,6 +742,9 @@ public final class Qvk3SettingsActivity extends Activity {
             case "ideas":
                 Qvk3MyTickets.ideas(this);
                 break;
+            case "settingsCode":
+                settingsCode();
+                break;
             case "channel":
                 Qvk3UpdatePrompt.channel(this);
                 break;
@@ -902,6 +926,121 @@ public final class Qvk3SettingsActivity extends Activity {
                     e.apply();
                     showSection(s);
                 }).setNegativeButton("Отмена", null).show();
+    }
+
+    static final String CODE_BACKUP = "qvk3_settings_code_backup";
+
+    private Boolean switchValue(String key) {
+        Qvk3SettingsIndex.Item it = index.get(key);
+        if (it == null || it.type != Qvk3SettingsIndex.SWITCH || "enablePin".equals(key)) return null;
+        return value(it);
+    }
+
+    private void setSwitch(String key, boolean v) {
+        if (key.startsWith("qvk3_")) Qvk3MusicSettings.prefs(this).edit().putBoolean(key, v).apply();
+        else try {
+            SettingsRuntime.toggle(key, v);
+        } catch (Throwable e) {
+            Qvk3MusicSettings.prefs(this).edit().putBoolean(key, v).apply();
+        }
+    }
+
+    /** IDEA-0017: every switch in one short code; paste applies it after showing how many settings change. */
+    private void settingsCode() {
+        String code = Qvk3SettingsCode.encode(this::switchValue);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(22), dp(6), dp(22), dp(6));
+        TextView c = Qvk3Ui.text(this, code, 20, p.text, true);
+        c.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+        c.setTextIsSelectable(true);
+        c.setPadding(dp(14), dp(12), dp(14), dp(12));
+        c.setBackground(Qvk3Ui.rounded(p.dark ? 0x1FFFFFFF : 0x0F000000, dp(14)));
+        col.addView(c, Qvk3Ui.match());
+        TextView n = Qvk3Ui.text(this, "Код хранит все переключатели QVK (без PIN-кода). Подходит и для будущих версий: новые настройки он не трогает. Вставьте чужой код, чтобы получить такие же настройки.", 13, p.text2, false);
+        n.setPadding(0, dp(10), 0, 0);
+        col.addView(n);
+        android.app.AlertDialog.Builder b = Qvk3Ui.dialog(this).setTitle("Код настроек").setView(col)
+                .setPositiveButton("Скопировать", (d, w) -> {
+                    android.content.ClipboardManager cm = getSystemService(android.content.ClipboardManager.class);
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("QVK", code));
+                    Qvk3Ui.toast(this, "Код скопирован");
+                })
+                .setNegativeButton("Вставить код", (d, w) -> pasteSettingsCode());
+        if (Qvk3MusicSettings.prefs(this).contains(CODE_BACKUP)) b.setNeutralButton("Вернуть как было", (d, w) -> restoreSettingsCode());
+        b.show();
+    }
+
+    private void pasteSettingsCode() {
+        EditText e = new EditText(this);
+        e.setHint("QVK1-…");
+        android.content.ClipboardManager cm = getSystemService(android.content.ClipboardManager.class);
+        if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
+            CharSequence clip = cm.getPrimaryClip().getItemAt(0).getText();
+            if (clip != null && clip.toString().trim().toUpperCase(java.util.Locale.ROOT).startsWith(Qvk3SettingsCode.PREFIX)) e.setText(clip.toString().trim());
+        }
+        FrameLayout f = new FrameLayout(this);
+        f.setPadding(dp(20), dp(8), dp(20), 0);
+        f.addView(e);
+        Qvk3Ui.dialog(this).setTitle("Вставить код настроек").setView(f).setPositiveButton("Дальше", (d, w) -> {
+            java.util.Map<String, Boolean> want;
+            try {
+                want = Qvk3SettingsCode.decode(e.getText().toString());
+            } catch (IllegalArgumentException ex) {
+                Qvk3Ui.toast(this, ex.getMessage());
+                return;
+            }
+            java.util.Map<String, Boolean> change = new java.util.LinkedHashMap<>();
+            for (java.util.Map.Entry<String, Boolean> en : want.entrySet()) {
+                Boolean cur = switchValue(en.getKey());
+                if (cur != null && !cur.equals(en.getValue())) change.put(en.getKey(), en.getValue());
+            }
+            if (change.isEmpty()) {
+                Qvk3Ui.toast(this, "Все настройки уже такие же");
+                return;
+            }
+            StringBuilder list = new StringBuilder();
+            int shown = 0;
+            for (java.util.Map.Entry<String, Boolean> en : change.entrySet()) {
+                if (shown++ >= 12) {
+                    list.append("…\n");
+                    break;
+                }
+                Qvk3SettingsIndex.Item it = index.get(en.getKey());
+                list.append(en.getValue() ? "● " : "○ ").append(it == null ? en.getKey() : it.title).append('\n');
+            }
+            Qvk3Ui.dialog(this).setTitle("Изменится настроек: " + change.size()).setMessage(list.toString().trim() + "\n\n● включится, ○ выключится. Вернуть можно в «Код настроек».")
+                    .setPositiveButton("Применить", (x, y) -> {
+                        try {
+                            org.json.JSONObject backup = new org.json.JSONObject();
+                            for (String k : change.keySet()) backup.put(k, switchValue(k));
+                            Qvk3MusicSettings.prefs(this).edit().putString(CODE_BACKUP, backup.toString()).apply();
+                        } catch (Exception ignored) {
+                        }
+                        for (java.util.Map.Entry<String, Boolean> en : change.entrySet()) setSwitch(en.getKey(), en.getValue());
+                        Qvk3SettingsHistory.record(this, "settingsCode", "Применён код настроек: " + change.size());
+                        Qvk3Ui.toast(this, "Применено: " + change.size() + ". Часть настроек сработает после перезапуска QVK");
+                        refresh();
+                    }).setNegativeButton("Отмена", null).show();
+        }).setNegativeButton("Отмена", null).show();
+    }
+
+    private void restoreSettingsCode() {
+        try {
+            org.json.JSONObject b = new org.json.JSONObject(Qvk3MusicSettings.prefs(this).getString(CODE_BACKUP, "{}"));
+            java.util.Iterator<String> it = b.keys();
+            int n = 0;
+            while (it.hasNext()) {
+                String k = it.next();
+                setSwitch(k, b.getBoolean(k));
+                n++;
+            }
+            Qvk3MusicSettings.prefs(this).edit().remove(CODE_BACKUP).apply();
+            Qvk3Ui.toast(this, "Возвращено настроек: " + n);
+            refresh();
+        } catch (Exception e) {
+            Qvk3Ui.toast(this, "Не удалось вернуть: " + Qvk3Jobs.message(e));
+        }
     }
 
     private void undo() {

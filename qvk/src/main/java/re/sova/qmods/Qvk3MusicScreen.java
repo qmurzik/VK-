@@ -761,6 +761,15 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 popular = Qvk3MusicSource.popular(15);
             } catch (Exception ignored) {
             }
+            // BUG-0010: VK's own music home (джемы, подборки, плейлисты дня) right on «Главная», not only on «Музыка ВК»
+            List<Qvk3MusicSource.Block> vkBlocks = new ArrayList<>();
+            try {
+                List<Qvk3MusicSource.Block> all = Qvk3MusicSource.vkHome();
+                for (int i = 0; i < all.size() && vkBlocks.size() < 5; i++) vkBlocks.add(all.get(i));
+            } catch (Exception e) {
+                android.util.Log.i("QVK3Music", "home: VK blocks unavailable: " + Qvk3Jobs.message(e) + " · " + Qvk3MusicSource.lastHomeTrace);
+            }
+            final List<Qvk3MusicSource.Block> fBlocks = vkBlocks;
             final List<Qvk3Track> fReco = reco, fPopular = popular;
             Qvk3Jobs.main(() -> {
                 List<Qvk3Track> reco2 = fReco, popular2 = fPopular;
@@ -774,6 +783,15 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                     for (int i = 0; i < favs.size(); i++) r.add(trackRow(favs, i));
                     r.add(note("Всё избранное →", () -> push(this::showFavorites)));
                 }
+                for (Qvk3MusicSource.Block b : fBlocks) {
+                    r.add(header(b.title));
+                    for (Qvk3MusicSource.Playlist pl : b.playlists) {
+                        r.add(new Row(Row.ITEM, pl.title, (pl.subtitle.isEmpty() ? "Плейлист" : pl.subtitle) + (pl.count > 0 ? " · " + pl.count + " треков" : ""),
+                                "", pl.cover, null, false, () -> push(() -> showPlaylist(pl)), null));
+                    }
+                    for (int i = 0; i < Math.min(5, b.tracks.size()); i++) r.add(trackRow(b.tracks, i));
+                }
+                if (!fBlocks.isEmpty()) r.add(note("Вся главная музыки ВК →", () -> selectTab(5)));
                 if (!reco2.isEmpty()) {
                     r.add(header("Для вас"));
                     for (int i = 0; i < reco2.size(); i++) r.add(trackRow(reco2, i));
@@ -812,6 +830,22 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 blocks = Qvk3MusicSource.vkHome();
             } catch (Exception e) {
                 err = Qvk3Jobs.message(e);
+            }
+            android.util.Log.i("QVK3Music", "VK home: " + (err != null ? "error " + err : (blocks == null ? 0 : blocks.size()) + " blocks") + " · " + Qvk3MusicSource.lastHomeTrace);
+            if (blocks == null || blocks.isEmpty()) {
+                // BUG-0010: never an empty tab — VK's own suggestions and charts from the audio API instead
+                List<Qvk3MusicSource.Block> fb = new ArrayList<>();
+                try {
+                    List<Qvk3Track> reco = Qvk3MusicSource.recommendations(30);
+                    if (!reco.isEmpty()) fb.add(new Qvk3MusicSource.Block("Для вас", reco, new ArrayList<>()));
+                } catch (Exception ignored) {
+                }
+                try {
+                    List<Qvk3Track> pop = Qvk3MusicSource.popular(30);
+                    if (!pop.isEmpty()) fb.add(new Qvk3MusicSource.Block("Популярное", pop, new ArrayList<>()));
+                } catch (Exception ignored) {
+                }
+                if (!fb.isEmpty()) blocks = fb;
             }
             final List<Qvk3MusicSource.Block> bl = blocks;
             final String e = err;

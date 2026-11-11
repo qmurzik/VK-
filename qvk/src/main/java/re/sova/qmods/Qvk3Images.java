@@ -56,8 +56,16 @@ public final class Qvk3Images {
                 return value.getByteCount() / 1024;
             }
         };
-        dir = new File(c.getCacheDir(), "qvk3_covers");
+        // BUG-0025: not in cacheDir — HyperOS/MIUI cleaners empty app caches, and covers were downloaded again and again.
+        // Same size limit as before (Qvk3MusicSettings.cacheLimitMb), so it never grows without bound.
+        dir = new File(c.getFilesDir(), "qvk3_covers");
         dir.mkdirs();
+        File old = new File(c.getCacheDir(), "qvk3_covers");
+        if (old.isDirectory()) Qvk3Jobs.io(() -> {
+            File[] files = old.listFiles();
+            if (files != null) for (File f : files) if (!f.renameTo(new File(dir, f.getName()))) f.delete();
+            old.delete();
+        });
         LinkedBlockingDeque<Runnable> lifo = new LinkedBlockingDeque<Runnable>() {
             @Override
             public boolean offer(Runnable r) {
@@ -78,8 +86,21 @@ public final class Qvk3Images {
      * cover got a new cache key every time the album list was refreshed and was downloaded again. The image itself is the path
      * plus its size parameter; that is the key for memory and disk.
      */
+    /**
+     * BUG-0025 (2): newer VK image links carry the signature inside the path (/s/v1/ig2/<signed>.jpg), so not even the path
+     * is stable. Screens that know what the picture is (an album, a playlist) register its identity here, and the cache uses
+     * that identity instead of the link.
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, String> aliases = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void alias(String url, String identity) {
+        if (url != null && !url.isEmpty() && identity != null && aliases.size() < 5000) aliases.put(url, "id:" + identity);
+    }
+
     public static String stable(String url) {
         if (url == null) return "";
+        String a = aliases.get(url);
+        if (a != null) return a;
         try {
             java.net.URI u = new java.net.URI(url);
             String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.ROOT);
