@@ -415,7 +415,7 @@ public final class Qvk3SettingsActivity extends Activity {
         chips.addView(gap());
         chips.addView(chip("Сценарии", false, this::scenarios), Qvk3Ui.weight(1));
         chips.addView(gap());
-        chips.addView(chip(t.dark ? "Светлая" : "Тёмная", false, this::quickTheme), Qvk3Ui.weight(1));
+        chips.addView(chip("День/ночь", false, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
         look.addView(chips);
 
         // scenario

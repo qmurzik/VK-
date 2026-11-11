@@ -371,6 +371,34 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         else if (!land && coverFlow != null && coverFlow.byRotation) hideCoverFlow();
     }
 
+    /**
+     * Keyboard detection that works whether or not the window passes IME insets down (VK's own window does not):
+     * the root insets, or on old Android the visible frame. Called whenever this screen is resized.
+     */
+    private void checkIme() {
+        boolean ime = false;
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.view.WindowInsets in = getRootWindowInsets();
+            if (in != null) ime = in.isVisible(android.view.WindowInsets.Type.ime());
+        }
+        if (!ime) {
+            android.graphics.Rect r = new android.graphics.Rect();
+            getWindowVisibleDisplayFrame(r);
+            int h = getRootView().getHeight();
+            ime = h > 0 && h - r.bottom > h * 0.15f;
+        }
+        if (ime != imeShown) {
+            imeShown = ime;
+            onState(engine);
+        }
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int ow, int oh) {
+        super.onSizeChanged(w, h, ow, oh);
+        post(this::checkIme);
+    }
+
     void showCoverFlow(boolean byRotation) {
         if (coverFlow != null) return;
         coverFlow = new Qvk3CoverFlowScreen(a, byRotation);

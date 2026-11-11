@@ -57,6 +57,19 @@ public final class Qvk3Appearance {
         return prefs(c).contains(STYLE) ? current(c).title : "Стандартное (QVK 2.x)";
     }
 
+    private static final String THEME_HASH = "qvk3_style_theme_hash";
+
+    private static String themeHash(SharedPreferences p) {
+        return Integer.toHexString((p.getString("qmods_theme_palette", "") + "|" + p.getString(ThemeProfiles.DAY, "") + "|" + p.getString(ThemeProfiles.NIGHT, "")).hashCode());
+    }
+
+    /** True when colours come from a theme the user made or installed, not from the last applied QVK 3.0 style. */
+    public static boolean hasOwnTheme(Context c) {
+        SharedPreferences p = prefs(c);
+        boolean any = !p.getString("qmods_theme_palette", "").isEmpty() || !p.getString(ThemeProfiles.DAY, "").isEmpty() || !p.getString(ThemeProfiles.NIGHT, "").isEmpty();
+        return any && !themeHash(p).equals(p.getString(THEME_HASH, ""));
+    }
+
     public static boolean weakDevice(Context c) {
         return Qvk3Compat.lowRam(c) || Runtime.getRuntime().availableProcessors() <= 4
                 || prefs(c).getBoolean("qvk3_perf_light", false);
@@ -64,6 +77,14 @@ public final class Qvk3Appearance {
 
     /** Applies a style to the whole app (recreates visible screens). Throws if QVK rejects the theme. */
     public static void apply(Activity a, Qvk3DesignTokens t) throws Exception {
+        apply(a, t, true);
+    }
+
+    /**
+     * colors = false applies only the style's shape and component families (radius, iOS/Material parts) and keeps the
+     * user's own QVK theme untouched — styles and themes no longer overwrite each other's colours behind the user's back.
+     */
+    public static void apply(Activity a, Qvk3DesignTokens t, boolean colors) throws Exception {
         SharedPreferences p = prefs(a);
         backup(p);
         SharedPreferences.Editor e = p.edit();
@@ -73,6 +94,12 @@ public final class Qvk3Appearance {
         e.putInt("qvk_material3_radius", Math.max(12, Math.min(28, r)));
         e.putString(STYLE, t.id);
         if ("custom".equals(t.id)) e.putString(TOKENS, t.toJson().toString());
+        if (!colors) {
+            e.commit();
+            ThemePalette.refresh(a);
+            Qvk3SettingsHistory.record(a, STYLE, "Стиль оформления (без цветов): " + t.title);
+            return;
+        }
         // Both variants; ThemeProfiles picks one by the system light/dark mode, and VK's theme follows the system.
         String day = t.variant(false).toTheme().toString(), night = t.variant(true).toTheme().toString();
         e.putString(ThemeProfiles.MODE, MODE_VK);
@@ -80,6 +107,7 @@ public final class Qvk3Appearance {
         e.putString(ThemeProfiles.NIGHT, ThemePalette.validate(night));
         e.putString("qmods_theme_palette", ThemePalette.validate(Qvk3Ui.night(a) ? night : day));
         e.commit();
+        p.edit().putString(THEME_HASH, themeHash(p)).apply();
         try {
             ThemeEditorActivity.setSystemMode(a);   // VK's own light/dark must match the palette slot
         } catch (Throwable x) {

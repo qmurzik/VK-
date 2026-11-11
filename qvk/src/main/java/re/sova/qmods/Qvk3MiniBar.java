@@ -96,6 +96,19 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
             return in;
         });
         v.requestApplyInsets();
+        // VK's window may not pass IME insets down; the bar is re-laid out when the keyboard resizes the screen
+        v.addOnLayoutChangeListener((view, l, t, r, b, ol, ot, or, ob) -> view.post(() -> {
+            android.view.WindowInsets in = view.getRootWindowInsets();
+            boolean ime = in != null && in.isVisible(android.view.WindowInsets.Type.ime());
+            if (!ime) {
+                android.graphics.Rect frame = new android.graphics.Rect();
+                view.getWindowVisibleDisplayFrame(frame);
+                int h = view.getRootView().getHeight();
+                ime = h > 0 && h - frame.bottom > h * 0.15f;
+            }
+            int want = ime ? View.INVISIBLE : View.VISIBLE;
+            if (view.getVisibility() != want) view.setVisibility(want);
+        }));
     }
 
     private void detach() {

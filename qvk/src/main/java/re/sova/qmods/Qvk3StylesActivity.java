@@ -126,13 +126,16 @@ public final class Qvk3StylesActivity extends Activity {
         bar.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
         apply = button("Применить", true);
         apply.setOnClickListener(v -> {
-            try {
-                Qvk3Appearance.apply(this, draft);
-                Qvk3Ui.toast(this, "Стиль «" + draft.title + "» применён");
-                finish();
-            } catch (Exception e) {
-                Qvk3Ui.toast(this, "Не удалось применить: " + Qvk3Jobs.message(e));
+            if (!Qvk3Appearance.hasOwnTheme(this)) {
+                applyStyle(true);
+                return;
             }
+            // the user has their own theme: say plainly what the style will do to it
+            Qvk3Ui.dialog(this).setTitle("Применить «" + draft.title + "»")
+                    .setMessage("У вас своя тема с цветами. Стиль может заменить её своими цветами (вашу тему можно вернуть кнопкой «Отменить» в настройках) или поменять только форму, скругления и шрифты, оставив ваши цвета.")
+                    .setPositiveButton("Стиль с цветами", (d, w) -> applyStyle(true))
+                    .setNeutralButton("Только форма", (d, w) -> applyStyle(false))
+                    .setNegativeButton("Отмена", null).show();
         });
         bar.addView(apply, Qvk3Ui.weight(2));
         root.addView(bar, Qvk3Ui.match());
@@ -153,6 +156,16 @@ public final class Qvk3StylesActivity extends Activity {
         t.setPadding(dp(32), dp(18), dp(16), dp(8));
         t.setAccessibilityHeading(true);
         return t;
+    }
+
+    private void applyStyle(boolean colors) {
+        try {
+            Qvk3Appearance.apply(this, draft, colors);
+            Qvk3Ui.toast(this, "Стиль «" + draft.title + "» применён" + (colors ? "" : " без замены цветов"));
+            finish();
+        } catch (Exception e) {
+            Qvk3Ui.toast(this, "Не удалось применить: " + Qvk3Jobs.message(e));
+        }
     }
 
     private TextView button(String label, boolean primary) {
