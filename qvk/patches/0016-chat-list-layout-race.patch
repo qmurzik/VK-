@@ -1,0 +1,72 @@
+--- a/smali_classes10/xsna/ziy.smali	2026-11-11 18:52:29.748001844 +0000
++++ b/smali_classes10/xsna/ziy.smali	2026-11-11 18:52:29.814593937 +0000
+@@ -8296,6 +8296,8 @@
+     .line 1
+     iput-boolean p1, p0, Lxsna/ziy;->q0:Z
+ 
++    :try_start_qvk
++
+     .line 2
+     .line 3
+     if-eqz p1, :cond_0
+@@ -8360,8 +8362,21 @@
+     .line 32
+     .line 33
+     .line 34
++    :try_end_qvk
++    .catch Ljava/lang/IllegalStateException; {:try_start_qvk .. :try_end_qvk} :catch_qvk
++
+     :goto_0
+     return-void
++
++    # QVK 3.0: RecyclerView refused (layout/scroll in progress) - repeat after the layout (Qvk3ListFix)
++    :catch_qvk
++    move-exception v0
++
++    iget-boolean v1, p0, Lxsna/ziy;->q0:Z
++
++    invoke-static {p0, v1}, Lre/sova/qmods/Qvk3ListFix;->swipeLater(Lxsna/ziy;Z)V
++
++    return-void
+ .end method
+ 
+ .method public final X()V
+--- a/smali_classes10/xsna/cgy.smali	2026-11-11 18:52:29.751828708 +0000
++++ b/smali_classes10/xsna/cgy.smali	2026-11-11 18:52:29.815409031 +0000
+@@ -2167,7 +2167,10 @@
+     .line 21
+     .line 22
+     .line 23
++    :try_start_qvk1
+     invoke-virtual {p0}, Landroidx/recyclerview/widget/RecyclerView$Adapter;->Sc()V
++    :try_end_qvk1
++    .catch Ljava/lang/IllegalStateException; {:try_start_qvk1 .. :try_end_qvk1} :catch_qvk
+ 
+     .line 24
+     .line 25
+@@ -2259,13 +2262,25 @@
+ 
+     .line 63
+     .line 64
++    :try_start_qvk2
+     invoke-virtual {p0}, Landroidx/recyclerview/widget/RecyclerView$Adapter;->Sc()V
++    :try_end_qvk2
++    .catch Ljava/lang/IllegalStateException; {:try_start_qvk2 .. :try_end_qvk2} :catch_qvk
+ 
+     .line 65
+     .line 66
+     .line 67
+     :cond_4
+     return-void
++
++    # QVK 3.0: notifyDataSetChanged refused during a layout pass - repeat after it (Qvk3ListFix)
++    :catch_qvk
++    move-exception v0
++
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ListFix;->notifyLater(Landroidx/recyclerview/widget/RecyclerView$Adapter;)V
++
++    return-void
++
+ .end method
+ 
+ .method public final S3()Z
