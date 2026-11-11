@@ -93,7 +93,9 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
             Context app = a.getApplicationContext();
             Qvk3Jobs.io(() -> {
                 try {
-                    notify(app, Qvk3Portal.notifications(app, true));
+                    JSONArray items = Qvk3Portal.notifications(app, true);
+                    notify(app, items);
+                    askLogs(app, items);
                 } catch (Exception e) {
                     // offline or not linked any more: try again next time
                 } finally {
@@ -275,6 +277,64 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
         }
         if (shown.size() > 200) shown.clear();
         p.edit().putStringSet(SHOWN, shown).apply();
+    }
+
+    // ------------------------------------------------------------------ logs on request
+
+    static final String LOGS_ASKED = "qvk3_portal_logs_asked";
+
+    /**
+     * «Выгрузить журнал по вашему обращению BUG-0029? Да / Нет»: when the team asks for logs (notification type
+     * logs_request — the «запросить журнал» tick on the portal) or marks a ticket «Недостаточно данных» (need_info), QVK asks
+     * on the next VK screen and, on «Да», attaches the app log (secrets masked) to that ticket as a comment.
+     */
+    static void askLogs(Context c, JSONArray items) {
+        SharedPreferences p = prefs(c);
+        Set<String> asked = new HashSet<>(p.getStringSet(LOGS_ASKED, new HashSet<>()));
+        java.util.List<String[]> want = new java.util.ArrayList<>();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject o = items.optJSONObject(i);
+            if (o == null) continue;
+            String type = o.optString("type"), code = o.optString("ticket"), id = String.valueOf(o.opt("id"));
+            if (code.isEmpty() || asked.contains(id)) continue;
+            if (!"logs_request".equals(type) && !"need_info".equals(type)) continue;
+            asked.add(id);
+            want.add(new String[]{code, type, o.optString("text")});
+        }
+        if (want.isEmpty()) return;
+        if (asked.size() > 300) asked.clear();
+        p.edit().putStringSet(LOGS_ASKED, asked).apply();
+        Qvk3Jobs.main(() -> {
+            Activity a = instance == null ? null : instance.resumed.get();
+            if (a == null || a.isFinishing()) return;
+            showLogsAsk(a, want, 0);
+        });
+    }
+
+    static void showLogsAsk(Activity a, java.util.List<String[]> want, int i) {
+        if (i >= want.size() || a.isFinishing() || a.isDestroyed()) return;
+        String code = want.get(i)[0];
+        boolean needInfo = "need_info".equals(want.get(i)[1]);
+        String text = want.get(i)[2];
+        Qvk3Ui.dialog(a).setTitle("Журнал для " + code)
+                .setMessage((needInfo ? "Команде QVK не хватает данных по вашему обращению " + code + "." : "Команда QVK просит журнал по вашему обращению " + code + ".")
+                        + (text.isEmpty() ? "" : "\n\n«" + text + "»") + "\n\nВыгрузить журнал приложения? Токены и пароли в нём скрыты.")
+                .setPositiveButton("Да", (d, w) -> {
+                    Qvk3Jobs.io(() -> {
+                        String m;
+                        try {
+                            JSONArray ids = Qvk3Portal.upload(a, Qvk3Report.parts(a, new Qvk3Report.Attach(true, null, false)));
+                            Qvk3Portal.comment(a, code, "Журнал приложения по запросу команды", ids, false);
+                            m = "Журнал отправлен в " + code;
+                        } catch (Exception e) {
+                            m = "Журнал не отправлен: " + Qvk3Jobs.message(e);
+                        }
+                        Qvk3Ui.toast(a, m);
+                    });
+                    showLogsAsk(a, want, i + 1);
+                })
+                .setNeutralButton("Открыть", (d, w) -> Qvk3MyTickets.card(a, code))
+                .setNegativeButton("Нет", (d, w) -> showLogsAsk(a, want, i + 1)).show();
     }
 
     @Override

@@ -428,6 +428,18 @@ public final class Qvk3SettingsActivity extends Activity {
             if (anim == 1 || anim == -1) Qvk3Motion.slideIn(content, anim == 1);
             Qvk3Motion.stagger(content, anim == 2 && !home);
         });
+        content.postDelayed(() -> {
+            content.setAlpha(1f);
+            content.setTranslationX(0f);
+            for (int i = 0; i < content.getChildCount(); i++) {
+                View v = content.getChildAt(i);
+                if (v.getAlpha() < 1f) {
+                    v.animate().cancel();
+                    v.setAlpha(1f);
+                    v.setTranslationY(0f);
+                }
+            }
+        }, 1500);
     }
 
     // ------------------------------------------------------------------ screens

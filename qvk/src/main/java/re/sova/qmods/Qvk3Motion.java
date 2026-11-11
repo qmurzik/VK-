@@ -21,10 +21,20 @@ final class Qvk3Motion {
 
     /** Children of the container rise and fade in one after another (at most ~12 are delayed). */
     static void stagger(ViewGroup parent, boolean light) {
-        float dy = Qvk3Ui.dp(parent.getContext(), light ? 6 : 18);
+        float dy = Qvk3Ui.dp(parent.getContext(), light ? 6 : 12);
+        // BUG-0029: only what is on screen animates; everything below is shown as is. Cards below the screen that started
+        // transparent could stay invisible on some firmware (HyperOS) — a whole screen of «empty space» under the items.
+        int visibleBottom = parent.getRootView().getHeight();
+        int[] at = new int[2];
+        parent.getLocationInWindow(at);
         for (int i = 0; i < parent.getChildCount(); i++) {
             View v = parent.getChildAt(i);
             v.animate().cancel();
+            if (visibleBottom > 0 && at[1] + v.getTop() > visibleBottom) {
+                v.setAlpha(1f);
+                v.setTranslationY(0f);
+                continue;
+            }
             v.setAlpha(0f);
             v.setTranslationY(dy);
             v.animate().alpha(1f).translationY(0f).setStartDelay(Math.min(i, 12) * (light ? 18L : 32L))
@@ -45,11 +55,11 @@ final class Qvk3Motion {
         v.setOnTouchListener((view, e) -> {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    view.animate().scaleX(0.965f).scaleY(0.965f).setDuration(90).setInterpolator(OUT).start();
+                    view.animate().scaleX(0.965f).scaleY(0.965f).setStartDelay(0).setDuration(90).setInterpolator(OUT).start();
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    view.animate().scaleX(1f).scaleY(1f).setDuration(260).setInterpolator(SPRING).start();
+                    view.animate().scaleX(1f).scaleY(1f).alpha(1f).setStartDelay(0).setDuration(260).setInterpolator(SPRING).start();
                     break;
                 default:
                     break;
