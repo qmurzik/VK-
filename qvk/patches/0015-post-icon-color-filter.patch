@@ -1,0 +1,12 @@
+--- a/smali_classes21/re/sova/qmods/PostButtonColors.smali	2026-11-11 18:26:03.799194353 +0000
++++ b/smali_classes21/re/sova/qmods/PostButtonColors.smali	2026-11-11 18:26:03.826469241 +0000
+@@ -2108,6 +2108,9 @@
+ 
+     invoke-virtual {p0, p1}, Landroid/widget/ImageView;->setImageTintList(Landroid/content/res/ColorStateList;)V
+ 
++    # QVK 3.0: AppCompat icons (repost, comments) re-apply their own tint; a colour filter wins (BUG-0011)
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3PostTint;->apply(Landroid/widget/ImageView;Landroid/content/res/ColorStateList;)V
++
+     .line 146
+     :cond_1
+     :goto_0

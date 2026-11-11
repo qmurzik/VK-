@@ -1,0 +1,20 @@
+--- a/smali_classes11/xsna/ub3.smali	2026-11-11 18:25:24.992875068 +0000
++++ b/smali_classes11/xsna/ub3.smali	2026-11-11 18:25:25.049342045 +0000
+@@ -16279,6 +16279,17 @@
+     .line 10
+     invoke-virtual {p0}, Lxsna/ub3;->A1()V
+ 
++    # QVK 3.0: the autoplay manager can already be gone when a screen closes (NPE in AutoPlayDelegate, BUG-0015 log)
++    invoke-virtual {p0}, Lxsna/y3;->j()Lcom/vk/libvideo/autoplay/a;
++
++    move-result-object v1
++
++    if-nez v1, :qvk_autoplay_ok
++
++    return-void
++
++    :qvk_autoplay_ok
++
+     .line 11
+     .line 12
+     .line 13
