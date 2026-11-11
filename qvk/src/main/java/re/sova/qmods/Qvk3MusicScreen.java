@@ -70,6 +70,8 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private Feed feed;
     private String miniCoverFor = "";
     private Qvk3CoverFlowScreen coverFlow;
+    private ImageView nowButton;
+    private boolean imeShown;
     /** Called when the standalone player-only host should close. */
     Runnable onPlayerClosed;
 
@@ -343,6 +345,17 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         });
         onState(engine);
         post(() -> orientation(getResources().getConfiguration()));
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            setOnApplyWindowInsetsListener((v, in) -> {
+                boolean ime = in.isVisible(android.view.WindowInsets.Type.ime());
+                if (ime != imeShown) {
+                    imeShown = ime;
+                    onState(engine);
+                }
+                return v.onApplyWindowInsets(in);
+            });
+            requestApplyInsets();
+        }
     }
 
     @Override
@@ -423,6 +436,10 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         screenTitle.setAccessibilityHeading(true);
         screenTitle.setPadding(Qvk3Ui.dp(a, 6), 0, 0, 0);
         header.addView(screenTitle, Qvk3Ui.weight(1));
+        // IDEA-0005: while the keyboard is open the mini player steps aside and this button opens the player instead
+        nowButton = Qvk3Ui.icon(a, Qvk3Icons.PLAY, p.accent, 48, 24, "Открыть плеер", v -> openPlayer());
+        nowButton.setVisibility(View.GONE);
+        header.addView(nowButton);
         header.addView(Qvk3Ui.icon(a, Qvk3Icons.TUNE, p.text, 48, 22, "Настройки QVK Music", v -> Qvk3MusicSettingsScreen.show(a)));
         col.addView(header, Qvk3Ui.match());
 
@@ -1133,7 +1150,8 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
         // inside VK's tab the floating QVK mini-player (Qvk3MiniBar) is shown instead of this one
-        miniBox.setVisibility(t == null ? View.GONE : View.VISIBLE);
+        miniBox.setVisibility(t == null || imeShown ? View.GONE : View.VISIBLE);
+        nowButton.setVisibility(t != null && imeShown ? View.VISIBLE : View.GONE);
         if (t == null) return;
         miniProgress.setProgress(e.duration() > 0 ? (int) (e.position() * 1000 / e.duration()) : 0);
         miniTitle.setText(t.title);
