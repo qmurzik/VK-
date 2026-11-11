@@ -302,14 +302,38 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
     private void applyRules(Activity a, SharedPreferences p) {
         java.util.Set<String> active = new java.util.HashSet<>();
         for (Rule r : rules(a)) {
-            View v = find(a, r.id);
-            if (v == null) continue;
+            java.util.List<View> all = findAll(a, r.id);
+            if (all.isEmpty()) continue;
             active.add(r.id);
+            for (View v : all) applyRule(a, r, v);
+        }
+        restoreStale(a, active);
+    }
+
+    /** Every view carrying this id: feeds and lists repeat the same id in each row, so a rule must reach all of them. */
+    static java.util.List<View> findAll(Activity a, String name) {
+        java.util.List<View> out = new java.util.ArrayList<>();
+        int id = a.getResources().getIdentifier(name, "id", a.getPackageName());
+        if (id == 0) return out;
+        View root = a.getWindow() == null ? null : a.getWindow().getDecorView();
+        if (root != null) collect(root, id, out, 0);
+        return out;
+    }
+
+    private static void collect(View v, int id, java.util.List<View> out, int depth) {
+        if (v.getId() == id) out.add(v);
+        if (depth > 60 || out.size() > 400 || !(v instanceof ViewGroup)) return;
+        ViewGroup g = (ViewGroup) v;
+        for (int i = 0; i < g.getChildCount(); i++) collect(g.getChildAt(i), id, out, depth + 1);
+    }
+
+    private void applyRule(Activity a, Rule r, View v) {
+        {
             Orig o = orig(v);
             if (r.hide) {
                 if (o.visibility < 0) o.visibility = v.getVisibility();
                 if (v.getVisibility() != View.GONE) v.setVisibility(View.GONE);
-                continue;
+                return;
             }
             if (o.visibility >= 0 && v.getVisibility() == View.GONE) v.setVisibility(o.visibility);
             if (r.opacity < 100) {
@@ -354,6 +378,9 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
                 }
             }
         }
+    }
+
+    private void restoreStale(Activity a, java.util.Set<String> active) {
         // views whose rule was removed go back to VK's original look
         for (java.util.Map.Entry<View, Orig> e : new java.util.ArrayList<>(origs.entrySet())) {
             View v = e.getKey();
