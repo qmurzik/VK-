@@ -158,6 +158,18 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
     @Override
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
+        // The engine reports position several times a second. The system extrapolates the position itself from
+        // state + speed, so the session and the notification are only touched when something visible changed
+        // (track, state, speed, cover, error) or the position jumped (seek / A-B loop). Re-posting the notification
+        // and the 512 px cover four times a second was the main battery cost of QVK Music.
+        long now = android.os.SystemClock.elapsedRealtime();
+        String sig = (t == null ? "" : t.key()) + "|" + e.state() + "|" + e.speed() + "|" + e.duration() + "|" + (cover != null) + "|" + coverFor + "|" + e.error();
+        long expected = lastPos + (e.state() == Qvk3MusicEngine.PLAYING ? (long) ((now - lastPosAt) * e.speed()) : 0);
+        boolean jumped = Math.abs(e.position() - expected) > 2000;
+        if (sig.equals(lastSig) && !jumped) return;
+        lastSig = sig;
+        lastPos = e.position();
+        lastPosAt = now;
         int st;
         switch (e.state()) {
             case Qvk3MusicEngine.PLAYING:
@@ -196,6 +208,7 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
                 Qvk3Images.get(this).load(t.cover, 512, bmp -> {
                     if (t.cover.equals(coverFor)) {
                         cover = bmp;
+                        lastSig = "";
                         onState(engine);
                     }
                 });
@@ -214,6 +227,9 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
             main.postDelayed(idleStop, IDLE_STOP_MS);
         }
     }
+
+    private String lastSig = "";
+    private long lastPos, lastPosAt;
 
     private void goForeground(Notification n) {
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);

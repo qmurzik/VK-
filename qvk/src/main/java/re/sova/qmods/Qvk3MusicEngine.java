@@ -329,7 +329,8 @@ public final class Qvk3MusicEngine {
                 saveState(false);
                 notifyState();
             }
-            if (state == PLAYING) worker.postDelayed(this, 250);
+            // 4 updates a second only while someone can see them; with the screen off once a second is enough
+            if (state == PLAYING) worker.postDelayed(this, screenOn() ? 250 : 1000);
         }
     };
 
@@ -776,12 +777,26 @@ public final class Qvk3MusicEngine {
     }
 
     /** Debounced: at most once per 5 s during playback, immediately on pause/stop/edits. */
+    private android.os.PowerManager power;
+
+    private boolean screenOn() {
+        try {
+            if (power == null) power = (android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE);
+            return power == null || power.isInteractive();
+        } catch (RuntimeException e) {
+            return true;
+        }
+    }
+
     private void saveState(boolean now) {
         long t = SystemClock.elapsedRealtime();
-        if (!now && t - lastSave < 5000) return;
+        if (!now && t - lastSave < 15000) return;
         lastSave = t;
         Qvk3Track cur = queue.current();
         prefs.edit().putLong("resume_position", safePosition()).putString("resume_key", cur == null ? "" : cur.key()).apply();
+        // Periodic saves keep only the position (cheap). The queue file, which can be megabytes for a whole library,
+        // is written with fsync only when the queue or the track changes (saveState(true)), not every few seconds.
+        if (!now) return;
         try {
             File f = stateFile();
             f.getParentFile().mkdirs();

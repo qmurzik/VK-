@@ -34,7 +34,8 @@ import java.util.Locale;
  * nothing is sent anywhere. Tokens and passwords are masked (Qvk3LogRedact) in everything the user copies or saves.
  */
 final class Qvk3Logs {
-    static final String PREF_CAPTURE = "qvk3_logs_capture";
+    /** Continuous recording (a logcat child process all the time): off by default, it costs battery. */
+    static final String PREF_CAPTURE = "qvk3_logs_continuous";
     private static final long ROTATE_AT = 6L << 20;       // one file part, bytes
     private static final long COPY_TAIL = 300L << 10;     // clipboard transactions fail above ~1 MB
     private static volatile Process proc;
@@ -48,7 +49,7 @@ final class Qvk3Logs {
     }
 
     static boolean enabled(Context c) {
-        return prefs(c).getBoolean(PREF_CAPTURE, true);
+        return prefs(c).getBoolean(PREF_CAPTURE, false);
     }
 
     static File dir(Context c) {
@@ -57,8 +58,15 @@ final class Qvk3Logs {
         return d;
     }
 
-    /** Starts the background recorder (once per process). Cheap: one `logcat` child process and a file writer. */
+    private static volatile boolean crashHook;
+
+    /**
+     * Called at start-up. Always: a crash hook (no cost until a crash) that saves the stack trace and the app's
+     * recent log lines, so a crash can be reported without adb. Only when the user turned it on: continuous
+     * recording through a `logcat` child process.
+     */
     static synchronized void start(Context c) {
+        installCrashHook(c.getApplicationContext());
         if (running || !enabled(c)) return;
         running = true;
         final File d = dir(c);
@@ -109,6 +117,60 @@ final class Qvk3Logs {
         });
     }
 
+    private static void installCrashHook(Context app) {
+        if (crashHook) return;
+        crashHook = true;
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                error.printStackTrace(new java.io.PrintWriter(sw));
+                String text = "# Падение " + stamp() + " в потоке " + thread.getName() + "\n" + sw + "\n# Последние строки журнала:\n" + snapshot(1500, 1500);
+                File f = new File(dir(app), "crash-" + System.currentTimeMillis() + ".log");
+                try (OutputStream os = new FileOutputStream(f)) {
+                    os.write(text.getBytes(StandardCharsets.UTF_8));
+                }
+                File[] old = dir(app).listFiles((d, n) -> n.startsWith("crash-"));
+                if (old != null && old.length > 5) {
+                    java.util.Arrays.sort(old);
+                    for (int i = 0; i < old.length - 5; i++) old[i].delete();
+                }
+            } catch (Throwable ignored) {
+                // never get in the way of the real crash handling
+            }
+            if (prev != null) prev.uncaughtException(thread, error);
+        });
+    }
+
+    /** The app's lines still in the system log buffer right now (`logcat -d`), newest last. */
+    static String snapshot(int lines, long timeoutMs) {
+        Process p = null;
+        try {
+            p = new ProcessBuilder("logcat", "-d", "-v", "threadtime", "-t", Integer.toString(lines)).redirectErrorStream(true).start();
+            final Process proc0 = p;
+            StringBuilder b = new StringBuilder();
+            Thread reader = new Thread(() -> {
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(proc0.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = r.readLine()) != null && b.length() < (6 << 20)) synchronized (b) {
+                        b.append(line).append('\n');
+                    }
+                } catch (IOException ignored) {
+                    // partial output is fine
+                }
+            });
+            reader.start();
+            reader.join(timeoutMs);
+            synchronized (b) {
+                return b.toString();
+            }
+        } catch (Exception e) {
+            return "(журнал недоступен: " + e.getMessage() + ")\n";
+        } finally {
+            if (p != null) p.destroy();
+        }
+    }
+
     static synchronized void stop() {
         running = false;
         Process p = proc;
@@ -136,7 +198,7 @@ final class Qvk3Logs {
         b.append("Устройство: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append(" (").append(Build.DEVICE).append(")\n");
         b.append("Android ").append(Build.VERSION.RELEASE).append(" / API ").append(Build.VERSION.SDK_INT).append(", ").append(Build.DISPLAY).append('\n');
         b.append("ABI: ").append(Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "?").append('\n');
-        b.append("Запись логов: ").append(enabled(c) ? "включена" : "выключена").append('\n');
+        b.append("Непрерывная запись логов: ").append(enabled(c) ? "включена" : "выключена").append('\n');
         try {
             b.append("\n--- Сбои модулей ---\n").append(RuntimeFaults.hasFailures() ? RuntimeFaults.report() : "не зарегистрировано").append('\n');
         } catch (Throwable t) {
@@ -147,6 +209,38 @@ final class Qvk3Logs {
 
     /** Log text oldest-first, secrets masked. tailBytes <= 0 means everything that is stored. */
     static String body(Context c, long tailBytes) {
+        StringBuilder out = new StringBuilder();
+        File[] crashes = dir(c).listFiles((dd, n) -> n.startsWith("crash-"));
+        if (crashes != null && crashes.length > 0) {
+            java.util.Arrays.sort(crashes);
+            for (int i = crashes.length - 1; i >= Math.max(0, crashes.length - 3); i--) {
+                out.append("\n--- ").append(crashes[i].getName()).append(" ---\n").append(Qvk3LogRedact.clean(read(crashes[i], tailBytes > 0 ? 60 << 10 : 0)));
+            }
+        }
+        String now = snapshot(tailBytes > 0 ? 4000 : 20000, 4000);
+        long budget = tailBytes > 0 ? Math.max(0, tailBytes - out.length() - now.length()) : 0;
+        if (tailBytes <= 0 || budget > 4096) out.append(stored(c, tailBytes > 0 ? budget : 0));
+        if (tailBytes > 0 && now.length() > tailBytes - Math.min(tailBytes, out.length())) {
+            now = now.substring(Math.max(0, now.length() - (int) Math.max(4096, tailBytes - out.length())));
+        }
+        out.append("\n--- журнал сейчас (logcat -d) ---\n").append(Qvk3LogRedact.clean(now));
+        return out.toString();
+    }
+
+    private static String read(File f, long tail) {
+        try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
+            long len = raf.length(), from = tail > 0 && len > tail ? len - tail : 0;
+            raf.seek(from);
+            byte[] buf = new byte[(int) (len - from)];
+            raf.readFully(buf);
+            return new String(buf, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "(не прочитано: " + e.getMessage() + ")\n";
+        }
+    }
+
+    /** Continuous-recording files (only when that mode was on), oldest first. */
+    private static String stored(Context c, long tailBytes) {
         File d = dir(c);
         File[] parts = {new File(d, "previous.log"), new File(d, "middle.log"), new File(d, "current.log")};
         StringBuilder b = new StringBuilder();

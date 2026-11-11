@@ -84,9 +84,22 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         Qvk3DayNight.sync(a);
         if (!stock(a)) return;
         lastVk = new WeakReference<>(a);
+        if (!active(a)) {
+            // nothing to restyle: no layout listener, no tree walks (they cost battery on every VK redraw)
+            ViewTreeObserver.OnGlobalLayoutListener old = listeners.remove(a);
+            if (old != null) {
+                try {
+                    a.getWindow().getDecorView().getViewTreeObserver().removeOnGlobalLayoutListener(old);
+                } catch (Throwable ignored) {
+                    // the window is gone
+                }
+                schedule(a, 0); // one last pass restores VK's original look
+            }
+            return;
+        }
         schedule(a, 0);
         if (listeners.containsKey(a)) return;
-        ViewTreeObserver.OnGlobalLayoutListener l = () -> schedule(a, 150);
+        ViewTreeObserver.OnGlobalLayoutListener l = () -> schedule(a, 300);
         listeners.put(a, l);
         try {
             a.getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(l);
@@ -95,11 +108,24 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         }
     }
 
+    /** True when the floating dock or any rule is configured. */
+    static boolean active(Context c) {
+        SharedPreferences p = prefs(c);
+        return "floating".equals(p.getString(DOCK, "off")) || !rules(c).isEmpty();
+    }
+
+    private final WeakHashMap<Activity, Long> lastApply = new WeakHashMap<>();
+
     private void schedule(Activity a, long delay) {
+        // VK redraws constantly (images, counters, typing): re-apply at most once a second per screen
+        Long last = lastApply.get(a);
+        if (delay > 0 && last != null) delay = Math.max(delay, 1000 - (android.os.SystemClock.uptimeMillis() - last));
+        if (delay > 0 && pending.containsKey(a)) return; // a pass is already queued; it will see the latest tree
         Runnable old = pending.get(a);
         if (old != null) main.removeCallbacks(old);
         Runnable r = () -> {
             pending.remove(a);
+            lastApply.put(a, android.os.SystemClock.uptimeMillis());
             if (a.isFinishing() || a.isDestroyed()) return;
             try {
                 applyTo(a);
@@ -275,10 +301,23 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         }
     }
 
-    public static java.util.List<Rule> rules(Context c) {
+    private static String rulesRaw;
+    private static java.util.List<Rule> rulesParsed = new java.util.ArrayList<>();
+
+    /** Parsed rules; re-parsed only when the stored text changes (this is called on every restyle pass). */
+    public static synchronized java.util.List<Rule> rules(Context c) {
+        String raw = prefs(c).getString(RULES, "[]");
+        if (!raw.equals(rulesRaw)) {
+            rulesParsed = parse(raw);
+            rulesRaw = raw;
+        }
+        return new java.util.ArrayList<>(rulesParsed);
+    }
+
+    private static java.util.List<Rule> parse(String raw) {
         java.util.List<Rule> out = new java.util.ArrayList<>();
         try {
-            JSONArray a = new JSONArray(prefs(c).getString(RULES, "[]"));
+            JSONArray a = new JSONArray(raw);
             for (int i = 0; i < a.length(); i++) {
                 Rule r = Rule.from(a.getJSONObject(i));
                 if (r.id.matches("[A-Za-z0-9_]{1,80}")) out.add(r);

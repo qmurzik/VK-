@@ -21,7 +21,7 @@ import java.util.Locale;
 final class Qvk3Growth {
     private static final String KEY = "qvk3_growth_history";
     private static final int KEEP = 40;                 // samples kept
-    private static final long MIN_GAP = 30L * 60_000;   // one sample per half hour at most
+    private static final long MIN_GAP = 12L * 3_600_000; // one sample per 12 h at most: walking the data folder costs IO
 
     private Qvk3Growth() {
     }
@@ -119,7 +119,7 @@ final class Qvk3Growth {
                     s.append("  ").append(f.format(new Date(o.optLong("t")))).append("  ").append(mb(o.optLong("db"))).append('\n');
                 }
             } else {
-                s.append("\nИстории роста пока нет: замер раз в полчаса при запуске, нужно хотя бы два.\n");
+                s.append("\nИстории роста пока нет: замер не чаще раза в 12 часов при запуске, нужно хотя бы два.\n");
             }
         } catch (Exception ignored) {
             // history is optional

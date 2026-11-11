@@ -56,6 +56,70 @@ final class Qvk3InfoScreens {
         });
     }
 
+    /**
+     * Battery centre: what in QVK can keep the phone awake right now, how heavy it is, and quick ways to turn it down.
+     * Nothing is changed without a tap.
+     */
+    static void battery(Activity a) {
+        StringBuilder s = new StringBuilder();
+        PowerManager pm = a.getSystemService(PowerManager.class);
+        boolean ign = pm != null && pm.isIgnoringBatteryOptimizations(a.getPackageName());
+        String mode = "auto";
+        try {
+            mode = PushModes.mode();
+        } catch (Throwable ignored) {
+            // QVK 2.x push module unavailable
+        }
+        int mi = Arrays.asList(Qvk3NativeEditors.PUSH_VALUES).indexOf(mode);
+        String label = mi >= 0 ? Qvk3NativeEditors.PUSH_LABELS[mi] : mode;
+        String cost;
+        switch (mode) {
+            case "longpoll":
+                cost = "высокий: постоянное соединение с сервером ВК всё время";
+                break;
+            case "poll":
+            case "alarm":
+                cost = "высокий: телефон просыпается примерно раз в минуту";
+                break;
+            case "job":
+                cost = "низкий: Android сам выбирает время, уведомления могут приходить с задержкой";
+                break;
+            default:
+                cost = "низкий, если работают сервисы Google/RuStore";
+        }
+        s.append("Что сейчас может расходовать батарею:\n\n");
+        s.append("• Доставка уведомлений: ").append(label).append(" — ").append(cost).append(".\n");
+        boolean bg = false;
+        try {
+            bg = RuntimeBridge.flag("qvk_background_delivery");
+        } catch (Throwable ignored) {
+            // flag unavailable
+        }
+        s.append("• Уведомления без Firebase (постоянная служба): ").append(bg ? "включены — заметный расход" : "выключены").append(".\n");
+        s.append("• Непрерывная запись логов: ").append(Qvk3Logs.enabled(a) ? "включена — расходует батарею, выключите после поиска бага" : "выключена").append(".\n");
+        s.append("• Мини-плеер поверх экранов ВК: ").append(Qvk3MusicSettings.prefs(a).getBoolean(Qvk3MusicSettings.MINI_ON_VK, false) ? "включён" : "выключен").append(".\n");
+        s.append("• Правила интерфейса и плавающая панель: ").append(Qvk3Skin.active(a) ? "включены (пересчёт не чаще раза в секунду)" : "выключены, не работают").append(".\n");
+        s.append("• Оптимизация батареи Android для QVK: ").append(ign ? "отключена — приложение может работать в фоне без ограничений" : "включена").append(".\n\n");
+        s.append("QVK Music: во время игры обновляет уведомление только при смене трека или паузе, при выключенном экране проверяет плеер раз в секунду, "
+                + "службу закрывает через 10 минут паузы.\n\nСамый большой расход обычно даёт доставка уведомлений без Firebase. "
+                + "Если на телефоне есть сервисы Google, выберите «Автоматически».");
+        Qvk3Ui.dialog(a).setTitle("Фоновая работа и батарея").setView(wrapScroll(a, body(a, s.toString())))
+                .setPositiveButton("Выключить лишнее", (d, w) -> {
+                    Qvk3SettingsHistory.before(a, Qvk3Logs.PREF_CAPTURE, "Экономия батареи");
+                    Qvk3Logs.setEnabled(a, false);
+                    Qvk3MusicSettings.prefs(a).edit().putBoolean(Qvk3MusicSettings.MINI_ON_VK, false).apply();
+                    Qvk3Ui.toast(a, "Выключены непрерывные логи и мини-плеер поверх ВК. Доставку уведомлений выберите сами");
+                })
+                .setNeutralButton("Доставка уведомлений", (d, w) -> Qvk3NativeEditors.push(a))
+                .setNegativeButton("Закрыть", null).show();
+    }
+
+    private static ScrollView wrapScroll(Activity a, android.view.View v) {
+        ScrollView sv = new ScrollView(a);
+        sv.addView(v);
+        return sv;
+    }
+
     /** Light / dark theme in one place (BUG-0012): mode choice plus the two palette editors, no hunting through menus. */
     static void dayNight(Activity a) {
         String cur = RuntimeBridge.prefs.getString(ThemeProfiles.MODE, "current");
@@ -88,19 +152,21 @@ final class Qvk3InfoScreens {
         col.addView(info);
         Runnable refresh = () -> Qvk3Jobs.io(() -> {
             long n = Qvk3Logs.size(a);
-            String t = "Запись логов этого приложения (только QVK/ВК, других программ нет). Данные остаются на устройстве, никуда не отправляются. "
-                    + "Токены и пароли в тексте скрываются.\n\nСейчас сохранено: " + (n >> 10) + " КБ. Хранится прошлый запуск и текущий, поэтому после вылета журнал можно скопировать при следующем открытии.\n\n"
-                    + "«Копировать» кладёт в буфер последние ~300 КБ с описанием устройства и сбоями модулей (буфер обмена не принимает больше). Весь журнал целиком — «В файл» (Загрузки/QVK).";
+            String t = "Журнал этого приложения (только QVK/ВК, других программ нет). Данные остаются на устройстве, никуда не отправляются, "
+                    + "токены и пароли в тексте скрываются.\n\nБез настройки: при копировании берутся последние строки журнала Android, а при вылете "
+                    + "QVK сам сохраняет описание падения, его можно скопировать при следующем открытии. Это не расходует батарею.\n\n"
+                    + "«Непрерывная запись» пишет журнал всё время, пока работает приложение: нужна, если баг трудно поймать. Она расходует батарею, "
+                    + "включайте её только на время поиска бага.\n\nСохранено: " + (n >> 10) + " КБ. «Копировать» — последние ~300 КБ, «В файл» — всё (Загрузки/QVK).";
             Qvk3Jobs.main(() -> info.setText(t));
         });
         refresh.run();
         Switch capture = new Switch(a);
-        capture.setText("Записывать логи");
+        capture.setText("Непрерывная запись (расходует батарею)");
         capture.setChecked(Qvk3Logs.enabled(a));
         capture.setPadding(Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 4));
         capture.setOnCheckedChangeListener((v, on) -> {
             Qvk3Logs.setEnabled(a, on);
-            Qvk3Ui.toast(a, on ? "Запись логов включена" : "Запись остановлена");
+            Qvk3Ui.toast(a, on ? "Непрерывная запись включена. Не забудьте выключить после поиска бага" : "Непрерывная запись остановлена");
         });
         col.addView(capture);
         LinearLayout row = new LinearLayout(a);
@@ -126,20 +192,7 @@ final class Qvk3InfoScreens {
                 dayNight(a);
                 break;
             case "battery": {
-                PowerManager pm = a.getSystemService(PowerManager.class);
-                boolean ign = pm != null && pm.isIgnoringBatteryOptimizations(a.getPackageName());
-                String s = "Оптимизация батареи для QVK: " + (ign ? "отключена" : "включена") + "\n\n"
-                        + "QVK Music держит службу переднего плана только во время воспроизведения и завершает её через 10 минут паузы. "
-                        + "Фоновые загрузки идут по одной. Тяжёлые эффекты стилей автоматически отключаются на слабых устройствах ("
-                        + (Qvk3Appearance.weakDevice(a) ? "это устройство считается слабым" : "это устройство не считается слабым") + ").\n\n"
-                        + "Если сообщения приходят с задержкой при выключенном экране, отключите оптимизацию батареи — но это увеличит расход.";
-                dialog(a, "Фоновая работа и батарея", body(a, s), ign ? null : "Настройки батареи", () -> {
-                    try {
-                        a.startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-                    } catch (Exception e) {
-                        Qvk3Ui.toast(a, "Настройка недоступна");
-                    }
-                });
+                battery(a);
                 break;
             }
             case "storage": {
