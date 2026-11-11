@@ -18,6 +18,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -42,8 +43,8 @@ public final class Qvk3ShellActivity extends Activity {
     private EditText search;
     private boolean loading, end;
     private Object backCallback;
-    static final String[] TABS = {"Чаты", "Музыка", "Настройки", "ВКонтакте"};
-    static final String[] ICONS = {Qvk3Icons.CHAT, Qvk3Icons.MUSIC, Qvk3Icons.SLIDERS, Qvk3Icons.GRID};
+    static final String[] TABS = {"Чаты", "Музыка", "Ещё", "Настройки"};
+    static final String[] ICONS = {Qvk3Icons.CHAT, Qvk3Icons.MUSIC, Qvk3Icons.GRID, Qvk3Icons.SLIDERS};
 
     private int dp(float v) {
         return Qvk3Ui.dp(this, v);
@@ -130,13 +131,8 @@ public final class Qvk3ShellActivity extends Activity {
     }
 
     private void select(int i) {
-        if (i == 2) {
-            startActivity(new Intent(this, Qvk3SettingsActivity.class));
-            return;
-        }
         if (i == 3) {
-            // the stock client is underneath this activity: reveal it
-            moveShellAside();
+            startActivity(new Intent(this, Qvk3SettingsActivity.class));
             return;
         }
         tab = i;
@@ -146,6 +142,8 @@ public final class Qvk3ShellActivity extends Activity {
             if (chatsView == null) chatsView = buildChats();
             content.addView(chatsView);
             reload();
+        } else if (i == 2) {
+            content.addView(buildMore());
         } else {
             if (music == null) music = new Qvk3MusicScreen(this, true, -1, false);
             content.addView(music);
@@ -156,6 +154,89 @@ public final class Qvk3ShellActivity extends Activity {
     private void moveShellAside() {
         Qvk3Ui.toast(this, "Штатный ВКонтакте. Вернуться в QVK: ярлык «QVK» на иконке приложения или Настройки QVK");
         finish();
+    }
+
+    // ------------------------------------------------------------------ more: every stock VK section
+
+    /** Opens a stock VK screen: QVK's own router first, then the vk.com link router of the app. */
+    private void openStock(String route, String url) {
+        try {
+            if (route != null && RuntimeBridge.navigateChecked(this, route)) return;
+            startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).setPackage(getPackageName()));
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.shell.stock", t);
+            Qvk3Ui.toast(this, "Не удалось открыть раздел");
+        }
+    }
+
+    private View buildMore() {
+        long me = RuntimeBridge.account();
+        String id = me > 0 ? "id" + me : "feed";
+        Object[][][] groups = {
+                {{"Профиль", Qvk3Icons.USER, 0xFF5856D6, null, "https://vk.com/" + id}, {"Новости", Qvk3Icons.HOME, 0xFF007AFF, null, "https://vk.com/feed"},
+                        {"Уведомления", Qvk3Icons.BELL, 0xFFFF3B30, "notifications", "https://vk.com/feed?section=notifications"}},
+                {{"Друзья", Qvk3Icons.USER, 0xFF34C759, "friends", "https://vk.com/friends"}, {"Сообщества", Qvk3Icons.GRID, 0xFFFF9500, "groups", "https://vk.com/groups"},
+                        {"Поиск", Qvk3Icons.SEARCH, 0xFF8E8E93, "search", "https://vk.com/search"}},
+                {{"Видео", Qvk3Icons.PLAY, 0xFFFF2D55, null, "https://vk.com/video"}, {"Клипы", Qvk3Icons.LAYERS, 0xFFAF52DE, null, "https://vk.com/clips"},
+                        {"Фотографии", Qvk3Icons.IMAGE, 0xFF5AC8FA, null, "https://vk.com/albums" + me}, {"Закладки", Qvk3Icons.STAR, 0xFFFFCC00, null, "https://vk.com/fave"},
+                        {"Документы", Qvk3Icons.FOLDER, 0xFF8E8E93, null, "https://vk.com/docs"}},
+                {{"Сервисы", Qvk3Icons.GRID, 0xFF30B0C7, "services", "https://vk.com/apps"}, {"Игры", Qvk3Icons.WAND, 0xFF34C759, null, "https://vk.com/games"},
+                        {"Маркет", Qvk3Icons.LAYERS, 0xFFFF9500, null, "https://vk.com/market"}}};
+        ScrollView sv = new ScrollView(this);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(16), 0, dp(16), dp(24));
+        sv.addView(col);
+        TextView title = Qvk3Ui.text(this, "Ещё", 34, s.text, true);
+        title.setAccessibilityHeading(true);
+        title.setPadding(dp(0), dp(10), 0, dp(10));
+        col.addView(title);
+        for (Object[][] g : groups) {
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackground(Qvk3Ui.rounded(s.field, dp(12)));
+            card.setClipToOutline(true);
+            for (Object[] it : g) {
+                if (card.getChildCount() > 0) {
+                    View d = new View(this);
+                    d.setBackgroundColor(s.sep);
+                    LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(-1, Math.max(1, dp(0.5f)));
+                    dl.leftMargin = dp(56);
+                    card.addView(d, dl);
+                }
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setMinimumHeight(dp(52));
+                row.setPadding(dp(14), dp(6), dp(12), dp(6));
+                View tile = Qvk3Ui.tile(this, (String) it[1], (Integer) it[2], 30);
+                LinearLayout.LayoutParams tl = (LinearLayout.LayoutParams) tile.getLayoutParams();
+                tl.rightMargin = dp(14);
+                row.addView(tile, tl);
+                row.addView(Qvk3Ui.text(this, (String) it[0], 17, s.text, false), Qvk3Ui.weight(1));
+                ImageView chev = new ImageView(this);
+                chev.setImageDrawable(Qvk3Icons.of(Qvk3Icons.RIGHT, s.text2));
+                row.addView(chev, new LinearLayout.LayoutParams(dp(18), dp(18)));
+                row.setBackground(Qvk3Ui.ripple(this, 0, s.dark ? 0x22FFFFFF : 0x14000000, 0));
+                row.setContentDescription((String) it[0]);
+                final String route = (String) it[3], url = (String) it[4];
+                row.setOnClickListener(v -> openStock(route, url));
+                card.addView(row, Qvk3Ui.match());
+            }
+            LinearLayout.LayoutParams cl = Qvk3Ui.match();
+            cl.bottomMargin = dp(18);
+            col.addView(card, cl);
+        }
+        LinearLayout stock = new LinearLayout(this);
+        stock.setBackground(Qvk3Ui.rounded(s.field, dp(12)));
+        stock.setGravity(Gravity.CENTER_VERTICAL);
+        stock.setPadding(dp(16), dp(14), dp(16), dp(14));
+        stock.addView(Qvk3Ui.text(this, "Открыть штатный ВКонтакте целиком", 17, s.tint, false), Qvk3Ui.weight(1));
+        stock.setOnClickListener(v -> moveShellAside());
+        col.addView(stock, Qvk3Ui.match());
+        TextView note = Qvk3Ui.text(this, "Все разделы оригинального клиента остаются доступны: они открываются штатными экранами ВК, а оболочка QVK заменяет только чаты и музыку.", 13, s.text2, false);
+        note.setPadding(dp(8), dp(12), dp(8), 0);
+        col.addView(note);
+        return sv;
     }
 
     // ------------------------------------------------------------------ chats
