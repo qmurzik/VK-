@@ -47,6 +47,7 @@ public final class Qvk3Runtime extends ContentProvider {
             if (c instanceof android.app.Application) Qvk3Shell.install((android.app.Application) c);
             if (c instanceof android.app.Application) Qvk3Skin.install((android.app.Application) c);
             Qvk3Jobs.io(() -> Qvk3Updates.cleanup(c));
+            Qvk3Jobs.io(() -> Qvk3Growth.sample(c));
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.runtime.start", t);
         }
