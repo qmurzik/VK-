@@ -1,0 +1,14 @@
+--- a/smali_classes21/re/sova/qmods/StickerGif.smali	2026-11-11 18:00:01.758704557 +0000
++++ b/smali_classes21/re/sova/qmods/StickerGif.smali	2026-11-11 18:00:01.799100027 +0000
+@@ -525,6 +525,11 @@
+     if-gt p2, v1, :cond_2
+ 
+     .line 71
++    # QVK 3.0: ordered dithering of colour and transparency before the fixed-palette mapping (BUG-0015)
++    iget v1, p0, Lre/sova/qmods/StickerGif;->width:I
++
++    invoke-static {p1, v1}, Lre/sova/qmods/Qvk3GifQuant;->prepare([II)V
++
+     const/4 v1, 0x4
+ 
+     new-array v1, v1, [B
