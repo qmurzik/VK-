@@ -84,6 +84,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         Qvk3DayNight.sync(a);
         if (!stock(a)) return;
         lastVk = new WeakReference<>(a);
+        Qvk3ElementPicker.maybeStart(a);
         if (!active(a)) {
             // nothing to restyle: no layout listener, no tree walks (they cost battery on every VK redraw)
             ViewTreeObserver.OnGlobalLayoutListener old = listeners.remove(a);
@@ -385,11 +386,13 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
                     o.background = v.getBackground();
                     o.hasBase = true;
                 }
+                // rounding alone keeps VK's own background (ripples, shapes) and only clips the corners
+                boolean replace = r.bg != 0 || o.background == null || o.background instanceof ColorDrawable;
                 GradientDrawable g = new GradientDrawable();
                 int base = r.bg != 0 ? r.bg : (o.background instanceof ColorDrawable ? ((ColorDrawable) o.background).getColor() : 0);
                 g.setColor(base);
                 g.setCornerRadius(r.radius >= 0 ? dp(a, r.radius) : 0);
-                if (!(v.getBackground() instanceof GradientDrawable) || !Integer.valueOf(r.bg * 31 + r.radius).equals(v.getTag(TAG_COLOR))) {
+                if (replace && (!(v.getBackground() instanceof GradientDrawable) || !Integer.valueOf(r.bg * 31 + r.radius).equals(v.getTag(TAG_COLOR)))) {
                     v.setBackground(g);
                     v.setTag(TAG_COLOR, r.bg * 31 + r.radius);
                 }

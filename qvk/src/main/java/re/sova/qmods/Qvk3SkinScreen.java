@@ -55,6 +55,7 @@ final class Qvk3SkinScreen {
         List<Qvk3Skin.Rule> rules = Qvk3Skin.rules(a);
         List<String> labels = new ArrayList<>();
         for (Qvk3Skin.Rule r : rules) labels.add("#" + r.id + (r.hide ? " · скрыт" : (r.radius >= 0 ? " · скругление " + r.radius : "") + (r.bg != 0 ? " · цвет" : "") + (r.opacity < 100 ? " · " + r.opacity + "%" : "") + (r.margin >= 0 ? " · отступ " + r.margin : "")));
+        labels.add("☝ Настроить элемент касанием на экране ВК");
         labels.add("＋ Новое правило по имени элемента");
         labels.add("Как найти имя элемента (Инспектор)");
         labels.add("Набор: убрать тени у шапки чата и панели");
@@ -62,12 +63,14 @@ final class Qvk3SkinScreen {
         labels.add("Набор: плоский вид (убрать разделители и тени везде)");
         labels.add("Сбросить все правила");
         Qvk3Ui.dialog(a).setTitle("Правила интерфейса ВК").setItems(labels.toArray(new String[0]), (d, i) -> {
+            int k = i - rules.size();
             if (i < rules.size()) edit(a, rules, i);
-            else if (i == rules.size()) edit(a, rules, -1);
-            else if (i == rules.size() + 1) inspector(a);
-            else if (i == rules.size() + 2) preset(a, rules, true, "dialog_shadow", "bottom_navigation_shadow");
-            else if (i == rules.size() + 3) preset(a, rules, false, "vkim_fab");
-            else if (i == rules.size() + 4) preset(a, rules, true, "shadow", "shadow_view", "app_bar_shadow_view", "header_shadow", "divider", "separator", "top_divider", "bottom_divider", "tool_bar_divider", "dialog_shadow", "bottom_navigation_shadow");
+            else if (k == 0) Qvk3ElementPicker.arm(a);
+            else if (k == 1) edit(a, rules, -1);
+            else if (k == 2) inspector(a);
+            else if (k == 3) preset(a, rules, true, "dialog_shadow", "bottom_navigation_shadow");
+            else if (k == 4) preset(a, rules, false, "vkim_fab");
+            else if (k == 5) preset(a, rules, true, "shadow", "shadow_view", "app_bar_shadow_view", "header_shadow", "divider", "separator", "top_divider", "bottom_divider", "tool_bar_divider", "dialog_shadow", "bottom_navigation_shadow");
             else {
                 rules.clear();
                 Qvk3Skin.saveRules(a, rules);

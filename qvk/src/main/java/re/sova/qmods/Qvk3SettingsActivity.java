@@ -216,6 +216,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
         idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
         idx.addScreen("qvk3:dock", "Нижняя панель ВК", "Плавающая, скруглённая, полупрозрачная — настоящая панель ВК", 0, "Интерфейс ВК");
+        idx.addScreen("qvk3:pick", "Настроить элемент касанием", "Коснитесь любого элемента ВК: скрыть, скруглить, прозрачность, цвет", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:rules", "Правила интерфейса ВК", "Скрыть, скруглить, перекрасить любой элемент по его имени", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:inspect", "Инспектор интерфейса", "Снять список элементов экрана ВК — для правил и для разработчика", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
@@ -572,6 +573,9 @@ public final class Qvk3SettingsActivity extends Activity {
                 break;
             case "rules":
                 Qvk3SkinScreen.rules(this);
+                break;
+            case "pick":
+                Qvk3ElementPicker.arm(this);
                 break;
             case "inspect":
                 Qvk3SkinScreen.inspector(this);

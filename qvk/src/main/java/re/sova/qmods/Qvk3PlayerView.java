@@ -179,7 +179,35 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             int hLimit = (int) (getResources().getDisplayMetrics().heightPixels * (land ? 0.6f : 0.46f));
             int size = Math.round(Math.min(w, hLimit) * Qvk3MusicSettings.coverSize(a));
             stage.addView(cover, new LayoutParams(size, size, Gravity.CENTER));
-            cover.setOnClickListener(v -> toggleLyrics());
+            // tap: lyrics · double tap: favourite (with a heart burst) · long press: queue
+            android.view.GestureDetector coverGestures = new android.view.GestureDetector(a, new android.view.GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onDown(android.view.MotionEvent e) {
+                    return true;
+                }
+
+                @Override
+                public boolean onSingleTapConfirmed(android.view.MotionEvent e) {
+                    toggleLyrics();
+                    return true;
+                }
+
+                @Override
+                public boolean onDoubleTap(android.view.MotionEvent e) {
+                    Qvk3Track t = engine.current();
+                    if (t != null && !Qvk3MusicLibrary.get(a).favorite(t.key())) toggleFavorite();
+                    heartBurst(stage);
+                    return true;
+                }
+
+                @Override
+                public void onLongPress(android.view.MotionEvent e) {
+                    cover.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                    Qvk3QueueDialog.show(a);
+                }
+            });
+            cover.setOnTouchListener((v, ev) -> coverGestures.onTouchEvent(ev));
+            cover.setClickable(true);
         }
         lyricsList = new ListView(a);
         lyricsList.setDivider(null);
@@ -601,11 +629,57 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         return onDark ? 0xFF8EC5FF : accent;
     }
 
-    /** Modern / CoverFlow: background gradient from the cover colour. */
+    private int lastBase = 0xFF3A3F4A;
+    private android.animation.ValueAnimator tintAnim;
+
+    /**
+     * Colours from the cover. Modern / CoverFlow: the background gradient glides (600 ms) from the previous track's
+     * colour to the new one instead of jumping. All dark layouts: the progress bar takes a vivid accent made from the
+     * cover (saturation and brightness lifted so it stays visible on dark).
+     */
     private void tint(Bitmap bmp) {
-        if (!(layout.equals("modern") || layout.equals("coverflow"))) return;
         int base = bmp == null ? 0xFF3A3F4A : Qvk3Ui.average(bmp);
-        gradient.setColors(new int[]{Qvk3Ui.deep(base, 0.42f), Qvk3Ui.deep(base, 0.16f), 0xFF0B0C10});
+        if (onDark && seek != null) Qvk3Ui.styleSeek(a, seek, vivid(base), 0x40FFFFFF);
+        if (!(layout.equals("modern") || layout.equals("coverflow"))) return;
+        final int from = lastBase, to = base;
+        lastBase = base;
+        if (tintAnim != null) tintAnim.cancel();
+        if (Qvk3Appearance.weakDevice(a)) {
+            gradient.setColors(new int[]{Qvk3Ui.deep(to, 0.42f), Qvk3Ui.deep(to, 0.16f), 0xFF0B0C10});
+            return;
+        }
+        android.animation.ArgbEvaluator ev = new android.animation.ArgbEvaluator();
+        tintAnim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+        tintAnim.setDuration(600);
+        tintAnim.addUpdateListener(an -> {
+            int c = (int) ev.evaluate(an.getAnimatedFraction(), from, to);
+            gradient.setColors(new int[]{Qvk3Ui.deep(c, 0.42f), Qvk3Ui.deep(c, 0.16f), 0xFF0B0C10});
+        });
+        tintAnim.start();
+    }
+
+    /** A bright, saturated version of a colour for accents on dark backgrounds. */
+    static int vivid(int c) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(c, hsv);
+        if (hsv[1] < 0.12f) return 0xFFFFFFFF;           // grey covers: plain white
+        hsv[1] = Math.max(hsv[1], 0.55f);
+        hsv[2] = Math.max(hsv[2], 0.92f);
+        return Color.HSVToColor(hsv);
+    }
+
+    /** A heart that pops up over the cover and fades (double tap = like). */
+    private void heartBurst(FrameLayout stage) {
+        if (stage == null) return;
+        ImageView h = new ImageView(a);
+        h.setImageDrawable(Qvk3Icons.of(Qvk3Icons.HEART_FILL, 0xFFFF4D6A));
+        stage.addView(h, new LayoutParams(dp(96), dp(96), Gravity.CENTER));
+        h.setScaleX(0.3f);
+        h.setScaleY(0.3f);
+        h.setAlpha(0f);
+        h.animate().scaleX(1.15f).scaleY(1.15f).alpha(1f).setDuration(180).withEndAction(() ->
+                h.animate().scaleX(1f).scaleY(1f).alpha(0f).setStartDelay(260).setDuration(320)
+                        .withEndAction(() -> stage.removeView(h)).start()).start();
     }
 
     private void toggleLyrics() {
