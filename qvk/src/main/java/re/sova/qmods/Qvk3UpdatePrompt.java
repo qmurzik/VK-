@@ -264,6 +264,17 @@ public final class Qvk3UpdatePrompt implements Application.ActivityLifecycleCall
         }
     }
 
+    /** «Канал обновлений»: every alpha build, or only the builds the team marked stable. */
+    static void channel(Activity a) {
+        boolean stable = Qvk3Updates.stableOnly(a);
+        String[] items = {"Альфа — все новые сборки (для тестировщиков)", "Стабильная — только проверенные сборки"};
+        Qvk3Ui.dialog(a).setTitle("Канал обновлений").setSingleChoiceItems(items, stable ? 1 : 0, (d, w) -> {
+            prefs(a).edit().putString(Qvk3Updates.CHANNEL, w == 1 ? "stable" : "alpha").remove(LAST_AUTO).apply();
+            d.dismiss();
+            Qvk3Ui.toast(a, w == 1 ? "Будут предлагаться только стабильные сборки" : "Будут предлагаться все новые сборки");
+        }).setNegativeButton("Закрыть", null).show();
+    }
+
     @Override
     public void onActivityCreated(Activity a, Bundle b) {
     }

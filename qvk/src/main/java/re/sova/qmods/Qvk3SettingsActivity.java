@@ -233,7 +233,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:inspect", "Инспектор интерфейса", "Снять список элементов экрана ВК — для правил и для разработчика", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
         idx.addSwitch(Qvk3CatalogAds.PREF, "Скрывать предложения подписки", "Баннеры «Целый месяц — 0 ₽ … Подключить» в музыке ВК", 4, "QVK Music", true);
-        idx.addSwitch(Qvk3FeedNow.PREF, "Кнопка музыки на «Главной»", "Кольцо с паузой в шапке ленты, пока играет QVK Music; удержание — плеер", 4, "QVK Music", true);
+        idx.addSwitch(Qvk3FeedNow.PREF, "Кнопка музыки в шапках ВК", "Кольцо с паузой в шапке «Главной», «Мессенджера», «Сообществ», «Поиска», «Сервисов», пока играет QVK Music; удержание — плеер", 4, "QVK Music", true);
         idx.addScreen("qvk3:musicSettings", "Настройки QVK Music", "Воспроизведение, звук, плеер, офлайн, тексты", 4, "QVK Music");
         idx.addScreen("qvk3:push", "Диагностика Push", "Google/microG, транспорт, фоновые ограничения", 6, "Доставка уведомлений");
         idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 7, "Загрузки и место");
@@ -247,6 +247,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:logs", "Логи приложения", "Скопировать или сохранить журнал без logcat", 7, "Диагностика");
         idx.addScreen("qvk3:faults", "Журнал ошибок", "Сбои модулей с указанием компонента", 7, "Диагностика");
         idx.addSwitch(Qvk3UpdatePrompt.PREF, "Предлагать обновления", "Раз в 6 часов при открытии ВК: «Доступно обновление — обновиться?»", 8, "Обновления", true);
+        idx.addScreen("qvk3:channel", "Канал обновлений", "Альфа — все сборки, стабильная — только проверенные", 8, "Обновления");
         idx.addScreen("qvk3:updates", "Проверить обновления", "Загрузка с докачкой, проверка подписи", 8, "Обновления");
         idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса, зеркала и ключи подписи", 8, "Обновления");
         idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 8, "О QVK");
@@ -583,6 +584,9 @@ public final class Qvk3SettingsActivity extends Activity {
             case "report":
                 Activity vk = Qvk3Skin.lastVkActivity();
                 Qvk3Report.open(this, vk == null || vk.isDestroyed() ? null : Qvk3Report.capture(vk), null);
+                break;
+            case "channel":
+                Qvk3UpdatePrompt.channel(this);
                 break;
             case "myTickets":
                 Qvk3MyTickets.show(this);

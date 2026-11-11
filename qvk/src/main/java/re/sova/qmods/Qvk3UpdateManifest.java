@@ -41,6 +41,8 @@ public final class Qvk3UpdateManifest {
         public final List<String> urls;
         public final String notes;
         public final String published;
+        /** "alpha" (every build, the default) or "stable" (builds the team marked as stable). */
+        public final String channel;
 
         Release(JSONObject o) {
             versionCode = o.optLong("version_code");
@@ -57,6 +59,7 @@ public final class Qvk3UpdateManifest {
             urls = u;
             notes = o.optString("notes", o.optString("text"));
             published = o.optString("published");
+            channel = "stable".equals(o.optString("channel")) ? "stable" : "alpha";
         }
 
         void validate() {
@@ -148,9 +151,15 @@ public final class Qvk3UpdateManifest {
 
     /** Newest release that is newer than {@code installed}, built on VK 8.100 and compatible with {@code sdk}. */
     public Release best(long installed, int sdk) {
+        return best(installed, sdk, false);
+    }
+
+    /** stableOnly: only releases marked "stable" (the «Стабильная» update channel). */
+    public Release best(long installed, int sdk, boolean stableOnly) {
         Release best = null;
         for (Release r : releases) {
             if (r.versionCode <= installed || r.minSdk > sdk || !VK_BASE.equals(r.vkBase)) continue;
+            if (stableOnly && !"stable".equals(r.channel)) continue;
             if (best == null || r.versionCode > best.versionCode) best = r;
         }
         return best;

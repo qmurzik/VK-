@@ -21,7 +21,12 @@ public final class Qvk3CatalogAds {
 
     public static void filter(Object response, String method) {
         try {
-            if (method == null || !method.toLowerCase(Locale.ROOT).startsWith("catalog.")) return;
+            String m = method == null ? "" : method.toLowerCase(Locale.ROOT);
+            if (response instanceof JSONObject && (m.startsWith("superapp.") || m.contains("showcase"))) {
+                if (RuntimeBridge.prefs == null || RuntimeBridge.prefs.getBoolean(PREF, true)) dropStoreNags((JSONObject) response, 0);
+                return;
+            }
+            if (method == null || !m.startsWith("catalog.")) return;
             if (!(response instanceof JSONObject)) return;
             if (RuntimeBridge.prefs != null && !RuntimeBridge.prefs.getBoolean(PREF, true)) return;
             strip((JSONObject) response);
@@ -94,5 +99,44 @@ public final class Qvk3CatalogAds {
             }
         }
         return removed;
+    }
+
+    /**
+     * BUG-0026: «Установите VK из RuStore — это нужно, чтобы получать обновления» in «Сервисы → Обзор» (superApp.getShowcase).
+     * QVK is updated by QVK, so any showcase item that sends to RuStore is dropped. Returns how many were removed.
+     */
+    public static int dropStoreNags(JSONObject o, int depth) throws Exception {
+        if (depth > 7) return 0;
+        int removed = 0;
+        java.util.Iterator<String> it = o.keys();
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        while (it.hasNext()) keys.add(it.next());
+        for (String k : keys) {
+            Object v = o.opt(k);
+            if (v instanceof JSONArray) {
+                JSONArray a = (JSONArray) v, kept = new JSONArray();
+                int before = removed;
+                for (int i = 0; i < a.length(); i++) {
+                    Object e = a.opt(i);
+                    if (e instanceof JSONObject && storeNag(e.toString())) {
+                        removed++;
+                        continue;
+                    }
+                    if (e instanceof JSONObject) removed += dropStoreNags((JSONObject) e, depth + 1);
+                    kept.put(e);
+                }
+                if (removed > before) o.put(k, kept);
+            } else if (v instanceof JSONObject) {
+                removed += dropStoreNags((JSONObject) v, depth + 1);
+            }
+        }
+        return removed;
+    }
+
+    static boolean storeNag(String json) {
+        String s = json.toLowerCase(Locale.ROOT);
+        // small objects only: a whole section that merely mentions RuStore somewhere deep inside is not removed
+        return s.length() < 6000 && (s.contains("rustore") || s.contains("ru_store")) && (s.contains("установите") || s.contains("обновлен")
+                || s.contains("install") || s.contains("update") || s.contains("banner"));
     }
 }

@@ -42,6 +42,12 @@ public final class Qvk3Updates {
     static final String COMMUNITY = "qvk3_update_community";
     static final String HISTORY = "qvk3_update_history";
     static final String LAST = "qvk3_update_last";
+    /** Update channel: "alpha" — every build (default for the beta), "stable" — only builds marked stable. */
+    public static final String CHANNEL = "qvk3_update_channel";
+
+    public static boolean stableOnly(Context c) {
+        return "stable".equals(prefs(c).getString(CHANNEL, "alpha"));
+    }
     static final String ACTION_INSTALL = "ru.qmods.qvk.QVK3_INSTALL_STATUS";
 
     private static final AtomicBoolean busy = new AtomicBoolean();
@@ -181,7 +187,7 @@ public final class Qvk3Updates {
             try {
                 Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(get(url, 512 * 1024), keys);
                 history.addAll(m.releases);
-                Qvk3UpdateManifest.Release r = m.best(installed, Build.VERSION.SDK_INT);
+                Qvk3UpdateManifest.Release r = m.best(installed, Build.VERSION.SDK_INT, stableOnly(c));
                 if (r != null && (best == null || r.versionCode > best.versionCode)) {
                     best = r;
                     bestSource = url;
@@ -199,7 +205,7 @@ public final class Qvk3Updates {
                 if (rel != null) {
                     Qvk3UpdateManifest m = Qvk3UpdateManifest.fromLegacy(rel);
                     history.addAll(m.releases);
-                    Qvk3UpdateManifest.Release r = m.best(installed, Build.VERSION.SDK_INT);
+                    Qvk3UpdateManifest.Release r = m.best(installed, Build.VERSION.SDK_INT, stableOnly(c));
                     if (r != null) {
                         best = r;
                         bestSource = "канал сообщества QVK";

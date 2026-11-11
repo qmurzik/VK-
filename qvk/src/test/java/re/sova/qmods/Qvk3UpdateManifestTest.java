@@ -104,4 +104,14 @@ public class Qvk3UpdateManifestTest {
         Qvk3UpdateManifest m = Qvk3UpdateManifest.fromLegacy(legacy);
         assertEquals(23790, m.best(23776, 30).versionCode);
     }
+
+    @Test public void stableChannelSkipsAlphaBuilds() throws Exception {
+        JSONObject alpha = release(23830, "8.100", 28);
+        JSONObject stable = release(23820, "8.100", 28).put("channel", "stable");
+        Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(payload(alpha, stable), null);
+        assertEquals(23830, m.best(23800, 34).versionCode);              // alpha channel: newest build
+        assertEquals(23820, m.best(23800, 34, true).versionCode);        // stable channel: newest stable build
+        assertNull(m.best(23820, 34, true));                             // already on the newest stable
+        assertEquals("alpha", m.releases.get(0).channel);                // no field = alpha
+    }
 }
