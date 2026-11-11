@@ -1,0 +1,26 @@
+--- a/smali_classes12/xsna/bf5$a.smali	2026-11-11 19:48:11.598001191 +0000
++++ b/smali_classes12/xsna/bf5$a.smali	2026-11-11 19:48:11.610688987 +0000
+@@ -78,6 +78,23 @@
+ .method public final invoke()V
+     .locals 3
+ 
++    # QVK 3.0 (IDEA-0012): open the QVK dock editor right away
++    iget-object v0, p0, Lxsna/bf5$a;->$anchor:Landroid/view/View;
++
++    invoke-virtual {v0}, Landroid/view/View;->getContext()Landroid/content/Context;
++
++    move-result-object v0
++
++    invoke-static {v0}, Lre/sova/qmods/Qvk3DockQuick;->open(Landroid/content/Context;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_vk_editor
++
++    return-void
++
++    :qvk3_vk_editor
++
+     .line 2
+     iget-object v0, p0, Lxsna/bf5$a;->this$0:Lxsna/bf5;
+ 

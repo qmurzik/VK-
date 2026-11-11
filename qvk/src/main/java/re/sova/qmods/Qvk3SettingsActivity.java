@@ -217,10 +217,12 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
         idx.addScreen("qvk3:dock", "Нижняя панель ВК", "Плавающая, скруглённая, полупрозрачная — настоящая панель ВК", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:searchTabs", "Разделы поиска ВК", "Скрыть ненужные вкладки поиска: игры, клипы, товары, сервисы", 1, "Интерфейс ВК");
+        idx.addSwitch(Qvk3SendRetry.PREF, "Повторять неотправленное", "Если фото, видео, файл или сообщение не ушли — QVK сам повторит отправку (до 2 раз, когда есть сеть)", 2, "Чаты и диалоги", true);
         idx.addScreen("qvk3:pick", "Настроить элемент касанием", "Коснитесь любого элемента ВК: скрыть, скруглить, прозрачность, цвет", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:rules", "Правила интерфейса ВК", "Скрыть, скруглить, перекрасить любой элемент по его имени", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:inspect", "Инспектор интерфейса", "Снять список элементов экрана ВК — для правил и для разработчика", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
+        idx.addSwitch(Qvk3FeedNow.PREF, "Кнопка музыки на «Главной»", "Кольцо с паузой в шапке ленты, пока играет QVK Music; удержание — плеер", 4, "QVK Music", true);
         idx.addScreen("qvk3:musicSettings", "Настройки QVK Music", "Воспроизведение, звук, плеер, офлайн, тексты", 4, "QVK Music");
         idx.addScreen("qvk3:push", "Диагностика Push", "Google/microG, транспорт, фоновые ограничения", 6, "Доставка уведомлений");
         idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 7, "Загрузки и место");
@@ -532,7 +534,8 @@ public final class Qvk3SettingsActivity extends Activity {
             return;
         }
         Qvk3SettingsHistory.before(this, it.key, (now ? "Включено: " : "Выключено: ") + it.title);
-        try {
+        if (it.key.startsWith("qvk3_")) Qvk3MusicSettings.prefs(this).edit().putBoolean(it.key, now).apply();
+        else try {
             SettingsRuntime.toggle(it.key, now);
         } catch (Throwable e) {
             Qvk3MusicSettings.prefs(this).edit().putBoolean(it.key, now).apply();

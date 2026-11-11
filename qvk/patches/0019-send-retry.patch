@@ -1,0 +1,17 @@
+--- a/smali_classes9/xsna/tqy.smali	2026-11-11 19:43:02.897777810 +0000
++++ b/smali_classes9/xsna/tqy.smali	2026-11-11 19:43:02.912994132 +0000
+@@ -429,6 +429,14 @@
+ 
+     .line 58
+     :cond_0
++
++    # QVK 3.0 (IDEA-0010): automatic retry of failed sends, see Qvk3SendRetry
++    iget-object v2, p0, Lxsna/tqy;->m:Lcom/vk/dto/common/Peer;
++
++    iget v3, p0, Lxsna/tqy;->c:I
++
++    invoke-static {v2, v3, p2, p3}, Lre/sova/qmods/Qvk3SendRetry;->failed(Ljava/lang/Object;ILjava/lang/Throwable;Z)V
++
+     iget v2, p0, Lxsna/tqy;->c:I
+ 
+     .line 59

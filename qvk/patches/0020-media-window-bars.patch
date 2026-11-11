@@ -1,0 +1,20 @@
+--- a/smali_classes21/re/sova/qmods/ThemePalette.smali	2026-11-11 19:43:32.565263120 +0000
++++ b/smali_classes21/re/sova/qmods/ThemePalette.smali	2026-11-11 19:43:32.582318754 +0000
+@@ -1762,6 +1762,17 @@
+ .method public static window(Landroid/app/Activity;)V
+     .locals 6
+ 
++    # QVK 3.0 (BUG-0024): keep VK's own bars on clips/video/stories windows
++    invoke-static {p0}, Lre/sova/qmods/Qvk3MediaWindow;->skip(Landroid/app/Activity;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_not_media
++
++    return-void
++
++    :qvk3_not_media
++
+     .line 148
+     invoke-virtual {p0}, Landroid/app/Activity;->getWindow()Landroid/view/Window;
+ 

@@ -288,6 +288,11 @@ public final class Qvk3SettingsIndex {
         add(new Item("screen:" + target, null, title, summary, section, group, SCREEN, target, false));
     }
 
+    /** A QVK 3.0 switch stored directly in QVK preferences (keys start with "qvk3_"). */
+    public void addSwitch(String key, String title, String summary, int section, String group, boolean def) {
+        add(new Item(key, key, title, summary, section, group, SWITCH, null, def));
+    }
+
     public void addHubScreen(String group, String title, String summary, String target) {
         // "all:"/"basic:" routes only re-list catalog switches that the centre already shows; a screen whose
         // target or title duplicates a catalog entry would appear twice.
