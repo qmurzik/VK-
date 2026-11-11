@@ -96,8 +96,22 @@ public final class Qvk3SettingsIndex {
         return !NATIVE.contains(target);
     }
 
+    /**
+     * QVK 2.x appearance screens replaced by QVK 3.0 «Стили и конструктор» (which writes the same iOS/Material/theme
+     * keys) and by «Светлая и тёмная тема». They are no longer listed or searchable: one customization system.
+     */
+    static final Set<String> LEGACY_LOOK = new java.util.HashSet<>(java.util.Arrays.asList(
+            "qvk_ios_style", "qvk_material3_style", "themes", "qvk_monet_options",
+            "ios", "material3", "modern", "original:themes", "monet"));
+
+    static boolean legacyLook(Item i) {
+        return LEGACY_LOOK.contains(i.id) || (i.target != null && LEGACY_LOOK.contains(i.target))
+                || (i.id.startsWith("screen:") && LEGACY_LOOK.contains(i.id.substring(7)));
+    }
+
     void add(Item i) {
         if (byId.containsKey(i.id)) return;
+        if (legacyLook(i)) return;
         // Older QVK 2.x screens stay in their real section: with patch 0010 (Qvk3Look) they share this centre's look.
         items.add(i);
         byId.put(i.id, i);
@@ -113,9 +127,8 @@ public final class Qvk3SettingsIndex {
     }
 
     static {
-        place(0, "Стиль интерфейса", "qvk_ios_style", "qvk_material3_style");
-        place(0, "Темы и цвета", "themes", "qvk_theme_catalog", "qvk_monet_colors", "qvk_monet_options");
-        place(0, "Персонализация", "qvk_personalization");
+        place(0, "Темы и цвета", "qvk_theme_catalog", "qvk_monet_colors");
+        place(0, "Фон и пузыри чатов", "qvk_personalization");
         place(0, "Анимации и запуск", "qvk_motion_options", "qvk_smooth_motion", "qvk_motion_blur_options", "qvk_splash_options");
         place(0, "Значки и украшения", "badges", "sova_badges_enabled", "qvk_ornament_catalog", "qvk_badge_application", "disable_nft_avatars", "disable_emoji_status", "core_christmas_garland");
         place(0, "Иконка, язык и эмодзи", "changeIcon", "appLanguage", "qvk_system_emoji");
@@ -183,14 +196,11 @@ public final class Qvk3SettingsIndex {
             case "themeCatalog":
                 return new String[]{"0", "Темы и цвета"};
             case "personal":
-                return new String[]{"0", "Персонализация"};
+                return new String[]{"0", "Фон и пузыри чатов"};
             case "original:badges":
                 return new String[]{"0", "Значки и украшения"};
-            case "ios":
-            case "material3":
-            case "modern":
             case "comfort":
-                return new String[]{"0", "Стиль интерфейса"};
+                return new String[]{"0", "Удобство и чтение"};
             case "icons":
             case "languagesCustom":
                 return new String[]{"0", "Иконка, язык и эмодзи"};

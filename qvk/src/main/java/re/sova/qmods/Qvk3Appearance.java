@@ -180,6 +180,12 @@ public final class Qvk3Appearance {
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.appearance.reset.material", t);
         }
+        try {
+            // QVK 2.x «Студия интерфейса» is no longer listed (one customization system): reset is the way back to its defaults
+            ModernStudio.save(ModernStudio.defaults());
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.appearance.reset.studio", t);
+        }
         Qvk3SettingsHistory.record(a, STYLE, "Оформление сброшено");
         ThemePalette.refresh(a);
     }
