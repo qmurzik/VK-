@@ -66,10 +66,36 @@ public final class Qvk3Updates {
         if (l != null) Qvk3Jobs.main(l::changed);
     }
 
+    /**
+     * Official QVK 3 channel: a signed manifest on Yandex Disk (public link stays the same when the file is replaced).
+     * Used when the user has not set own sources; the signature is checked with the key in assets/qvk3_update_keys.json.
+     */
+    public static final String DEFAULT_SOURCE = "https://yadi.sk/d/CEfYrKqqYoX6PQ";
+
     public static List<String> sources(Context c) {
         List<String> out = new ArrayList<>();
         for (String s : prefs(c).getString(SOURCES, "").split("\n")) if (!s.trim().isEmpty()) out.add(s.trim());
+        if (out.isEmpty()) out.add(DEFAULT_SOURCE);
         return out;
+    }
+
+    /** Yandex Disk public links (yadi.sk, disk.yandex.*) point to a web page; the API gives a short-lived direct link. */
+    static boolean yandexPublic(String url) {
+        String h = host(url).toLowerCase(java.util.Locale.ROOT);
+        return h.equals("yadi.sk") || h.equals("disk.yandex.ru") || h.equals("disk.yandex.com") || h.equals("disk.360.yandex.ru");
+    }
+
+    static String direct(String url) throws IOException {
+        if (!yandexPublic(url)) return url;
+        String api = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=" + java.net.URLEncoder.encode(url, "UTF-8");
+        try {
+            String href = new JSONObject(plain(api, 64 * 1024)).optString("href");
+            if (href.isEmpty()) throw new IOException("Яндекс Диск не дал ссылку на файл");
+            Qvk3UpdateManifest.httpsUrl(href);
+            return href;
+        } catch (org.json.JSONException e) {
+            throw new IOException("Яндекс Диск: неожиданный ответ");
+        }
     }
 
     public static void setSources(Context c, List<String> urls) {
@@ -202,6 +228,10 @@ public final class Qvk3Updates {
     }
 
     static String get(String url, int limit) throws IOException {
+        return plain(direct(url), limit);
+    }
+
+    static String plain(String url, int limit) throws IOException {
         Qvk3UpdateManifest.httpsUrl(url);
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setConnectTimeout(8000);
@@ -313,6 +343,8 @@ public final class Qvk3Updates {
         Qvk3UpdateManifest.httpsUrl(url);
         long have = part.isFile() ? part.length() : 0;
         if (have >= size) return;
+        String from = url;
+        url = direct(url); // Yandex Disk: fresh direct link on every attempt (they expire)
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setConnectTimeout(10000);
         con.setReadTimeout(30000);
@@ -335,7 +367,7 @@ public final class Qvk3Updates {
                     int p = (int) (have * 100 / size);
                     if (p != lastP) {
                         lastP = p;
-                        set("Загрузка обновления · " + p + "% · " + host(url), p);
+                        set("Загрузка обновления · " + p + "% · " + host(from), p);
                     }
                 }
             }

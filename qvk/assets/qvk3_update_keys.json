@@ -1,4 +1,11 @@
 {
   "comment": "Доверенные открытые ключи подписи манифеста обновлений QVK 3 (EC P-256, X.509 SubjectPublicKeyInfo в base64). Пустой список: подпись манифеста не проверяется, но SHA-256, пакет, версия и сертификат APK проверяются всегда. Сгенерируйте ключ: python3 qvk/tools/update_manifest.py keygen",
-  "keys": []
+  "keys": [
+    {
+      "id": "main",
+      "public_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESrtlxxvL9Q4KCrnG1xC58N/Q+fN7OOM8kdK6IHbiI0byJc53FSKpMca+6ynIs9xZCneZra/L418eiyatrp82Lg==",
+      "added": "2026-11-11",
+      "channel": "Яндекс Диск, приложение QVK"
+    }
+  ]
 }

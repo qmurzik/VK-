@@ -1,0 +1,5 @@
+{
+ "payload": "{\"schema\": 3, \"package\": \"ru.qmods.qvk\", \"channel\": \"stable\", \"releases\": [{\"version_code\": 23828, \"version_name\": \"8.100-qvk-3.0.0-alpha29\", \"vk_base\": \"8.100\", \"min_sdk\": 28, \"apk_size\": 194240328, \"sha256\": \"e77d2eee0e65e660e499350753fbb2d7728311725212e6fb8fbe802a62d779c1\", \"signer_sha256\": \"a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc\", \"urls\": [\"https://yadi.sk/d/o8yF3xzlaJCMLg\", \"https://buzzheavier.com/6tl9p1v2p5kn\"], \"notes\": \"Автоповтор отправки, кнопка музыки на «Главной», быстрый редактор нижней панели, одна система оформления, разделы поиска; исправления клипов, мини-плеера и боковой шторки.\", \"published\": \"2026-11-11\"}]}",
+ "key_id": "main",
+ "signature": "MEUCIQDZA95djrPL+wwgzOxytQB90qvwnJp3g+na7HnccceRlQIgB2VLeVv/ngEOLyTAe5uSCyaTgUf+gb1/4ctWr0PuHSg="
+}
