@@ -33,6 +33,8 @@ import java.util.Set;
  */
 public final class Qvk3SettingsActivity extends Activity {
     static final String FAVORITES = "qvk3_settings_favorites";
+    /** Opens a qvk3 route on start, e.g. from a portal notification: "myTickets", "ticket:BUG-0021". */
+    static final String EXTRA_ROUTE = "qvk3_route";
     private Qvk3Ui.Palette p;
     private Qvk3SettingsIndex index;
     private LinearLayout content;
@@ -133,6 +135,14 @@ public final class Qvk3SettingsActivity extends Activity {
         if (state != null && !state.getString("query", "").isEmpty()) search.setText(state.getString("query"));
         else if (section >= 0) showSection(section);
         else showHome();
+        String route = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_ROUTE);
+        if (route != null && state == null) content.post(() -> {
+            try {
+                qvk3(route);
+            } catch (Exception e) {
+                Qvk3Ui.toast(this, Qvk3Jobs.message(e));
+            }
+        });
         if (Build.VERSION.SDK_INT >= 33) {
             android.window.OnBackInvokedCallback cb = this::handleBack;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
@@ -231,6 +241,9 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:battery", "Фоновая работа и батарея", "Оптимизация батареи и ограничения Android", 7, "Производительность и батарея");
         idx.addScreen("qvk3:weather", "Погода на экране запуска", "Температура под логотипом QVK; дождь и снег — подписью", 0, "Анимации и запуск");
         idx.addScreen("qvk3:dayNight", "Светлая и тёмная тема", "Режим (как в системе, по времени) и цвета каждой темы", 0, "Темы и цвета");
+        idx.addScreen("qvk3:report", "Сообщить о проблеме", "Баг или идея на портал бета-теста — с журналом, снимком экрана и версией", 7, "Портал бета-теста");
+        idx.addScreen("qvk3:myTickets", "Мои обращения", "Статусы, ответы команды, проверка исправлений", 7, "Портал бета-теста");
+        idx.addSwitch(Qvk3PortalWatch.SHAKE, "Встряхнуть — сообщить о проблеме", "На экранах ВК: встряхните телефон, чтобы отправить баг со снимком экрана", 7, "Портал бета-теста", true);
         idx.addScreen("qvk3:logs", "Логи приложения", "Скопировать или сохранить журнал без logcat", 7, "Диагностика");
         idx.addScreen("qvk3:faults", "Журнал ошибок", "Сбои модулей с указанием компонента", 7, "Диагностика");
         idx.addSwitch(Qvk3UpdatePrompt.PREF, "Предлагать обновления", "Раз в 6 часов при открытии ВК: «Доступно обновление — обновиться?»", 8, "Обновления", true);
@@ -562,7 +575,18 @@ public final class Qvk3SettingsActivity extends Activity {
     }
 
     private void qvk3(String what) throws Exception {
+        if (what.startsWith("ticket:")) {
+            Qvk3MyTickets.card(this, what.substring(7));
+            return;
+        }
         switch (what) {
+            case "report":
+                Activity vk = Qvk3Skin.lastVkActivity();
+                Qvk3Report.open(this, vk == null || vk.isDestroyed() ? null : Qvk3Report.capture(vk), null);
+                break;
+            case "myTickets":
+                Qvk3MyTickets.show(this);
+                break;
             case "styles":
             case "editor":
                 styles();
