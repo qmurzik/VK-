@@ -37,7 +37,7 @@ public final class Qvk3MusicSettingsScreen {
             {Qvk3MusicSettings.CACHE_LIMIT_MB},
             {Qvk3MusicSettings.LYRICS_EXTERNAL, Qvk3MusicSettings.LYRICS_SIZE, Qvk3MusicSettings.LYRICS_OVER_COVER},
             {}, {Qvk3MusicSettings.PAUSE_ON_UNPLUG},
-            {Qvk3MusicSettings.COVERFLOW_SPACING},
+            {Qvk3MusicSettings.COVERFLOW_SPACING, Qvk3MusicSettings.ROTATE_COVERFLOW},
             {Qvk3MusicSettings.HISTORY},
             {Qvk3MusicSettings.ENABLED}};
 
@@ -255,7 +255,10 @@ public final class Qvk3MusicSettingsScreen {
                     c.addView(info(a, p, "Кнопки гарнитуры и Bluetooth-устройств управляют QVK Music через системную медиасессию (воспроизведение, пауза, следующий/предыдущий)."));
                 };
             case 9:
-                return (a, p, c, r) -> c.addView(link(a, p, "Расстояние между альбомами: " + Qvk3MusicSettings.coverflowSpacing(a) + "%", v -> {
+                return (a, p, c, r) -> {
+                c.addView(toggle(a, "Cover Flow при повороте телефона", Qvk3MusicSettings.ROTATE_COVERFLOW, true, null));
+                c.addView(info(a, p, "Альбомы медиатеки на чёрном фоне, как на iPhone. Касание альбома переворачивает его к списку треков, касание трека включает альбом с него."));
+                c.addView(link(a, p, "Расстояние между альбомами: " + Qvk3MusicSettings.coverflowSpacing(a) + "%", v -> {
                     String[] l = {"Плотно (40%)", "Обычно (55%)", "Просторно (70%)", "Очень просторно (85%)"};
                     int[] val = {40, 55, 70, 85};
                     choose(a, "CoverFlow", l, -1, w -> {
@@ -264,6 +267,7 @@ public final class Qvk3MusicSettingsScreen {
                         refreshPlayer(a);
                     });
                 }));
+                };
             case 10:
                 return (a, p, c, r) -> {
                     c.addView(toggle(a, "Вести историю прослушивания (только на устройстве)", Qvk3MusicSettings.HISTORY, true, null));

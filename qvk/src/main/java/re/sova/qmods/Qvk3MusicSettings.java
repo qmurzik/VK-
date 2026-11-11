@@ -28,6 +28,8 @@ public final class Qvk3MusicSettings {
     public static final String CACHE_LIMIT_MB = "qvk3_music_cache_mb";
     public static final String HISTORY = "qvk3_music_history";
     public static final String COVERFLOW_SPACING = "qvk3_music_coverflow_spacing";
+    /** Turning the phone sideways opens the album Cover Flow. */
+    public static final String ROTATE_COVERFLOW = "qvk3_music_rotate_coverflow";
     public static final String PROGRESS_STYLE = "qvk3_music_progress";
 
     public static final String[] LAYOUTS = {"modern", "classic", "amoled", "glass", "coverflow"};
@@ -93,6 +95,10 @@ public final class Qvk3MusicSettings {
 
     public static int cacheLimitMb(Context c) {
         return Math.max(50, Math.min(4096, prefs(c).getInt(CACHE_LIMIT_MB, 300)));
+    }
+
+    public static boolean rotateCoverflow(Context c) {
+        return prefs(c).getBoolean(ROTATE_COVERFLOW, true);
     }
 
     public static int coverflowSpacing(Context c) {

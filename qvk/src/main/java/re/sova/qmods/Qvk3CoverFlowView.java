@@ -52,7 +52,9 @@ public final class Qvk3CoverFlowView extends View {
         void onItem(int index, boolean settled);
     }
 
-    private static final int VISIBLE_SIDE = 5; // covers drawn on each side
+    private static final int VISIBLE_SIDE = 5; // minimum covers drawn on each side
+    /** Covers drawn on each side: enough to reach past the screen edge, so none appears on screen out of nowhere. */
+    private int side = VISIBLE_SIDE;
     private static final float UNIT = 1000f;   // scroller works in integer units: 1 item = 1000
 
     private final List<Item> items = new ArrayList<>();
@@ -105,6 +107,7 @@ public final class Qvk3CoverFlowView extends View {
 
     public void setSpacingPercent(int p) {
         spacingPercent = Math.max(30, Math.min(90, p));
+        if (getWidth() > 0) computeSide(getWidth());
         invalidate();
     }
 
@@ -155,6 +158,25 @@ public final class Qvk3CoverFlowView extends View {
         int textSpace = Math.round(title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 24));
         // cover + reflection + caption must fit the height; the cover never exceeds ~46% of the width
         coverPx = Math.max(1, Math.min(Math.round(w * 0.46f), Math.round((h - textSpace) / (1f + REFLECTION))));
+        computeSide(w);
+    }
+
+    private void computeSide(int w) {
+        float W = coverPx, gap = W * (0.50f + 0.20f * spacingPercent / 62f), step = W * (0.11f + 0.10f * spacingPercent / 62f);
+        // first index whose (turned, ~0.34 W wide) cover lies completely beyond the edge, plus one spare
+        side = Math.max(VISIBLE_SIDE, Math.min(30, (int) Math.ceil((w / 2f + 0.2f * W - gap) / step) + 2));
+    }
+
+    /** Where the centre cover is drawn (used by the flip animation). */
+    public void centerCoverRect(RectF out) {
+        float textSpace = title.getTextSize() + subtitle.getTextSize() + Qvk3Compat.dp(getContext(), 28);
+        float top = Math.max(Qvk3Compat.dp(getContext(), 8), (getHeight() - coverPx * (1f + REFLECTION) - textSpace) / 2f);
+        float cx = getWidth() / 2f;
+        out.set(cx - coverPx / 2f, top, cx + coverPx / 2f, top + coverPx);
+    }
+
+    public Item item(int i) {
+        return i >= 0 && i < items.size() ? items.get(i) : null;
     }
 
     private float spacing() {
@@ -172,7 +194,7 @@ public final class Qvk3CoverFlowView extends View {
         }
         if (items.isEmpty() || coverPx <= 1) return;
         int center = Math.round(pos);
-        int from = Math.max(0, center - VISIBLE_SIDE - 1), to = Math.min(items.size() - 1, center + VISIBLE_SIDE + 1);
+        int from = Math.max(0, center - side - 1), to = Math.min(items.size() - 1, center + side + 1);
         // Draw farthest first so nearer covers overlap them.
         List<Integer> order = new ArrayList<>();
         for (int i = from; i <= to; i++) order.add(i);
@@ -203,8 +225,8 @@ public final class Qvk3CoverFlowView extends View {
      */
     private void drawCover(Canvas canvas, int i, float d, float cx, float top) {
         float ad = Math.abs(d);
-        if (ad > VISIBLE_SIDE + 0.999f) return;
-        float alpha = ad <= VISIBLE_SIDE - 1 ? 1f : Math.max(0f, VISIBLE_SIDE - ad);
+        if (ad > side + 0.999f) return;
+        float alpha = 1f; // the outermost drawn covers are already past the screen edge: no fading in on screen
         float sign = d < 0 ? -1f : 1f;
         float turn = Math.min(1f, ad);                       // 0 = facing us, 1 = fully turned
         float angle = (float) Math.toRadians(70f * turn);
@@ -296,7 +318,7 @@ public final class Qvk3CoverFlowView extends View {
         int c = selected();
         if (c < 0) return;
         Qvk3Images img = Qvk3Images.get(getContext());
-        for (int i = Math.max(0, c - VISIBLE_SIDE); i <= Math.min(items.size() - 1, c + VISIBLE_SIDE); i++) {
+        for (int i = Math.max(0, c - side); i <= Math.min(items.size() - 1, c + side); i++) {
             img.prefetch(items.get(i).cover, coverBucket());
         }
         if (c != lastSettled) {
@@ -342,11 +364,11 @@ public final class Qvk3CoverFlowView extends View {
                     // Inertia: a strong swipe travels many albums and keeps gliding (decelerating) for up to
                     // ~2.5 s; the end point is an exact album, so the motion always finishes centred.
                     float itemsPerSecond = -vx / (spacing() * 0.8f);
-                    float travel = Math.max(-40f, Math.min(40f, itemsPerSecond * 0.55f));
+                    float travel = Math.max(-120f, Math.min(120f, itemsPerSecond * 0.9f));
                     int target = Math.max(0, Math.min(items.size() - 1, Math.round(pos + travel)));
                     int start = Math.round(pos * UNIT);
                     int dist = Math.round(target * UNIT) - start;
-                    int duration = (int) Math.min(2600, 450 + 260 * Math.sqrt(Math.abs(dist) / UNIT));
+                    int duration = (int) Math.min(3200, 500 + 300 * Math.sqrt(Math.abs(dist) / UNIT));
                     scroller.startScroll(start, 0, dist, 0, duration);
                     postInvalidateOnAnimation();
                 } else {

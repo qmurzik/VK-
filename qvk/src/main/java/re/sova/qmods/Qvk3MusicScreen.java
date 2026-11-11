@@ -69,8 +69,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private Runnable current;
     private Feed feed;
     private String miniCoverFor = "";
-    private Qvk3Ring albumRing;
-    private Qvk3MusicLibrary.Group ringAlbum;
+    private Qvk3CoverFlowScreen coverFlow;
     /** Called when the standalone player-only host should close. */
     Runnable onPlayerClosed;
 
@@ -340,9 +339,40 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         engine.addListener(this);
         Qvk3MusicDownloads.setListener((key, percent, status) -> {
             if (tab == 4 && back.isEmpty()) showDownloads();
-            else if (albumRing != null) refreshAlbumRing();
+            else if (coverFlow != null) coverFlow.refreshRing();
         });
         onState(engine);
+        post(() -> orientation(getResources().getConfiguration()));
+    }
+
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration c) {
+        super.onConfigurationChanged(c);
+        orientation(c);
+    }
+
+    /** Turning the phone sideways opens the album Cover Flow (as on the iPhone); turning it back closes it. */
+    private void orientation(android.content.res.Configuration c) {
+        boolean land = c.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        if (land && Qvk3MusicSettings.rotateCoverflow(a)) showCoverFlow(true);
+        else if (!land && coverFlow != null && coverFlow.byRotation) hideCoverFlow();
+    }
+
+    void showCoverFlow(boolean byRotation) {
+        if (coverFlow != null) return;
+        coverFlow = new Qvk3CoverFlowScreen(a, byRotation);
+        coverFlow.setOnClose(this::hideCoverFlow);
+        coverFlow.setOnSync(this::syncAll);
+        root.addView(coverFlow, new FrameLayout.LayoutParams(-1, -1));
+        coverFlow.setAlpha(0f);
+        coverFlow.animate().alpha(1f).setDuration(200).start();
+    }
+
+    void hideCoverFlow() {
+        final Qvk3CoverFlowScreen c = coverFlow;
+        if (c == null) return;
+        coverFlow = null;
+        c.animate().alpha(0f).setDuration(160).withEndAction(() -> root.removeView(c)).start();
     }
 
     @Override
@@ -354,6 +384,10 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
 
     /** Returns true when the back press was consumed (player closed / inner screen popped). */
     public boolean handleBack() {
+        if (coverFlow != null) {
+            if (!coverFlow.back()) hideCoverFlow();
+            return true;
+        }
         if (playerShown()) {
             if (!player.back()) closePlayer();
             return true;
@@ -567,14 +601,6 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private void go(Runnable screen) {
         current = screen;
         feed = null;
-        if (coverflowHeader != null) {
-            list.setAdapter(null);
-            list.removeHeaderView(coverflowHeader);
-            coverflowHeader = null;
-            albumRing = null;
-            ringAlbum = null;
-            list.setAdapter(rows);
-        }
         screen.run();
         list.setSelection(0);
     }
@@ -714,6 +740,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         List<Row> head = new ArrayList<>();
         head.add(note("Альбомы · Исполнители · Избранное · История · Файлы", null));
         head.add(new Row(Row.ITEM, "Альбомы", Qvk3MusicSettings.layout(a).equals("coverflow") ? "CoverFlow" : "Сгруппировано по альбомам", "", null, null, false, () -> push(this::showAlbums), null));
+        head.add(new Row(Row.ITEM, "Cover Flow", "Альбомы на чёрном фоне, как на iPhone. Открывается и поворотом телефона", "", null, null, false, () -> showCoverFlow(false), null));
         head.add(new Row(Row.ITEM, "Исполнители", "Сгруппировано по исполнителям", "", null, null, false, () -> push(this::showArtists), null));
         head.add(new Row(Row.ITEM, "Избранное QVK", "Локальный список, не меняет медиатеку ВК", "", null, null, false, () -> push(this::showFavorites), null));
         head.add(new Row(Row.ITEM, "История", "Недавно прослушанные", "", null, null, false, () -> Qvk3QueueDialog.history(a, p), null));
@@ -782,101 +809,12 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         if (total < 0 || cached < total) {
             r.add(note("В индексе " + cached + (total > 0 ? " из " + total : "") + " треков. Нажмите, чтобы загрузить всю медиатеку для группировки", this::syncAll));
         }
-        if (Qvk3MusicSettings.layout(a).equals("coverflow") && !albums.isEmpty()) {
-            Qvk3CoverFlowView cf = new Qvk3CoverFlowView(a);
-            cf.setId(View.generateViewId());
-            cf.setColors(0xFFFFFFFF, 0xB3FFFFFF, 0x33FFFFFF); // on black, like the iPhone
-            cf.setSpacingPercent(Qvk3MusicSettings.coverflowSpacing(a));
-            cf.setCornerRadius(Qvk3Ui.dp(a, Qvk3MusicSettings.coverRadiusDp(a)));
-            List<Qvk3CoverFlowView.Item> items = new ArrayList<>();
-            for (Qvk3MusicLibrary.Group g : albums) items.add(new Qvk3CoverFlowView.Item(g.cover, g.name, g.artist + " · " + g.count));
-            int saved = Qvk3MusicSettings.prefs(a).getInt("qvk3_music_coverflow_selected", 0);
-            // open on the album that is playing now; otherwise on the last opened one
-            Qvk3Track playing = engine.current();
-            if (playing != null && !playing.album.isEmpty()) {
-                for (int i = 0; i < albums.size(); i++) if (albums.get(i).name.equals(playing.album)) saved = i;
-            }
-            saved = Math.max(0, Math.min(saved, items.size() - 1));
-            cf.setItems(items, saved);
-            cf.setListener((index, settled) -> {
-                Qvk3MusicSettings.prefs(a).edit().putInt("qvk3_music_coverflow_selected", index).apply();
-                if (!settled) albumTracks(albums.get(index), true);
-                else albumTracks(albums.get(index), false);
-            });
-            boolean land = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-            int h = Math.round(getResources().getDisplayMetrics().heightPixels * (land ? 0.62f : 0.42f));
-            LinearLayout head = new LinearLayout(a);
-            head.setOrientation(LinearLayout.VERTICAL);
-            head.setGravity(Gravity.CENTER_HORIZONTAL);
-            // soft gradient behind the opened album
-            head.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0xFF000000, 0xFF000000, Qvk3DesignTokens.mix(0xFF000000, p.accent, 0.25f)}));
-            head.addView(cf, new LinearLayout.LayoutParams(-1, h));
-            albumRing = new Qvk3Ring(a, 0xFFFFFFFF, p.accent);
-            albumRing.setOnClickListener(v -> downloadAlbum());
-            LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 48), Qvk3Ui.dp(a, 48));
-            rl.bottomMargin = Qvk3Ui.dp(a, 6);
-            head.addView(albumRing, rl);
-            head.setLayoutParams(new ListView.LayoutParams(-1, -2));
-            coverflowHeader = head;
-            list.setAdapter(null);
-            list.addHeaderView(head, null, false);
-            list.setAdapter(rows);
-            rows.set(r);
-            albumTracks(albums.get(saved), false);
-            return;
-        }
+        if (Qvk3MusicSettings.layout(a).equals("coverflow")) showCoverFlow(false); // the list below stays as the fallback
         for (Qvk3MusicLibrary.Group g : albums) {
             r.add(new Row(Row.ITEM, g.name, g.artist + " · " + g.count + " треков", "", g.cover, null, false, () -> push(() -> showGroup("album", g.name)), null));
         }
         if (albums.isEmpty() && cached > 0) r.add(note("У треков в медиатеке нет данных об альбомах", null));
         rows.set(r);
-    }
-
-    private View coverflowHeader;
-
-    /** Track list under CoverFlow: duration on the right, ⬇ for saved tracks; play on tap. */
-    private void albumTracks(Qvk3MusicLibrary.Group g, boolean playFirst) {
-        List<Qvk3Track> tracks = Qvk3MusicLibrary.get(a).group("my", "album", g.name);
-        List<Row> r = new ArrayList<>();
-        for (int i = 0; i < tracks.size(); i++) r.add(trackRow(tracks, i));
-        rows.set(r);
-        ringAlbum = g;
-        ringTracks = tracks;
-        refreshAlbumRing();
-        if (playFirst && !tracks.isEmpty()) play(tracks, 0);
-    }
-
-    private List<Qvk3Track> ringTracks = new ArrayList<>();
-
-    /** Ring state of the opened album: share of its available tracks already saved on the device. */
-    void refreshAlbumRing() {
-        if (albumRing == null || ringAlbum == null) return;
-        final List<Qvk3Track> tracks = ringTracks;
-        Qvk3Jobs.io(() -> {
-            Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
-            int total = 0, done = 0;
-            for (Qvk3Track t : tracks) {
-                if (t.id == 0 || t.restricted != 0) continue;
-                total++;
-                if (lib.downloadedLocation(t.key()) != null) done++;
-            }
-            final float pr = total == 0 ? 0f : done / (float) total;
-            final boolean active = Qvk3MusicDownloads.running() && pr < 1f && albumQueued;
-            Qvk3Jobs.main(() -> {
-                if (albumRing != null && tracks == ringTracks) albumRing.set(pr, active);
-            });
-        });
-    }
-
-    private boolean albumQueued;
-
-    private void downloadAlbum() {
-        if (ringTracks.isEmpty()) return;
-        albumQueued = true;
-        Qvk3Ui.toast(a, Qvk3MusicDownloads.enqueue(a, new ArrayList<>(ringTracks)));
-        albumRing.set(0.02f, true);
-        refreshAlbumRing();
     }
 
     private void showArtists() {
@@ -929,6 +867,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             }
             Qvk3Jobs.main(() -> {
                 if (!a.isDestroyed() && current != null) current.run();
+                if (coverFlow != null) coverFlow.load();
             });
         });
     }

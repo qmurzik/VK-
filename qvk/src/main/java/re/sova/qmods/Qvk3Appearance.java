@@ -16,18 +16,12 @@ public final class Qvk3Appearance {
     public static final String STYLE = "qvk3_style";
     public static final String TOKENS = "qvk3_tokens";
     /**
-     * QVK's existing "system" slot mode. The patched ThemeProfiles.slotAt() resolves it by VK's real
-     * light/dark theme instead of Android's night mode (they differ when VK's theme is set manually).
-     * Reusing the existing value keeps QVK 2.x settings import/export valid.
+     * QVK's existing "system" slot mode: ThemeProfiles picks the day or night palette by Android's night mode,
+     * as in QVK 2.x. (alpha2–alpha15 resolved it by VK's internal theme flag instead — patch 0006. That flag changes
+     * later than Android's and is flipped by the theme catalog, which mixed the two palettes: BUG-0014/0016.)
+     * apply() switches VK's own light/dark theme to follow the system too, so both always agree.
      */
     public static final String MODE_VK = "system";
-
-    /** Called from the patched ThemeProfiles.slotAt(): maps "system" to VK's current light/dark theme. */
-    public static String slotMode(Context c, String mode) {
-        if (!MODE_VK.equals(mode)) return mode;
-        Context ctx = c != null ? c : RuntimeBridge.context;
-        return ctx != null && vkDark(ctx) ? "dark" : "light";
-    }
 
     static boolean vkDark(Context c) {
         try {
@@ -79,13 +73,18 @@ public final class Qvk3Appearance {
         e.putInt("qvk_material3_radius", Math.max(12, Math.min(28, r)));
         e.putString(STYLE, t.id);
         if ("custom".equals(t.id)) e.putString(TOKENS, t.toJson().toString());
-        // Both variants, chosen at runtime by VK's real light/dark theme ("vk" slot mode, patch 0006).
+        // Both variants; ThemeProfiles picks one by the system light/dark mode, and VK's theme follows the system.
         String day = t.variant(false).toTheme().toString(), night = t.variant(true).toTheme().toString();
         e.putString(ThemeProfiles.MODE, MODE_VK);
         e.putString(ThemeProfiles.DAY, ThemePalette.validate(day));
         e.putString(ThemeProfiles.NIGHT, ThemePalette.validate(night));
-        e.putString("qmods_theme_palette", ThemePalette.validate(vkDark(a) ? night : day));
+        e.putString("qmods_theme_palette", ThemePalette.validate(Qvk3Ui.night(a) ? night : day));
         e.commit();
+        try {
+            ThemeEditorActivity.setSystemMode(a);   // VK's own light/dark must match the palette slot
+        } catch (Throwable x) {
+            RuntimeFaults.record("qvk3.appearance.systemMode", x);
+        }
         ThemePalette.refresh(a);
         Qvk3SettingsHistory.record(a, STYLE, "Стиль оформления: " + t.title);
     }

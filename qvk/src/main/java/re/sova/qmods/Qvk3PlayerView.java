@@ -76,7 +76,9 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     public void rebuild() {
         removeAllViews();
         land = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-        layout = land ? "coverflow" : Qvk3MusicSettings.layout(a); // rotating the phone shows Cover Flow, like the iPhone
+        // Turning the phone shows the album Cover Flow above the player (Qvk3MusicScreen); with that option off the
+        // player keeps the chosen layout in landscape instead of a stretched queue Cover Flow (BUG-0007).
+        layout = Qvk3MusicSettings.layout(a);
         lastLand = land;
         Qvk3Ui.Palette p = Qvk3Ui.palette(a, layout.equals("classic") ? "classic" : "modern");
         onDark = !layout.equals("classic") || p.dark;

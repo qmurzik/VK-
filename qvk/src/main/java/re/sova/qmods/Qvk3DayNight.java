@@ -23,7 +23,9 @@ final class Qvk3DayNight {
         try {
             SharedPreferences p = RuntimeBridge.prefs;
             if (p == null) return;
-            String mode = Qvk3Appearance.vkDark(a) ? "night" : "day";
+            // same choice as the palette itself (ThemeProfiles slot), else Android's night mode
+            String slot = ThemeProfiles.slot(a);
+            String mode = ThemeProfiles.NIGHT.equals(slot) ? "night" : ThemeProfiles.DAY.equals(slot) ? "day" : (Qvk3Ui.night(a) ? "night" : "day");
             String active = p.getString(ACTIVE, "");
             if (mode.equals(active)) return;
             SharedPreferences.Editor e = p.edit();

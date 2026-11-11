@@ -142,6 +142,20 @@ public final class Qvk3MusicLibrary extends SQLiteOpenHelper {
         return out;
     }
 
+    /** Albums whose every track is saved on the device (the ⬇ mark in Cover Flow). */
+    public java.util.Set<String> albumsSaved(String list) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT li.album FROM list_items li LEFT JOIN downloads d ON d.key=li.key AND d.state=2 "
+                        + "WHERE li.account=? AND li.list=? AND li.album<>'' GROUP BY li.album HAVING COUNT(*)=COUNT(d.key)",
+                new String[]{Long.toString(account()), list})) {
+            while (c.moveToNext()) out.add(c.getString(0));
+        } catch (Exception e) {
+            RuntimeFaults.record("qvk3.music.db.saved", e);
+        }
+        return out;
+    }
+
     public List<Group> artists(String list) {
         List<Group> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
