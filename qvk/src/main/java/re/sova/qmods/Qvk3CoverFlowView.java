@@ -72,6 +72,7 @@ public final class Qvk3CoverFlowView extends View {
     private int spacingPercent = 62;
     private float radius;
     private Listener listener;
+    private boolean byUser, settledByUser;
     private int lastSettled = -1;
     private boolean fastFling;
 
@@ -122,8 +123,14 @@ public final class Qvk3CoverFlowView extends View {
         scroller.forceFinished(true);
         pos = items.isEmpty() ? 0 : Math.max(0, Math.min(select, items.size() - 1));
         lastSettled = -1;
+        byUser = false;
         settle();
         invalidate();
+    }
+
+    /** Valid inside Listener.onItem(index, true): true when the finger (not code) moved the covers to this one. */
+    public boolean settledByUser() {
+        return settledByUser;
     }
 
     public int selected() {
@@ -134,6 +141,7 @@ public final class Qvk3CoverFlowView extends View {
     public void smoothScrollTo(int index) {
         if (items.isEmpty()) return;
         index = Math.max(0, Math.min(index, items.size() - 1));
+        byUser = false;
         scroller.forceFinished(true);
         int from = Math.round(pos * UNIT);
         int dist = Math.round(index * UNIT) - from;
@@ -293,6 +301,8 @@ public final class Qvk3CoverFlowView extends View {
         }
         if (c != lastSettled) {
             lastSettled = c;
+            settledByUser = byUser;
+            byUser = false;
             setContentDescription(items.get(c).title + ", " + items.get(c).subtitle + ". Альбом " + (c + 1) + " из " + items.size());
             sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
             if (listener != null) listener.onItem(c, true);
@@ -307,6 +317,7 @@ public final class Qvk3CoverFlowView extends View {
         velocity.addMovement(e);
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                byUser = true;
                 scroller.forceFinished(true);
                 downX = lastX = e.getX();
                 dragging = false;

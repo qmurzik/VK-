@@ -81,6 +81,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
 
     @Override
     public void onActivityResumed(Activity a) {
+        Qvk3DayNight.sync(a);
         if (!stock(a)) return;
         lastVk = new WeakReference<>(a);
         schedule(a, 0);

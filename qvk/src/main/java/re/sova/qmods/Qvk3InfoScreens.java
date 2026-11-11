@@ -56,6 +56,29 @@ final class Qvk3InfoScreens {
         });
     }
 
+    /** Light / dark theme in one place (BUG-0012): mode choice plus the two palette editors, no hunting through menus. */
+    static void dayNight(Activity a) {
+        String cur = RuntimeBridge.prefs.getString(ThemeProfiles.MODE, "current");
+        int at = Math.max(0, java.util.Arrays.asList(ThemeProfiles.MODES).indexOf(cur));
+        Qvk3Ui.dialog(a).setTitle("Светлая и тёмная тема")
+                .setSingleChoiceItems(ThemeProfiles.LABELS, at, (d, i) -> {
+                    try {
+                        ThemeProfiles.chooseMode(ThemeProfiles.MODES[i]);
+                        if (i == 1 || i == 2) ThemeEditorActivity.setNativeMode(i == 2);
+                        else if (i == 3) ThemeEditorActivity.setSystemMode(a);
+                        else if (i == 4) ThemeEditorActivity.setNativeMode(ThemeProfiles.NIGHT.equals(ThemeProfiles.slot(a)));
+                        d.dismiss();
+                        ThemePalette.refresh(a);
+                        a.recreate();
+                    } catch (Exception e) {
+                        Qvk3Ui.toast(a, "Не удалось сохранить режим темы");
+                    }
+                })
+                .setPositiveButton("Светлая: цвета", (d, w) -> ThemeProfiles.edit(a, ThemeProfiles.DAY))
+                .setNeutralButton("Тёмная: цвета", (d, w) -> ThemeProfiles.edit(a, ThemeProfiles.NIGHT))
+                .setNegativeButton("Закрыть", null).show();
+    }
+
     /** Logs screen: copy / save the app's own log without adb. */
     static void logs(Activity a) {
         Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
@@ -98,6 +121,9 @@ final class Qvk3InfoScreens {
         switch (what) {
             case "logs":
                 logs(a);
+                break;
+            case "dayNight":
+                dayNight(a);
                 break;
             case "battery": {
                 PowerManager pm = a.getSystemService(PowerManager.class);

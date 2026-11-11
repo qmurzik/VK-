@@ -145,7 +145,11 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             flow.setSpacingPercent(Qvk3MusicSettings.coverflowSpacing(a));
             flow.setCornerRadius(dp(Qvk3MusicSettings.coverRadiusDp(a)));
             flow.setListener((index, settled) -> {
-                if (settled) return;
+                if (settled) {
+                    // swiping the covers and letting go on another one switches to that track (BUG-0013)
+                    if (flow.settledByUser() && index != engine.queue().currentIndex()) engine.playIndex(index);
+                    return;
+                }
                 if (index != engine.queue().currentIndex()) engine.playIndex(index);
                 else engine.toggle();
             });

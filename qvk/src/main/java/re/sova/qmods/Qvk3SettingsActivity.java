@@ -224,6 +224,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 7, "Загрузки и место");
         idx.addScreen("qvk3:perf", "Облегчённый режим", "Без размытия и прозрачности — для слабых устройств", 7, "Производительность и батарея");
         idx.addScreen("qvk3:battery", "Фоновая работа и батарея", "Оптимизация батареи и ограничения Android", 7, "Производительность и батарея");
+        idx.addScreen("qvk3:dayNight", "Светлая и тёмная тема", "Режим (как в системе, по времени) и цвета каждой темы", 0, "Темы и цвета");
         idx.addScreen("qvk3:logs", "Логи приложения", "Скопировать или сохранить журнал без logcat", 7, "Диагностика");
         idx.addScreen("qvk3:faults", "Журнал ошибок", "Сбои модулей с указанием компонента", 7, "Диагностика");
         idx.addScreen("qvk3:updates", "Проверить обновления", "Загрузка с докачкой, проверка подписи", 8, "Обновления");
@@ -452,11 +453,13 @@ public final class Qvk3SettingsActivity extends Activity {
             content.addView(hr);
             LinearLayout c = card();
             java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT);
-            for (int i = 0; i < Math.min(3, hist.size()); i++) {
+            for (int i = 0; i < Math.min(2, hist.size()); i++) {
                 Qvk3SettingsHistory.Entry e = hist.get(i);
                 Qvk3SettingsIndex.Item it = index.get(e.key);
                 TextView when = Qvk3Ui.text(this, df.format(new java.util.Date(e.time)), 12, p.text2, false);
-                row(c, null, 0, e.title, null, when, it == null ? null : () -> showSection(it.section), null);
+                LinearLayout hrow = row(c, null, 0, e.title, null, when, it == null ? null : () -> showSection(it.section), null);
+                hrow.setMinimumHeight(dp(40));   // BUG-0004: the "recent changes" card was too tall for what it shows
+                hrow.setPadding(dp(16), dp(5), dp(12), dp(5));
             }
 
         }
@@ -597,6 +600,7 @@ public final class Qvk3SettingsActivity extends Activity {
             case "about":
             case "faults":
             case "logs":
+            case "dayNight":
                 Qvk3InfoScreens.show(this, what);
                 break;
             case "updates":
