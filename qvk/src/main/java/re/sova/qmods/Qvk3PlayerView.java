@@ -812,8 +812,24 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 tv.setPadding(dp(12), dp(7), dp(12), dp(7));
                 boolean synced = lyrics != null && lyrics.synced;
                 boolean active = synced && position == lyrics.lineAt(engine.position());
-                tv.setTextColor(active ? fg : synced ? (fg & 0x00FFFFFF) | 0x66000000 : fg);
-                tv.setTextSize(size + (active ? 1 : 0));
+                // same text size for every line (no reflow jump); the current line glides in by scale and brightness
+                tv.setTextColor(fg);
+                tv.setTextSize(size);
+                tv.setPivotX(0f);
+                tv.setPivotY(tv.getHeight() / 2f);
+                float scale = active ? 1.06f : 1f, alpha = !synced || active ? 1f : 0.42f;
+                Object was = tv.getTag();
+                boolean sameRow = was instanceof Integer && (Integer) was == position;
+                tv.setTag(position);
+                tv.animate().cancel();
+                if (sameRow && !Qvk3Appearance.weakDevice(a)) {
+                    tv.animate().scaleX(scale).scaleY(scale).alpha(alpha).setDuration(260)
+                            .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+                } else {
+                    tv.setScaleX(scale);
+                    tv.setScaleY(scale);
+                    tv.setAlpha(alpha);
+                }
                 return tv;
             }
         };

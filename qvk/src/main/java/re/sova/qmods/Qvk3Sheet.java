@@ -156,6 +156,7 @@ final class Qvk3Sheet {
         row.addView(t, Qvk3Ui.weight(1));
         if (value != null) {
             android.widget.TextView v = Qvk3Ui.text(c, value, 14, p.text2, false);
+            row.setTag(v);
             v.setMaxLines(1);
             v.setEllipsize(android.text.TextUtils.TruncateAt.END);
             v.setMaxWidth(Qvk3Ui.dp(c, 160));
@@ -169,6 +170,42 @@ final class Qvk3Sheet {
         row.setOnClickListener(l);
         Qvk3Motion.press(row);
         return row;
+    }
+
+    /** Updates the right-hand value of a {@link #navRow} built from a "Title: value" label. */
+    static void setNavValue(View row, String value) {
+        if (row.getTag() instanceof android.widget.TextView) ((android.widget.TextView) row.getTag()).setText(value);
+    }
+
+    /** Row with a colour swatch on the right; {@link #setSwatch} repaints it. */
+    static View swatchRow(Context c, Qvk3Ui.Palette p, String title, int color, View.OnClickListener l) {
+        android.widget.LinearLayout row = new android.widget.LinearLayout(c);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(Qvk3Ui.dp(c, 52));
+        row.setPadding(0, Qvk3Ui.dp(c, 6), 0, Qvk3Ui.dp(c, 6));
+        row.addView(Qvk3Ui.text(c, title, 16, p.text, false), Qvk3Ui.weight(1));
+        android.widget.TextView hex = Qvk3Ui.text(c, "", 13, p.text2, false);
+        hex.setTypeface(android.graphics.Typeface.MONOSPACE);
+        hex.setPadding(0, 0, Qvk3Ui.dp(c, 10), 0);
+        row.addView(hex, Qvk3Ui.wrap());
+        View sw = new View(c);
+        row.addView(sw, new android.widget.LinearLayout.LayoutParams(Qvk3Ui.dp(c, 28), Qvk3Ui.dp(c, 28)));
+        row.setTag(new View[]{hex, sw});
+        setSwatch(c, p, row, color);
+        row.setContentDescription(title);
+        row.setOnClickListener(l);
+        Qvk3Motion.press(row);
+        return row;
+    }
+
+    static void setSwatch(Context c, Qvk3Ui.Palette p, View row, int color) {
+        View[] v = (View[]) row.getTag();
+        ((android.widget.TextView) v[0]).setText(String.format("#%06X", color & 0xFFFFFF));
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        g.setColor(color);
+        g.setStroke(Qvk3Ui.dp(c, 1.5f), p.dark ? 0x40FFFFFF : 0x26000000);
+        v[1].setBackground(g);
     }
 
     /** Thin divider between rows of a {@link #group}. */

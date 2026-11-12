@@ -399,16 +399,36 @@ public final class Qvk3SettingsActivity extends Activity {
         boolean fav = favorites().contains(it.id);
         String sum = it.summary;
         if (showSection) sum = Qvk3SettingsIndex.SECTIONS[it.section] + " › " + it.group + (sum.isEmpty() ? "" : " · " + sum);
-        String t = (fav ? "★ " : "") + it.title;
+        String t = it.title;
         if (it.type == Qvk3SettingsIndex.SWITCH) {
             boolean on = value(it);
             Qvk3Toggle tg = toggle(on);
             LinearLayout[] holder = new LinearLayout[1];
             holder[0] = row(card, null, 0, t, sum, tg, () -> flip(it, tg, holder[0]), () -> toggleFavorite(it));
             LinearLayout r = holder[0];
-            r.setContentDescription(it.title + ". " + (on ? "Включено" : "Выключено") + ". " + it.summary);
+            r.setContentDescription((fav ? "В избранном. " : "") + it.title + ". " + (on ? "Включено" : "Выключено") + ". " + it.summary);
+            if (fav) markFavorite(r);
         } else {
-            row(card, null, 0, t, sum, null, () -> open(it), () -> toggleFavorite(it));
+            LinearLayout r = row(card, null, 0, t, sum, null, () -> open(it), () -> toggleFavorite(it));
+            if (fav) {
+                markFavorite(r);
+                r.setContentDescription("В избранном. " + r.getContentDescription());
+            }
+        }
+    }
+
+    /** Small accent star after the title of a favourite (instead of a «★» glyph in the text). */
+    private void markFavorite(LinearLayout row) {
+        for (int i = 0; i < row.getChildCount(); i++) {
+            View c = row.getChildAt(i);
+            if (c instanceof LinearLayout && ((LinearLayout) c).getChildAt(0) instanceof TextView) {
+                TextView t = (TextView) ((LinearLayout) c).getChildAt(0);
+                android.graphics.drawable.Drawable star = Qvk3Icons.of(Qvk3Icons.STAR, p.accent);
+                star.setBounds(0, 0, dp(14), dp(14));
+                t.setCompoundDrawablesRelative(null, null, star, null);
+                t.setCompoundDrawablePadding(dp(6));
+                return;
+            }
         }
     }
 
@@ -905,9 +925,9 @@ public final class Qvk3SettingsActivity extends Activity {
         List<Qvk3Scenarios.Scenario> all = Qvk3Scenarios.all(this);
         List<String> labels = new ArrayList<>();
         String active = Qvk3Scenarios.active(this);
-        for (Qvk3Scenarios.Scenario s : all) labels.add((s.id.equals(active) ? "✓ " : "") + s.title + " — " + s.description);
-        labels.add("＋ Сохранить текущие настройки как сценарий");
-        if (Qvk3Scenarios.canUndo(this)) labels.add("↶ Вернуть как было до сценария");
+        for (Qvk3Scenarios.Scenario s : all) labels.add(s.title + "\n" + (s.id.equals(active) ? "Включён · " : "") + s.description);
+        labels.add("Сохранить текущие настройки\nКак новый сценарий");
+        if (Qvk3Scenarios.canUndo(this)) labels.add("Вернуть как было\nДо применения сценария");
         Qvk3Ui.dialog(this).setTitle("Сценарии").setItems(labels.toArray(new String[0]), (d, i) -> {
             try {
                 if (i < all.size()) {

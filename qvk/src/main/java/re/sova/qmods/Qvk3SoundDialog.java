@@ -63,7 +63,7 @@ public final class Qvk3SoundDialog {
                 List<String> user = fx.userPresets();
                 String[] all = new String[dev.length + user.size()];
                 for (int i = 0; i < dev.length; i++) all[i] = dev[i];
-                for (int i = 0; i < user.size(); i++) all[dev.length + i] = "★ " + user.get(i);
+                for (int i = 0; i < user.size(); i++) all[dev.length + i] = user.get(i) + "\nМой пресет";
                 Qvk3Ui.dialog(a).setTitle("Пресет эквалайзера").setItems(all, (d, i) -> {
                     if (i < dev.length) fx.usePreset((short) i);
                     else fx.useUserPreset(user.get(i - dev.length));

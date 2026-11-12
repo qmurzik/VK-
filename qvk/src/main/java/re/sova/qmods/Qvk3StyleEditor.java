@@ -1,5 +1,7 @@
 package re.sova.qmods;
 
+import java.util.ArrayList;
+import java.util.List;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -59,63 +61,76 @@ public final class Qvk3StyleEditor {
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         FrameLayout previewHost = new FrameLayout(a);
-        col.addView(previewHost);
+        col.addView(previewHost, Qvk3Ui.match());
         Runnable render = () -> {
             previewHost.removeAllViews();
             previewHost.addView(mock(a, cur[0]));
         };
         render.run();
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
+        int pad = Qvk3Ui.dp(a, 24);
+        // the preview as a rounded card inside the sheet, not an edge-to-edge strip
+        LinearLayout.LayoutParams plp = (LinearLayout.LayoutParams) previewHost.getLayoutParams();
+        plp.leftMargin = plp.rightMargin = pad;
+        previewHost.setLayoutParams(plp);
+        Qvk3Ui.clipRound(previewHost, Qvk3Ui.dp(a, 18));
         LinearLayout controls = new LinearLayout(a);
         controls.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        controls.setPadding(pad, Qvk3Ui.dp(a, 8), pad, pad);
+        controls.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
         col.addView(controls);
-        int tc = Qvk3Ui.night(a) ? 0xFFEEEEEE : 0xFF222222;
 
-        String[][] colours = {{"accent", "Акцентный цвет"}, {"page", "Фон экранов"}, {"content", "Карточки"}, {"header", "Шапка и нижняя панель"},
+        String[][] colours = {{"accent", "Акцент"}, {"page", "Фон экранов"}, {"content", "Карточки"}, {"header", "Шапка и нижняя панель"},
                 {"text", "Основной текст"}, {"text2", "Дополнительный текст"}, {"separator", "Разделители"},
                 {"incoming", "Входящие сообщения"}, {"outgoing", "Исходящие сообщения"}};
+        controls.addView(Qvk3Sheet.section(a, p, "Цвета"));
+        LinearLayout cg = Qvk3Sheet.group(a, p);
         for (String[] c : colours) {
-            TextView row = Qvk3Ui.text(a, c[1], 15, tc, false);
-            row.setMinHeight(Qvk3Ui.dp(a, 44));
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setOnClickListener(v -> pickColor(a, c[1], colour(cur[0], c[0]), col2 -> {
+            View[] row = new View[1];
+            row[0] = Qvk3Sheet.swatchRow(a, p, c[1], colour(cur[0], c[0]), v -> pickColor(a, c[1], colour(cur[0], c[0]), col2 -> {
                 cur[0] = cur[0].with(c[0], col2);
+                Qvk3Sheet.setSwatch(a, p, row[0], col2);
                 render.run();
             }));
-            controls.addView(row);
+            cg.addView(row[0]);
         }
-        controls.addView(slider(a, tc, "Скругление карточек и кнопок, dp", cur[0].radius, 28, v -> {
+        controls.addView(cg);
+        controls.addView(Qvk3Sheet.section(a, p, "Форма"));
+        LinearLayout fg = Qvk3Sheet.group(a, p);
+        fg.addView(Qvk3SoundDialog.slider(a, p, "Скругление", cur[0].radius, 28, v -> {
             cur[0] = cur[0].with("radius", v);
             render.run();
-        }));
-        controls.addView(slider(a, tc, "Размер текста, % (90–125)", cur[0].textScale - 90, 35, v -> {
+        }, v -> v + " dp"));
+        fg.addView(Qvk3SoundDialog.slider(a, p, "Размер текста", cur[0].textScale - 90, 35, v -> {
             cur[0] = cur[0].with("textScale", 90 + v);
             render.run();
-        }));
-        controls.addView(choice(a, tc, "Шрифт", Qvk3DesignTokens.ThemeFonts.TITLES, () -> indexOf(Qvk3DesignTokens.ThemeFonts.ALL, cur[0].font), i -> {
+        }, v -> (90 + v) + "%"));
+        controls.addView(fg);
+        controls.addView(Qvk3Sheet.section(a, p, "Стиль"));
+        LinearLayout sg = Qvk3Sheet.group(a, p);
+        sg.addView(choice(a, p, "Шрифт", Qvk3DesignTokens.ThemeFonts.TITLES, () -> indexOf(Qvk3DesignTokens.ThemeFonts.ALL, cur[0].font), i -> {
             cur[0] = cur[0].with("font", Qvk3DesignTokens.ThemeFonts.ALL[i]);
             render.run();
         }));
-        controls.addView(choice(a, tc, "Плотность и отступы", new String[]{"Компактно", "Обычно", "Просторно"},
+        sg.addView(choice(a, p, "Плотность", new String[]{"Компактно", "Обычно", "Просторно"},
                 () -> indexOf(new String[]{"compact", "normal", "comfortable"}, cur[0].density), i -> {
                     cur[0] = cur[0].with("density", new String[]{"compact", "normal", "comfortable"}[i]);
                     render.run();
                 }));
-        controls.addView(choice(a, tc, "Форма элементов (списки, кнопки, панели)", new String[]{"Плоская ВК", "iOS", "Material"},
+        sg.addView(choice(a, p, "Форма элементов", new String[]{"Плоская ВК", "iOS", "Material"},
                 () -> indexOf(new String[]{"flat", "ios", "material"}, cur[0].components), i -> {
                     cur[0] = cur[0].with("components", new String[]{"flat", "ios", "material"}[i]);
                     render.run();
                 }));
-        controls.addView(choice(a, tc, "Фон экранов", new String[]{"Сплошной", "Градиент", "Точки", "Сетка"},
+        sg.addView(choice(a, p, "Фон экранов", new String[]{"Сплошной", "Градиент", "Точки", "Сетка"},
                 () -> indexOf(new String[]{"solid", "gradient", "dots", "grid"}, cur[0].background), i -> {
                     cur[0] = cur[0].with("background", new String[]{"solid", "gradient", "dots", "grid"}[i]);
                     render.run();
                 }));
-        controls.addView(choice(a, tc, "Схема", new String[]{"Светлая", "Тёмная"}, () -> cur[0].dark ? 1 : 0, i -> {
+        sg.addView(choice(a, p, "Схема", new String[]{"Светлая", "Тёмная"}, () -> cur[0].dark ? 1 : 0, i -> {
             cur[0] = cur[0].with("dark", i == 1);
             render.run();
         }));
+        controls.addView(sg);
         ScrollView sv = new ScrollView(a);
         sv.addView(col);
         Qvk3Ui.dialog(a).setTitle("Конструктор оформления").setView(sv)
@@ -187,50 +202,95 @@ public final class Qvk3StyleEditor {
     }
 
     static View choice(Activity a, int tc, String label, String[] options, IntSource current, IntSink sink) {
-        TextView t = Qvk3Ui.text(a, label + ": " + options[current.get()], 15, tc, false);
-        t.setMinHeight(Qvk3Ui.dp(a, 44));
-        t.setGravity(Gravity.CENTER_VERTICAL);
-        t.setOnClickListener(v -> Qvk3Ui.dialog(a).setTitle(label).setSingleChoiceItems(options, current.get(), (d, i) -> {
+        return choice(a, Qvk3Sheet.palette(a), label, options, current, sink);
+    }
+
+    static View choice(Activity a, Qvk3Ui.Palette p, String label, String[] options, IntSource current, IntSink sink) {
+        View[] row = new View[1];
+        row[0] = Qvk3Sheet.navRow(a, p, label + ": " + options[current.get()], v -> Qvk3Ui.dialog(a).setTitle(label).setSingleChoiceItems(options, current.get(), (d, i) -> {
             sink.set(i);
-            t.setText(label + ": " + options[i]);
+            Qvk3Sheet.setNavValue(row[0], options[i]);
             d.dismiss();
         }).show());
-        return t;
+        return row[0];
     }
 
     /** HEX input + a palette of swatches. */
     static void pickColor(Activity a, String title, int initial, IntSink sink) {
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(Qvk3Ui.dp(a, 24), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 24), 0);
-        EditText hex = new EditText(a);
-        hex.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        hex.setText(String.format("#%06X", initial & 0xFFFFFF));
-        col.addView(hex);
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, 0);
+        final int[] cur = {initial | 0xFF000000};
+        View big = new View(a);
+        col.addView(big, new LinearLayout.LayoutParams(-1, Qvk3Ui.dp(a, 64)));
+        EditText hex = Qvk3Sheet.field(a, p, new EditText(a));
+        hex.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        hex.setTypeface(Typeface.MONOSPACE);
+        hex.setSingleLine(true);
+        LinearLayout.LayoutParams hl = Qvk3Ui.match();
+        hl.topMargin = Qvk3Ui.dp(a, 12);
+        col.addView(hex, hl);
         int[] swatches = {0xFF2688EB, 0xFF007AFF, 0xFF3F8AE0, 0xFF8B75CB, 0xFFFF2BD6, 0xFFE64646, 0xFFFF9500, 0xFFC07A4F, 0xFF4BB34B,
                 0xFF00B3A4, 0xFF000000, 0xFF19191A, 0xFF2C2D2E, 0xFF818C99, 0xFFEBEDF0, 0xFFF6F7F9, 0xFFFFFFFF, 0xFFF7F1EA};
+        List<View> dots = new ArrayList<>();
+        Runnable paint = () -> {
+            big.setBackground(Qvk3Ui.rounded(cur[0], Qvk3Ui.dp(a, 18)));
+            for (int k = 0; k < dots.size(); k++) {
+                int c = swatches[k];
+                GradientDrawable g = new GradientDrawable();
+                g.setShape(GradientDrawable.OVAL);
+                g.setColor(c);
+                boolean sel = (c & 0xFFFFFF) == (cur[0] & 0xFFFFFF);
+                g.setStroke(Qvk3Ui.dp(a, sel ? 3 : 1), sel ? p.text : (p.dark ? 0x40FFFFFF : 0x26000000));
+                dots.get(k).setBackground(g);
+            }
+        };
         LinearLayout grid = null;
         for (int i = 0; i < swatches.length; i++) {
             if (i % 6 == 0) {
                 grid = new LinearLayout(a);
-                col.addView(grid);
+                LinearLayout.LayoutParams gl = Qvk3Ui.match();
+                gl.topMargin = Qvk3Ui.dp(a, i == 0 ? 14 : 8);
+                col.addView(grid, gl);
             }
             final int c = swatches[i];
+            FrameLayout cell = new FrameLayout(a);
             View v = new View(a);
-            GradientDrawable g = new GradientDrawable();
-            g.setColor(c);
-            g.setCornerRadius(Qvk3Ui.dp(a, 18));
-            g.setStroke(Qvk3Ui.dp(a, 1), 0x33888888);
-            v.setBackground(g);
             v.setContentDescription(String.format("Цвет #%06X", c & 0xFFFFFF));
             v.setOnClickListener(x -> hex.setText(String.format("#%06X", c & 0xFFFFFF)));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 36), Qvk3Ui.dp(a, 36));
-            lp.setMargins(Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4));
-            grid.addView(v, lp);
+            cell.addView(v, new FrameLayout.LayoutParams(Qvk3Ui.dp(a, 38), Qvk3Ui.dp(a, 38), Gravity.CENTER));
+            grid.addView(cell, new LinearLayout.LayoutParams(0, Qvk3Ui.dp(a, 44), 1f));
+            dots.add(v);
         }
-        Qvk3Ui.dialog(a).setTitle(title).setView(col).setPositiveButton("OK", (d, w) -> {
+        hex.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence q, int st, int c, int af) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence q, int st, int b, int c) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                try {
+                    String t = e.toString().trim();
+                    if (t.matches("#?[0-9A-Fa-f]{6}")) {
+                        cur[0] = Color.parseColor(t.startsWith("#") ? t : "#" + t) | 0xFF000000;
+                        paint.run();
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        });
+        hex.setText(String.format("#%06X", initial & 0xFFFFFF));
+        paint.run();
+        Qvk3Ui.dialog(a).setTitle(title).setView(col).setPositiveButton("Готово", (d, w) -> {
             try {
-                sink.set(Color.parseColor(hex.getText().toString().trim()));
+                String t = hex.getText().toString().trim();
+                sink.set(Color.parseColor(t.startsWith("#") ? t : "#" + t));
             } catch (IllegalArgumentException e) {
                 Qvk3Ui.toast(a, "Цвет в формате #RRGGBB");
             }

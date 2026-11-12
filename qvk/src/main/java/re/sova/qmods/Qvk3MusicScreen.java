@@ -151,10 +151,30 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             }
             if (r.type == Row.NOTE) {
                 TextView t = convert instanceof TextView ? (TextView) convert : Qvk3Ui.text(a, "", 14, p.text2, false);
-                t.setText(r.title);
-                t.setTextColor(r.click != null ? p.accent : p.text2);
-                t.setGravity(Gravity.CENTER);
-                t.setPadding(Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 14), Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 14));
+                int d16 = Qvk3Ui.dp(t.getContext(), 16);
+                if (r.click != null) {
+                    // an action row: soft tonal card with a chevron instead of a blue «link →»
+                    t.setText(Qvk3Ui.plain(r.title));
+                    t.setTextSize(15);
+                    t.setTextColor(p.text);
+                    t.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+                    t.setMinHeight(Qvk3Ui.dp(t.getContext(), 52));
+                    t.setBackground(new android.graphics.drawable.InsetDrawable(Qvk3Ui.ripple(a, p.dark ? 0x12FFFFFF : 0x0A000000,
+                            p.dark ? 0x22FFFFFF : 0x14000000, Qvk3Ui.dp(t.getContext(), 14)), d16, Qvk3Ui.dp(t.getContext(), 4), d16, Qvk3Ui.dp(t.getContext(), 4)));
+                    android.graphics.drawable.Drawable chev = Qvk3Icons.of(Qvk3Icons.RIGHT, (p.text2 & 0x00FFFFFF) | 0x99000000);
+                    chev.setBounds(0, 0, d16, d16);
+                    t.setCompoundDrawablesRelative(null, null, chev, null);
+                    t.setPadding(d16 * 2, Qvk3Ui.dp(t.getContext(), 14), d16 * 2, Qvk3Ui.dp(t.getContext(), 14));
+                } else {
+                    t.setText(r.title);
+                    t.setTextSize(14);
+                    t.setTextColor(p.text2);
+                    t.setGravity(Gravity.CENTER);
+                    t.setMinHeight(0);
+                    t.setBackground(null);
+                    t.setCompoundDrawablesRelative(null, null, null, null);
+                    t.setPadding(d16, Qvk3Ui.dp(t.getContext(), 14), d16, Qvk3Ui.dp(t.getContext(), 14));
+                }
                 return t;
             }
             ItemHolder h;
@@ -195,8 +215,17 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             title.setText(r.title);
             title.setTextColor(now ? p.accent : r.track != null && !r.track.playable() ? p.text2 : p.text);
             sub.setText(r.subtitle);
-            right.setText((r.saved ? "⬇  " : "") + (r.right == null ? "" : r.right));
-            right.setTextColor(r.saved ? p.accent : p.text2);
+            right.setText(r.right == null ? "" : r.right);
+            right.setTextColor(p.text2);
+            if (r.saved) {
+                android.graphics.drawable.Drawable dl = Qvk3Icons.of(Qvk3Icons.DOWNLOAD, p.accent);
+                int sz = Qvk3Ui.dp(a, 14);
+                dl.setBounds(0, 0, sz, sz);
+                right.setCompoundDrawablesRelative(dl, null, null, null);
+                right.setCompoundDrawablePadding(Qvk3Ui.dp(a, 6));
+            } else {
+                right.setCompoundDrawablesRelative(null, null, null, null);
+            }
             row.setContentDescription(r.title + ", " + r.subtitle + (r.saved ? ", сохранён на устройстве" : "")
                     + (r.right == null || r.right.isEmpty() ? "" : ", " + r.right) + (now ? ", сейчас играет" : ""));
             if (r.cover == null || !r.cover.equals(boundCover)) {
@@ -912,7 +941,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         });
         List<Row> h = feed.header;
         if (listKey.equals("local")) {
-            h.add(new Row(Row.NOTE, "＋ Импортировать файлы с устройства", "", "", null, null, false, this::importFiles, null));
+            h.add(new Row(Row.NOTE, "Импортировать файлы с устройства", "", "", null, null, false, this::importFiles, null));
             h.add(new Row(Row.NOTE, "Найти музыку, ранее сохранённую QVK", "", "", null, null, false, () -> Qvk3Jobs.io(() -> {
                 int n = Qvk3MusicDownloads.importExisting(a);
                 Qvk3Ui.toast(a, n > 0 ? "Найдено файлов: " + n : "Сохранённых QVK файлов не найдено (нужен Android 10+)");
@@ -1068,7 +1097,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private void showPlaylist(Qvk3MusicSource.Playlist pl) {
         screenTitle.setText(pl.title);
         List<Row> head = new ArrayList<>();
-        head.add(new Row(Row.NOTE, "▶ Слушать · ⬇ Скачать доступные", "", "", null, null, false, () -> playlistMenu(pl), null));
+        head.add(new Row(Row.NOTE, "Слушать или скачать", "", "", null, null, false, () -> playlistMenu(pl), null));
         feed = new Feed("pl:" + pl.key(), head, offset -> Qvk3MusicSource.playlistTracks(pl, offset));
         feed.render();
         feed.more();

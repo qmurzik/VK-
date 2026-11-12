@@ -124,6 +124,13 @@ public final class Qvk3Ui {
         return b;
     }
 
+    /** Label without decorative glyphs: leading «＋ ▶ ⬇ ☝ ⇪ ⇩ ★», trailing «→». Icons do that job now. */
+    public static String plain(CharSequence label) {
+        String s = label.toString().replaceAll("[→▶⬇＋☝⇪⇩★✓✗•]", "").replaceAll("\\s+·\\s+·\\s+", " · ").replaceAll("\\s{2,}", " ").trim();
+        if (s.startsWith("· ")) s = s.substring(2);
+        return s;
+    }
+
     /** Round icon-like control drawn with a text glyph (no drawable resources needed). */
     public static TextView glyph(Context c, Palette p, String glyph, String description, float sp, View.OnClickListener l) {
         TextView b = text(c, glyph, sp, p.text, false);

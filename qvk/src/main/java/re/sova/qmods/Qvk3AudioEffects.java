@@ -47,7 +47,7 @@ public final class Qvk3AudioEffects {
         } catch (Throwable t) {
             virt = null;
         }
-        unavailable = missing.toString().trim();
+        unavailable = missing.toString().trim().replaceAll("(басов|эквалайзер|звук) (?=\\S)", "$1, ");
         apply();
     }
 
