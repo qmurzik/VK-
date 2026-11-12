@@ -112,11 +112,14 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         }
     }
 
-    /** True when the floating dock or any rule is configured. */
+    /**
+     * BUG-0016: the "VK interface" layer (floating dock + element rules) is retired — QVK keeps a single
+     * appearance system, themes. This always returns false, so VK is never restyled by QVK: onActivityResumed
+     * still tracks the current VK activity and runs the day/night theme sync, but schedules no dock/rule passes,
+     * and a previously-applied dock/rules is restored to VK's original look on the next resume.
+     */
     static boolean active(Context c) {
-        if (Qvk3Kill.off(c, "skin")) return false;
-        SharedPreferences p = prefs(c);
-        return "floating".equals(p.getString(DOCK, "off")) || !rules(c).isEmpty();
+        return false;
     }
 
     private final WeakHashMap<Activity, Long> lastApply = new WeakHashMap<>();
