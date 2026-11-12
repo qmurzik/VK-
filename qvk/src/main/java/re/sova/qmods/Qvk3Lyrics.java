@@ -25,6 +25,8 @@ public final class Qvk3Lyrics {
     public static final String SOURCE_LOCAL = "Локальный файл";
     public static final String SOURCE_CACHE = "Сохранённый текст";
     public static final String SOURCE_LRCLIB = "LRCLIB";
+    public static final String SOURCE_NETEASE = "NetEase";
+    public static final String SOURCE_OVH = "lyrics.ovh";
     /** Max duration difference, in seconds, for accepting an external match. */
     public static final int DURATION_TOLERANCE = 3;
 
@@ -211,5 +213,127 @@ public final class Qvk3Lyrics {
             b.append(String.format(Locale.ROOT, "[%02d:%02d.%02d]%s\n", t / 60000, (t / 1000) % 60, (t % 1000) / 10, l.text));
         }
         return b.toString();
+    }
+
+    // ------------------------------------------------------------------ extra sources (pure, unit-tested)
+
+    /** {@link #normal} plus release decorations: «- Remastered 2011», «(Live)», «(Radio Edit)», «[Original Mix]». */
+    public static String cleanTitle(String s) {
+        if (s == null) return "";
+        String n = s.replaceAll("(?i)\\s*[(\\[][^)\\]]*(remaster|edit|version|mix|mono|stereo|deluxe|bonus|explicit)[^)\\]]*[)\\]]", "");
+        n = n.replaceAll("(?i)\\s+-\\s+.*(remaster|edit|version|mix|mono|stereo|live).*$", "");
+        return normal(n);
+    }
+
+    /** Like {@link #matches} but with cleaned titles and a wider duration window (other services cut intros differently). */
+    public static boolean matchesLoose(String artist, String title, int duration, String rArtist, String rTitle, int rDuration) {
+        String a = normal(artist), t = cleanTitle(title), ra = normal(rArtist), rt = cleanTitle(rTitle);
+        if (a.isEmpty() || t.isEmpty() || ra.isEmpty() || rt.isEmpty() || !t.equals(rt)) return false;
+        boolean artistOk = a.equals(ra) || (a.length() >= 3 && ra.length() >= 3 && (a.contains(ra) || ra.contains(a)));
+        return artistOk && (duration <= 0 || rDuration <= 0 || Math.abs(duration - rDuration) <= 8);
+    }
+
+    static boolean cjk(int c) {
+        Character.UnicodeScript sc = Character.UnicodeScript.of(c);
+        return sc == Character.UnicodeScript.HAN || sc == Character.UnicodeScript.HIRAGANA || sc == Character.UnicodeScript.KATAKANA || sc == Character.UnicodeScript.HANGUL;
+    }
+
+    /** Share of Cyrillic among letters (0..1); -1 when there are no letters. */
+    static float cyrillicShare(String s) {
+        int letters = 0, cyr = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!Character.isLetter(c)) continue;
+            letters++;
+            if (Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC) cyr++;
+        }
+        return letters == 0 ? -1 : cyr / (float) letters;
+    }
+
+    /** False for a translation: a Cyrillic title with Latin text or the other way round (LRCLIB has translations). */
+    public static boolean scriptMatches(String title, String text) {
+        float t = cyrillicShare(title), x = cyrillicShare(text);
+        if (t < 0 || x < 0) return true;
+        if (t > 0.6f && x < 0.3f) return false;
+        return !(t < 0.05f && x > 0.7f);
+    }
+
+    /** Best match from LRCLIB /api/search: same track, original language, synced first, then the closest duration. */
+    public static Qvk3Lyrics fromLrclibSearch(org.json.JSONArray arr, String artist, String title, int duration) {
+        if (arr == null) return null;
+        Qvk3Lyrics best = null;
+        int bestScore = Integer.MAX_VALUE;
+        for (int i = 0; i < arr.length() && i < 30; i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            int d = (int) Math.round(o.optDouble("duration", 0));
+            if (!matchesLoose(artist, title, duration, o.optString("artistName"), o.optString("trackName"), d)) continue;
+            String synced = o.optString("syncedLyrics", ""), plain = o.optString("plainLyrics", "");
+            Qvk3Lyrics l = null;
+            if (!synced.isEmpty() && !"null".equals(synced)) l = parse(synced, SOURCE_LRCLIB);
+            if ((l == null || !l.synced) && !plain.isEmpty() && !"null".equals(plain)) l = parse(plain, SOURCE_LRCLIB);
+            if (l == null || !scriptMatches(title, l.plain())) continue;
+            int score = (l.synced ? 0 : 1000) + (duration > 0 && d > 0 ? Math.abs(duration - d) : 50);
+            if (score < bestScore) {
+                bestScore = score;
+                best = l;
+            }
+        }
+        return best;
+    }
+
+    /** NetEase search answer → id of the matching song, or 0. */
+    public static long neteaseSongId(JSONObject search, String artist, String title, int duration) {
+        JSONObject r = search == null ? null : search.optJSONObject("result");
+        org.json.JSONArray songs = r == null ? null : r.optJSONArray("songs");
+        if (songs == null) return 0;
+        long best = 0;
+        int bestDiff = Integer.MAX_VALUE;
+        for (int i = 0; i < songs.length(); i++) {
+            JSONObject s = songs.optJSONObject(i);
+            if (s == null) continue;
+            org.json.JSONArray ar = s.optJSONArray("artists");
+            StringBuilder names = new StringBuilder();
+            if (ar != null) for (int k = 0; k < ar.length(); k++) names.append(k == 0 ? "" : " ").append(ar.optJSONObject(k) == null ? "" : ar.optJSONObject(k).optString("name"));
+            int d = (int) (s.optLong("duration") / 1000);
+            if (!matchesLoose(artist, title, duration, names.toString(), s.optString("name"), d)) continue;
+            int diff = duration > 0 && d > 0 ? Math.abs(duration - d) : 50;
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = s.optLong("id");
+            }
+        }
+        return best;
+    }
+
+    /** NetEase lyric answer → text without its Chinese credit lines (作词/作曲…) and «instrumental» placeholders. */
+    public static Qvk3Lyrics fromNetease(JSONObject o, String title) {
+        JSONObject lrc = o == null ? null : o.optJSONObject("lrc");
+        String text = lrc == null ? "" : lrc.optString("lyric", "");
+        if (text.isEmpty()) return null;
+        boolean cjkTitle = title.codePoints().anyMatch(Qvk3Lyrics::cjk);
+        StringBuilder b = new StringBuilder();
+        for (String line : text.split("\n")) {
+            String body = line.replaceAll("^(\\[[^\\]]*\\])+", "");
+            if (!cjkTitle && body.codePoints().anyMatch(Qvk3Lyrics::cjk)) continue;
+            if (body.matches("(?i)\\s*(by|lyrics|composer|arranger|producer|written by)\\s*[:：].*")) continue;
+            b.append(line).append('\n');
+        }
+        Qvk3Lyrics l = parse(b.toString(), SOURCE_NETEASE);
+        if (l == null || l.lines.size() < 3 || !scriptMatches(title, l.plain())) return null;
+        return l;
+    }
+
+    /** lyrics.ovh answer (plain text only). */
+    public static Qvk3Lyrics fromOvh(JSONObject o, String title) {
+        String t = o == null ? "" : o.optString("lyrics", "").replace("\r", "");
+        if (t.startsWith("Paroles de la chanson")) {
+            int nl = t.indexOf('\n');
+            t = nl < 0 ? "" : t.substring(nl + 1);
+        }
+        t = t.replaceAll("\n{3,}", "\n\n").trim();
+        if (t.length() < 20) return null;
+        Qvk3Lyrics l = parse(t, SOURCE_OVH);
+        return l == null || !scriptMatches(title, l.plain()) ? null : l;
     }
 }

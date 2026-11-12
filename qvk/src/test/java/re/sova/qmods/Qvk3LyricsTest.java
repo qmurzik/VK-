@@ -62,4 +62,52 @@ public class Qvk3LyricsTest {
         assertEquals(62300, r.lines.get(0).time);
         assertEquals("b", r.lines.get(1).text);
     }
+
+    @Test public void cleanTitleDropsReleaseDecorations() {
+        assertEquals(Qvk3Lyrics.cleanTitle("Yellow"), Qvk3Lyrics.cleanTitle("Yellow - Remastered 2011"));
+        assertEquals(Qvk3Lyrics.cleanTitle("Группа крови"), Qvk3Lyrics.cleanTitle("Группа крови (Radio Edit)"));
+        assertTrue(Qvk3Lyrics.matchesLoose("Кино", "Группа крови", 284, "Кино", "Группа крови (Remastered)", 287));
+        assertFalse(Qvk3Lyrics.matchesLoose("Кино", "Группа крови", 284, "Кино", "Кукушка", 284));
+    }
+
+    @Test public void translationsAreRejectedByScript() {
+        assertFalse(Qvk3Lyrics.scriptMatches("Группа крови", "It's such a warm place, but there on the street"));
+        assertTrue(Qvk3Lyrics.scriptMatches("Группа крови", "Тёплое место, но улицы ждут отпечатков наших ног"));
+        assertTrue(Qvk3Lyrics.scriptMatches("Yellow", "Look at the stars, look how they shine for you"));
+        assertFalse(Qvk3Lyrics.scriptMatches("Yellow", "Посмотри на звёзды, как они сияют для тебя"));
+    }
+
+    @Test public void lrclibSearchPicksOriginalSyncedClosestDuration() throws Exception {
+        org.json.JSONArray a = new org.json.JSONArray()
+                .put(new org.json.JSONObject().put("artistName", "Группа КИНО").put("trackName", "Группа крови").put("duration", 236.0)
+                        .put("plainLyrics", "It's such a warm place,\nBut there on the street"))
+                .put(new org.json.JSONObject().put("artistName", "Кино").put("trackName", "Группа крови").put("duration", 237.0)
+                        .put("syncedLyrics", "[00:45.91]Тёплое место\n[00:54.80]Звёздная пыль"))
+                .put(new org.json.JSONObject().put("artistName", "Кино").put("trackName", "Группа крови").put("duration", 284.0)
+                        .put("syncedLyrics", "[00:47.00]Тёплое место\n[00:56.00]Звёздная пыль"));
+        Qvk3Lyrics l = Qvk3Lyrics.fromLrclibSearch(a, "Кино", "Группа крови", 285);
+        assertNotNull(l);
+        assertTrue(l.synced);
+        assertEquals(47000, l.lines.get(0).time);
+    }
+
+    @Test public void neteaseCreditsAreRemoved() throws Exception {
+        org.json.JSONObject search = new org.json.JSONObject("{\"result\":{\"songs\":[{\"id\":1,\"name\":\"Yellow\",\"duration\":300000,\"artists\":[{\"name\":\"Coldplay\"}]},"
+                + "{\"id\":17177324,\"name\":\"Yellow\",\"duration\":266773,\"artists\":[{\"name\":\"Coldplay\"}]}]}}");
+        assertEquals(17177324, Qvk3Lyrics.neteaseSongId(search, "Coldplay", "Yellow", 267));
+        org.json.JSONObject lyr = new org.json.JSONObject().put("lrc", new org.json.JSONObject().put("lyric",
+                "[00:00.000] 作词 : Chris Martin\n[00:01.000] 作曲 : Chris Martin\n[00:33.10]Look at the stars\n[00:38.20]Look how they shine for you\n[00:43.00]And everything you do"));
+        Qvk3Lyrics l = Qvk3Lyrics.fromNetease(lyr, "Yellow");
+        assertNotNull(l);
+        assertTrue(l.synced);
+        assertEquals("Look at the stars", l.lines.get(0).text);
+        assertEquals(3, l.lines.size());
+    }
+
+    @Test public void ovhPlainText() throws Exception {
+        Qvk3Lyrics l = Qvk3Lyrics.fromOvh(new org.json.JSONObject().put("lyrics", "Paroles de la chanson Yellow par Coldplay\r\nLook at the stars\nLook how they shine for you"), "Yellow");
+        assertNotNull(l);
+        assertFalse(l.synced);
+        assertEquals("Look at the stars", l.lines.get(0).text);
+    }
 }

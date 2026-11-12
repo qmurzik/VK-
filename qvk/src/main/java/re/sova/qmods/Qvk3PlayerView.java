@@ -307,7 +307,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         lyricsList.setOnItemClickListener((parent, view, position, id) -> {
             if (lyrics != null && lyrics.synced && position < lyrics.lines.size()) {
                 // synced text: a tap on a line jumps there
-                engine.seekTo(lyrics.lines.get(position).time);
+                engine.seekTo(Math.max(0, lyrics.lines.get(position).time - lyricsOffset()));
                 manualScrollUntil = 0;
                 lastLine = -2;
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
@@ -316,10 +316,8 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             showLyrics(false); // plain text: a tap hides it
         });
         lyricsList.setOnItemLongClickListener((parent, view, position, id) -> {
-            if (lyrics == null) return false;
-            android.content.ClipboardManager cm = a.getSystemService(android.content.ClipboardManager.class);
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("Текст песни", lyrics.plain()));
-            Qvk3Ui.toast(a, "Текст скопирован");
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            lyricsMenu();
             return true;
         });
         if (cover != null) {
@@ -824,7 +822,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             flow.smoothScrollTo(e.queue().currentIndex());
         }
         if (lyricsMode && lyrics != null && lyrics.synced) {
-            int line = lyrics.lineAt(e.position());
+            int line = lyrics.lineAt(e.position() + lyricsOffset());
             if (line != lastLine) {
                 lastLine = line;
                 lyricsAdapter.notifyDataSetChanged();
@@ -937,6 +935,110 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                         .withEndAction(() -> stage.removeView(h)).start()).start();
     }
 
+    // ------------------------------------------------------------------ lyrics: sources and timing
+
+    private String offsetKey() {
+        Qvk3Track t = engine.current();
+        return t == null ? null : "qvk3_lyr_off_" + t.key();
+    }
+
+    /** Per-track timing correction of synced text, ms (positive = text earlier). */
+    private long lyricsOffset() {
+        String k = offsetKey();
+        return k == null ? 0 : Qvk3MusicSettings.prefs(a).getLong(k, 0);
+    }
+
+    private void shiftLyrics(long delta) {
+        String k = offsetKey();
+        if (k == null) return;
+        long v = delta == 0 ? 0 : lyricsOffset() + delta;
+        if (v == 0) Qvk3MusicSettings.prefs(a).edit().remove(k).apply();
+        else Qvk3MusicSettings.prefs(a).edit().putLong(k, v).apply();
+        lastLine = -2;
+        if (lyricsAdapter != null) lyricsAdapter.notifyDataSetChanged();
+        Qvk3Ui.toast(a, v == 0 ? "Текст без сдвига" : "Текст " + (v > 0 ? "раньше" : "позже") + " на " + String.format(java.util.Locale.ROOT, "%.1f", Math.abs(v) / 1000f).replace('.', ',') + " с");
+    }
+
+    private void lyricsMenu() {
+        Qvk3Track t = engine.current();
+        if (t == null) return;
+        List<String> items = new ArrayList<>();
+        List<Runnable> acts = new ArrayList<>();
+        if (lyrics != null) {
+            items.add("Скопировать текст");
+            acts.add(() -> {
+                android.content.ClipboardManager cm = a.getSystemService(android.content.ClipboardManager.class);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Текст песни", lyrics.plain()));
+                Qvk3Ui.toast(a, "Текст скопирован");
+            });
+        }
+        items.add("Другой текст\nПоискать во всех источниках и выбрать");
+        acts.add(this::chooseLyrics);
+        if (lyrics != null && lyrics.synced) {
+            long off = lyricsOffset();
+            items.add("Текст раньше на 0,5 с\nЕсли строки отстают от песни");
+            acts.add(() -> shiftLyrics(500));
+            items.add("Текст позже на 0,5 с\nЕсли строки спешат");
+            acts.add(() -> shiftLyrics(-500));
+            if (off != 0) {
+                items.add("Убрать сдвиг\nСейчас " + (off > 0 ? "раньше" : "позже") + " на " + String.format(java.util.Locale.ROOT, "%.1f", Math.abs(off) / 1000f).replace('.', ',') + " с");
+                acts.add(() -> shiftLyrics(0));
+            }
+        }
+        Qvk3Ui.dialog(a).setTitle("Текст песни").setItems(items.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
+    }
+
+    /** Runs every source and lets the user pick; the choice is remembered for the track. */
+    private void chooseLyrics() {
+        Qvk3Track t = engine.current();
+        if (t == null) return;
+        if (!Qvk3MusicSettings.lyricsExternal(a)) Qvk3Ui.toast(a, "Поиск в интернете выключен в настройках QVK Music — ищем только во ВКонтакте и в файлах");
+        android.app.AlertDialog wait = Qvk3Ui.dialog(a).setTitle("Ищем текст…").setMessage("ВКонтакте, LRCLIB, NetEase, lyrics.ovh и файлы рядом с треком").setNegativeButton("Отмена", null).create();
+        wait.show();
+        android.content.Context app = a.getApplicationContext();
+        Qvk3Jobs.io(() -> {
+            List<Qvk3Lyrics> found;
+            if (Qvk3MusicSettings.lyricsExternal(app)) found = Qvk3LyricsManager.searchAll(app, t);
+            else {
+                found = new ArrayList<>();
+                try {
+                    Qvk3Lyrics vk = t.hasLyrics ? Qvk3MusicSource.lyrics(t) : null;
+                    if (vk != null) found.add(vk);
+                } catch (Exception ignored) {
+                }
+                Qvk3Lyrics side = Qvk3LyricsManager.sidecar(t);
+                if (side != null) found.add(side);
+            }
+            final List<Qvk3Lyrics> res = found;
+            Qvk3Jobs.main(() -> {
+                if (!wait.isShowing()) return;
+                wait.dismiss();
+                if (!t.key().equals(coverFor)) return;
+                if (res.isEmpty()) {
+                    Qvk3Ui.toast(a, "Текст не найден ни в одном источнике");
+                    return;
+                }
+                String[] labels = new String[res.size()];
+                for (int i = 0; i < res.size(); i++) {
+                    Qvk3Lyrics l = res.get(i);
+                    String first = "";
+                    for (Qvk3Lyrics.Line ln : l.lines) if (!ln.text.trim().isEmpty()) { first = ln.text.trim(); break; }
+                    labels[i] = l.source + (l.synced ? " · синхронный" : " · обычный") + "\n" + (first.length() > 60 ? first.substring(0, 60) + "…" : first);
+                }
+                Qvk3Ui.dialog(a).setTitle("Выберите текст").setItems(labels, (d, w) -> {
+                    Qvk3Lyrics l = res.get(w);
+                    Qvk3Jobs.io(() -> Qvk3LyricsManager.choose(app, t, l));
+                    List<String> lines = new ArrayList<>();
+                    for (Qvk3Lyrics.Line ln : l.lines) lines.add(ln.text);
+                    lines.add("");
+                    lines.add("Источник: " + l.source);
+                    lyricsFor = t.key();
+                    setLyricsLines(lines, l);
+                }).setNegativeButton("Отмена", null).show();
+            });
+        });
+    }
+
     private void toggleLyrics() {
         showLyrics(!lyricsMode);
     }
@@ -972,7 +1074,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 if (fl == null) {
                     List<String> msg = new ArrayList<>();
                     msg.add(fe != null ? "Текст недоступен: " + fe : "Для этого трека нет текста");
-                    if (!Qvk3MusicSettings.lyricsExternal(a)) msg.add("Поиск в LRCLIB выключен в настройках QVK Music");
+                    if (!Qvk3MusicSettings.lyricsExternal(a)) msg.add("Поиск в интернете выключен в настройках QVK Music → Тексты песен");
                     setLyricsLines(msg, null);
                 } else {
                     List<String> lines = new ArrayList<>();
@@ -996,7 +1098,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                 tv.setText(getItem(position));
                 tv.setPadding(dp(12), dp(7), dp(12), dp(7));
                 boolean synced = lyrics != null && lyrics.synced;
-                boolean active = synced && position == lyrics.lineAt(engine.position());
+                boolean active = synced && position == lyrics.lineAt(engine.position() + lyricsOffset());
                 // same text size for every line (no reflow jump); the current line glides in by scale and brightness
                 tv.setTextColor(fg);
                 tv.setTextSize(size);

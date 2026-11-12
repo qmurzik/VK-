@@ -207,8 +207,8 @@ public final class Qvk3MusicSettingsScreen {
                 };
             case 6:
                 return (a, p, c, r) -> {
-                    c.addView(info(a, p, "Порядок: текст ВК → сохранённый текст → внешний источник. Внешний текст принимается только при совпадении исполнителя, названия и длительности."));
-                    c.addView(toggle(a, "Искать недостающий текст в LRCLIB", Qvk3MusicSettings.LYRICS_EXTERNAL, Qvk3MusicSettings.lyricsExternal(a), null));
+                    c.addView(info(a, p, "Порядок: текст ВК → сохранённый → файл .lrc рядом с треком → интернет (LRCLIB, NetEase, lyrics.ovh). Синхронный текст важнее обычного. Внешний текст принимается только при совпадении исполнителя, названия и длительности, переводы отсеиваются. Удержание текста в плеере — «Другой текст…» и сдвиг по времени."));
+                    c.addView(toggle(a, "Искать текст в интернете", Qvk3MusicSettings.LYRICS_EXTERNAL, Qvk3MusicSettings.lyricsExternal(a), null));
                     c.addView(toggle(a, "Текст поверх обложки", Qvk3MusicSettings.LYRICS_OVER_COVER, Qvk3MusicSettings.lyricsOverCover(a), () -> refreshPlayer(a)));
                     c.addView(link(a, p, "Размер шрифта: " + Qvk3MusicSettings.lyricsSizeSp(a), v -> {
                         String[] l = {"14", "16", "18", "22", "26", "30"};
