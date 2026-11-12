@@ -1,0 +1,51 @@
+diff -ru a/smali_classes2/xsna/pax0.smali b/smali_classes2/xsna/pax0.smali
+--- a/smali_classes2/xsna/pax0.smali	2026-11-12 20:13:50.904223991 +0000
++++ b/smali_classes2/xsna/pax0.smali	2026-11-12 20:13:50.955981797 +0000
+@@ -53,7 +53,10 @@
+ 
+     .line 5
+     .line 6
+-    const-string v0, "com.google.android.gms"
++    # QVK 3.0: bind FCM registration to the ReVanced GmsCore package (so QVK appears in it and registers)
++    iget-object v0, p0, Lxsna/pax0;->a:Landroid/content/Context;
++    invoke-static {v0}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v0
+     :try_end_0
+     .catchall {:try_start_0 .. :try_end_0} :catchall_0
+ 
+@@ -207,7 +210,10 @@
+ 
+     .line 19
+     .line 20
+-    const-string v3, "com.google.android.gms"
++    # QVK 3.0: bind FCM registration to the ReVanced GmsCore package (so QVK appears in it and registers)
++    iget-object v3, p0, Lxsna/pax0;->a:Landroid/content/Context;
++    invoke-static {v3}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v3
+ 
+     .line 21
+     .line 22
+@@ -287,7 +293,10 @@
+     .line 53
+     .line 54
+     .line 55
+-    const-string v4, "com.google.android.gms"
++    # QVK 3.0: bind FCM registration to the ReVanced GmsCore package (so QVK appears in it and registers)
++    iget-object v4, p0, Lxsna/pax0;->a:Landroid/content/Context;
++    invoke-static {v4}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v4
+ 
+     .line 56
+     .line 57
+@@ -337,7 +346,10 @@
+     .line 78
+     .line 79
+     .line 80
+-    const-string v4, "com.google.android.gms"
++    # QVK 3.0: bind FCM registration to the ReVanced GmsCore package (so QVK appears in it and registers)
++    iget-object v4, p0, Lxsna/pax0;->a:Landroid/content/Context;
++    invoke-static {v4}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v4
+ 
+     .line 81
+     .line 82

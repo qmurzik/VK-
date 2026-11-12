@@ -130,15 +130,25 @@ public final class Qvk3MicroG {
     }
 
     /** Intent that opens microG's settings (Cloud Messaging / registration live there). Never null. */
+    /**
+     * The GmsCore package whose settings the user should see: ReVanced GmsCore when it is the push provider
+     * (present and no stock com.google.android.gms), otherwise the stock package for a normal microG.
+     */
+    public static String providerPackage(Context c) {
+        if (c != null && !has(c, GMS) && has(c, REVANCED_GMS)) return REVANCED_GMS;
+        return GMS;
+    }
+
     public static Intent settingsIntent(Context c) {
         PackageManager pm = c.getPackageManager();
+        String pkg = providerPackage(c);   // BUG: this opened stock microG even with ReVanced GmsCore installed
         String[] candidates = {
                 "org.microg.gms.ui.SettingsActivity",
                 "org.microg.gms.ui.settings.SettingsActivity",
                 "org.microg.gms.ui.PushNotificationFragment",
         };
         for (String name : candidates) {
-            ComponentName cn = new ComponentName(GMS, name);
+            ComponentName cn = new ComponentName(pkg, name);
             try {
                 if (pm.getActivityInfo(cn, 0) != null) {
                     Intent i = new Intent();
@@ -150,13 +160,13 @@ public final class Qvk3MicroG {
                 // try next
             }
         }
-        // Fallback: the microG app's launcher, else its system App Info page.
-        Intent launch = pm.getLaunchIntentForPackage(GMS);
+        // Fallback: the provider app's launcher, else its system App Info page.
+        Intent launch = pm.getLaunchIntentForPackage(pkg);
         if (launch != null) {
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             return launch;
         }
-        Intent info = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + GMS));
+        Intent info = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg));
         info.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         return info;
     }
