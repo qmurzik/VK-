@@ -11,7 +11,6 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
 
 /**
@@ -42,10 +41,10 @@ public final class Qvk3MusicSettingsScreen {
             {Qvk3MusicSettings.ENABLED}};
 
     public static void show(Activity a) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        EditText filter = new EditText(a);
+        EditText filter = Qvk3Sheet.field(a, p, new EditText(a));
         filter.setHint("Поиск по настройкам музыки");
         filter.setSingleLine(true);
         col.addView(filter);
@@ -57,8 +56,7 @@ public final class Qvk3MusicSettingsScreen {
             body.removeAllViews();
             String q = Qvk3Lyrics.normal(filter.getText().toString());
             for (int i = 0; i < TITLES.length; i++) {
-                LinearLayout sec = new LinearLayout(a);
-                sec.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout sec = Qvk3Sheet.group(a, p);
                 section(i).build(a, p, sec, render[0]);
                 boolean match = q.isEmpty() || Qvk3Lyrics.normal(TITLES[i]).contains(q);
                 if (!match) {
@@ -69,22 +67,23 @@ public final class Qvk3MusicSettingsScreen {
                     }
                     if (sec.getChildCount() == 0) continue;
                 }
-                TextView h = Qvk3Ui.text(a, TITLES[i], 17, p.accent, true);
+                TextView h = Qvk3Sheet.section(a, p, TITLES[i]);
                 h.setAccessibilityHeading(true);
-                h.setPadding(0, Qvk3Ui.dp(a, 16), 0, Qvk3Ui.dp(a, 4));
                 body.addView(h);
                 body.addView(sec);
                 final int idx = i;
                 if (RESET_KEYS[i].length > 0) {
-                    TextView reset = Qvk3Ui.text(a, "Сбросить раздел «" + TITLES[i] + "»", 13, p.text2, false);
-                    reset.setPadding(0, Qvk3Ui.dp(a, 6), 0, Qvk3Ui.dp(a, 6));
+                    TextView reset = Qvk3Ui.text(a, "Сбросить раздел", 13, p.text2, false);
+                    reset.setContentDescription("Сбросить раздел «" + TITLES[i] + "»");
+                    reset.setGravity(android.view.Gravity.END);
+                    reset.setPadding(0, Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4));
                     reset.setOnClickListener(v -> Qvk3Ui.dialog(a).setTitle("Сбросить «" + TITLES[idx] + "»?")
                             .setPositiveButton("Сбросить", (d, w) -> {
                                 Qvk3MusicSettings.reset(a, RESET_KEYS[idx]);
                                 render[0].run();
                                 refreshPlayer(a);
                             }).setNegativeButton("Отмена", null).show());
-                    body.addView(reset);
+                    body.addView(reset, Qvk3Ui.match());
                 }
             }
         };
@@ -104,7 +103,7 @@ public final class Qvk3MusicSettingsScreen {
         });
         render[0].run();
         ScrollView sv = new ScrollView(a);
-        int pad = Qvk3Ui.dp(a, 20);
+        int pad = Qvk3Ui.dp(a, 24);
         col.setPadding(pad, 0, pad, pad);
         sv.addView(col);
         Qvk3Ui.dialog(a).setTitle("Настройки QVK Music").setView(sv).setPositiveButton("Готово", null).show();
@@ -115,32 +114,25 @@ public final class Qvk3MusicSettingsScreen {
         if (sc != null) sc.rebuildPlayer();
     }
 
-    static Switch toggle(Activity a, String title, String key, boolean def, Runnable after) {
-        Switch s = new Switch(a);
-        s.setText(title);
-        s.setContentDescription(title);
-        s.setMinHeight(Qvk3Ui.dp(a, 48));
+    static View toggle(Activity a, String title, String key, boolean def, Runnable after) {
         SharedPreferences prefs = Qvk3MusicSettings.prefs(a);
-        s.setChecked(prefs.getBoolean(key, def));
-        s.setOnCheckedChangeListener((b, v) -> {
+        View row = Qvk3Sheet.switchRow(a, Qvk3Sheet.palette(a), title, null, prefs.getBoolean(key, def), v -> {
             Qvk3SettingsHistory.before(a, key, title);
             prefs.edit().putBoolean(key, v).apply();
             if (after != null) after.run();
         });
-        return s;
+        row.setContentDescription(title);
+        return row;
     }
 
-    static TextView link(Activity a, Qvk3Ui.Palette p, String title, View.OnClickListener l) {
-        TextView t = Qvk3Ui.text(a, title, 15, p.accent, false);
-        t.setMinHeight(Qvk3Ui.dp(a, 44));
-        t.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        t.setOnClickListener(l);
-        return t;
+    static View link(Activity a, Qvk3Ui.Palette p, String title, View.OnClickListener l) {
+        return Qvk3Sheet.navRow(a, p, title, l);
     }
 
     static TextView info(Activity a, Qvk3Ui.Palette p, String text) {
         TextView t = Qvk3Ui.text(a, text, 13, p.text2, false);
-        t.setPadding(0, Qvk3Ui.dp(a, 2), 0, Qvk3Ui.dp(a, 6));
+        t.setLineSpacing(0, 1.15f);
+        t.setPadding(0, Qvk3Ui.dp(a, 10), 0, Qvk3Ui.dp(a, 10));
         return t;
     }
 
@@ -161,7 +153,7 @@ public final class Qvk3MusicSettingsScreen {
             case 0:
                 return (a, p, c, r) -> {
                     c.addView(toggle(a, "Без пауз между треками (gapless)", Qvk3MusicSettings.GAPLESS, true, null));
-                    c.addView(link(a, p, "Кроссфейд: " + Qvk3MusicSettings.crossfadeSeconds(a) + " с", v -> {
+                    c.addView(link(a, p, "Кроссфейд: " + (Qvk3MusicSettings.crossfadeSeconds(a) == 0 ? "выкл" : Qvk3MusicSettings.crossfadeSeconds(a) + " с"), v -> {
                         String[] l = {"Выключен", "2 с", "4 с", "6 с", "8 с", "12 с"};
                         int[] val = {0, 2, 4, 6, 8, 12};
                         choose(a, "Кроссфейд", l, -1, w -> {
@@ -177,9 +169,9 @@ public final class Qvk3MusicSettingsScreen {
                     c.addView(info(a, p, "Скорость, таймер сна и повтор A–B — кнопки под плеером."));
                 };
             case 1:
-                return (a, p, c, r) -> c.addView(link(a, p, "Эквалайзер, басы, объёмный звук, кроссфейд", v -> Qvk3SoundDialog.show(a)));
+                return (a, p, c, r) -> c.addView(link(a, p, "Эквалайзер и эффекты", v -> Qvk3SoundDialog.show(a)));
             case 2:
-                return (a, p, c, r) -> c.addView(link(a, p, "Макет: " + Qvk3MusicSettings.LAYOUT_TITLES[indexOf(Qvk3MusicSettings.layout(a))] + " · размер и форма обложки", v -> playerLook(a, () -> {
+                return (a, p, c, r) -> c.addView(link(a, p, "Плеер: " + Qvk3MusicSettings.LAYOUT_TITLES[indexOf(Qvk3MusicSettings.layout(a))], v -> playerLook(a, () -> {
                     r.run();
                     refreshPlayer(a);
                 })));
@@ -218,7 +210,7 @@ public final class Qvk3MusicSettingsScreen {
                     c.addView(info(a, p, "Порядок: текст ВК → сохранённый текст → внешний источник. Внешний текст принимается только при совпадении исполнителя, названия и длительности."));
                     c.addView(toggle(a, "Искать недостающий текст в LRCLIB", Qvk3MusicSettings.LYRICS_EXTERNAL, Qvk3MusicSettings.lyricsExternal(a), null));
                     c.addView(toggle(a, "Текст поверх обложки", Qvk3MusicSettings.LYRICS_OVER_COVER, Qvk3MusicSettings.lyricsOverCover(a), () -> refreshPlayer(a)));
-                    c.addView(link(a, p, "Размер шрифта текста: " + Qvk3MusicSettings.lyricsSizeSp(a), v -> {
+                    c.addView(link(a, p, "Размер шрифта: " + Qvk3MusicSettings.lyricsSizeSp(a), v -> {
                         String[] l = {"14", "16", "18", "22", "26", "30"};
                         choose(a, "Размер текста песни", l, -1, w -> {
                             putInt(a, Qvk3MusicSettings.LYRICS_SIZE, "Размер текста песни", Integer.parseInt(l[w]));
@@ -258,7 +250,7 @@ public final class Qvk3MusicSettingsScreen {
                 return (a, p, c, r) -> {
                 c.addView(toggle(a, "Cover Flow при повороте телефона", Qvk3MusicSettings.ROTATE_COVERFLOW, true, null));
                 c.addView(info(a, p, "Альбомы медиатеки на чёрном фоне, как на iPhone. Касание альбома переворачивает его к списку треков, касание трека включает альбом с него."));
-                c.addView(link(a, p, "Расстояние между альбомами: " + Qvk3MusicSettings.coverflowSpacing(a) + "%", v -> {
+                c.addView(link(a, p, "Расстояние: " + Qvk3MusicSettings.coverflowSpacing(a) + "%", v -> {
                     String[] l = {"Плотно (40%)", "Обычно (55%)", "Просторно (70%)", "Очень просторно (85%)"};
                     int[] val = {40, 55, 70, 85};
                     choose(a, "CoverFlow", l, -1, w -> {
@@ -288,7 +280,7 @@ public final class Qvk3MusicSettingsScreen {
                     c.addView(toggle(a, "QVK Music вместо раздела «Музыка» ВК", Qvk3MusicSettings.ENABLED, true, null));
                     c.addView(toggle(a, "Мини-плеер поверх экранов ВКонтакте", Qvk3MusicSettings.MINI_ON_VK, false, null));
                     boolean hide = "hide".equals(Qvk3MusicSettings.prefs(a).getString(Qvk3MusicSettings.MINI_SWIPE, "stop"));
-                    c.addView(link(a, p, "Действие при смахивании мини-плеера: " + (hide ? "только скрыть" : "остановить музыку"), v -> {
+                    c.addView(link(a, p, "Смахивание мини-плеера: " + (hide ? "скрыть" : "стоп"), v -> {
                         String[] l = {"Остановить музыку", "Только скрыть (до следующего трека)"};
                         choose(a, "Смахивание мини-плеера вправо", l, hide ? 1 : 0, w -> {
                             Qvk3SettingsHistory.before(a, Qvk3MusicSettings.MINI_SWIPE, "Смахивание мини-плеера: " + l[w]);

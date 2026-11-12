@@ -137,12 +137,15 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
             }
             org.json.JSONArray verify = new org.json.JSONArray();
             if (Qvk3Portal.linked(app)) {
-                for (String kind : new String[]{"bug", "idea"}) {
-                    try {
-                        org.json.JSONArray it = Qvk3Portal.tickets(app, "scope=mine&kind=" + kind + "&status=verify&limit=20").optJSONArray("items");
-                        if (it != null) for (int i = 0; i < it.length(); i++) verify.put(it.get(i));
-                    } catch (Exception ignored) {
+                // only bugs waiting for «Требуется проверка» (ideas have no such step; the portal ignores an unknown status)
+                try {
+                    org.json.JSONArray it = Qvk3Portal.tickets(app, "scope=mine&kind=bug&status=verify&limit=20").optJSONArray("items");
+                    if (it != null) for (int i = 0; i < it.length(); i++) {
+                        org.json.JSONObject t = it.optJSONObject(i);
+                        org.json.JSONObject st = t == null ? null : t.optJSONObject("status");
+                        if (st != null && "verify".equals(st.optString("code"))) verify.put(t);
                     }
+                } catch (Exception ignored) {
                 }
             }
             final String n = notes;
@@ -163,30 +166,30 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
 
     static void showWhatsNew(Activity a, String notes, org.json.JSONArray verify) {
         if (a.isFinishing() || a.isDestroyed()) return;
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         android.widget.LinearLayout col = new android.widget.LinearLayout(a);
         col.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 22);
-        col.setPadding(pad, Qvk3Ui.dp(a, 4), pad, Qvk3Ui.dp(a, 8));
-        if (!notes.isEmpty()) col.addView(Qvk3Ui.text(a, notes, 15, p.text, false));
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
         android.app.AlertDialog[] d = new android.app.AlertDialog[1];
         if (verify.length() > 0) {
-            android.widget.TextView h = Qvk3Ui.text(a, "Проверьте исправления ваших обращений:", 14, p.accent, true);
-            h.setPadding(0, Qvk3Ui.dp(a, notes.isEmpty() ? 0 : 14), 0, Qvk3Ui.dp(a, 4));
+            android.widget.TextView h = Qvk3Ui.text(a, "ПРОВЕРЬТЕ ИСПРАВЛЕНИЯ", 12, p.text2, true);
+            h.setLetterSpacing(0.06f);
+            h.setPadding(0, Qvk3Ui.dp(a, 12), 0, Qvk3Ui.dp(a, 6));
             col.addView(h);
             for (int i = 0; i < verify.length(); i++) {
                 org.json.JSONObject t = verify.optJSONObject(i);
                 String code = t.optString("code");
-                col.addView(Qvk3MyTickets.action(a, p, code + " · " + t.optString("title"), false, () -> {
+                col.addView(Qvk3MyTickets.ticketRow(a, p, code, t.optString("title"), () -> {
                     if (d[0] != null) d[0].dismiss();
                     Qvk3MyTickets.card(a, code);
                 }));
             }
         }
-        android.widget.ScrollView sv = new android.widget.ScrollView(a);
-        sv.addView(col);
-        d[0] = Qvk3Ui.dialog(a).setTitle("Что нового в QVK " + Qvk3Portal.appVersion(a)).setView(sv)
-                .setPositiveButton("Отлично", null).show();
+        android.app.AlertDialog.Builder bld = Qvk3Ui.dialog(a).setTitle("Что нового в QVK " + Qvk3Portal.appVersion(a));
+        if (!notes.isEmpty()) bld.setMessage(notes);
+        if (verify.length() > 0) bld.setView(col);
+        d[0] = bld.setPositiveButton("Отлично", null).show();
     }
 
     // ------------------------------------------------------------------ crash

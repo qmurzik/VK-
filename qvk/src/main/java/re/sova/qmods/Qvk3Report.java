@@ -87,11 +87,11 @@ final class Qvk3Report {
     }
 
     private static void form(Activity a, Bitmap screenshot, String crash, String preTitle, String preDesc, String preCategory) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 4), pad, Qvk3Ui.dp(a, 8));
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
         final String[] kind = {"bug"}, category = {preCategory != null ? preCategory : crash != null ? "performance" : null}, frequency = {crash != null ? "once" : null};
 
         LinearLayout kinds = new LinearLayout(a);
@@ -367,8 +367,11 @@ final class Qvk3Report {
         e.setHintTextColor(p.text2);
         e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | (multi ? InputType.TYPE_TEXT_FLAG_MULTI_LINE : 0));
         if (multi) e.setMaxLines(6);
+        // a soft filled field instead of the old underline
+        e.setBackground(Qvk3Ui.rounded(p.dark ? 0x14FFFFFF : 0x0A000000, Qvk3Ui.dp(a, 14)));
+        e.setPadding(Qvk3Ui.dp(a, 14), Qvk3Ui.dp(a, 12), Qvk3Ui.dp(a, 14), Qvk3Ui.dp(a, 12));
         LinearLayout.LayoutParams lp = Qvk3Ui.match();
-        lp.topMargin = Qvk3Ui.dp(a, 4);
+        lp.topMargin = Qvk3Ui.dp(a, 8);
         parent.addView(e, lp);
         return e;
     }
@@ -383,6 +386,7 @@ final class Qvk3Report {
         CheckBox c = new CheckBox(a);
         c.setText(s);
         c.setTextColor(p.text);
+        c.setButtonTintList(android.content.res.ColorStateList.valueOf(p.accent));
         c.setChecked(on);
         parent.addView(c, new LinearLayout.LayoutParams(-2, -2));
         return c;

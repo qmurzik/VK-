@@ -992,7 +992,7 @@ public final class Qvk3SettingsActivity extends Activity {
             if (clip != null && clip.toString().trim().toUpperCase(java.util.Locale.ROOT).startsWith(Qvk3SettingsCode.PREFIX)) e.setText(clip.toString().trim());
         }
         FrameLayout f = new FrameLayout(this);
-        f.setPadding(dp(20), dp(8), dp(20), 0);
+        f.setPadding(dp(24), dp(8), dp(24), 0);
         f.addView(e);
         Qvk3Ui.dialog(this).setTitle("Вставить код настроек").setView(f).setPositiveButton("Дальше", (d, w) -> {
             java.util.Map<String, Boolean> want;

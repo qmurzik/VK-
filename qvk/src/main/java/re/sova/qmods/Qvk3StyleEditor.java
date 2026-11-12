@@ -202,7 +202,7 @@ public final class Qvk3StyleEditor {
     static void pickColor(Activity a, String title, int initial, IntSink sink) {
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 20), 0);
+        col.setPadding(Qvk3Ui.dp(a, 24), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 24), 0);
         EditText hex = new EditText(a);
         hex.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         hex.setText(String.format("#%06X", initial & 0xFFFFFF));

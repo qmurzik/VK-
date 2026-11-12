@@ -10,8 +10,6 @@ import android.text.InputType;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Switch;
-import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,30 +17,28 @@ import java.util.List;
 /** Settings of the VK skin engine: floating bottom bar, per-id rules and the interface inspector. */
 final class Qvk3SkinScreen {
     static void dock(Activity a) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         android.content.SharedPreferences pr = Qvk3Skin.prefs(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 8), pad, Qvk3Ui.dp(a, 8));
-        Switch on = new Switch(a);
-        on.setText("Плавающая скруглённая нижняя панель");
-        on.setChecked("floating".equals(pr.getString(Qvk3Skin.DOCK, "off")));
-        on.setOnCheckedChangeListener((b, v) -> {
-            Qvk3SettingsHistory.before(a, Qvk3Skin.DOCK, v ? "Плавающая нижняя панель включена" : "Нижняя панель ВК: стандартная");
-            pr.edit().putString(Qvk3Skin.DOCK, v ? "floating" : "off").apply();
-            Qvk3Skin.refresh();
-        });
-        col.addView(on);
-        col.addView(Qvk3SoundDialog.slider(a, p, "Скругление, dp", pr.getInt(Qvk3Skin.DOCK_RADIUS, 24), 40, v -> save(a, Qvk3Skin.DOCK_RADIUS, v)));
-        col.addView(Qvk3SoundDialog.slider(a, p, "Отступ от краёв, dp", pr.getInt(Qvk3Skin.DOCK_MARGIN, 12), 32, v -> save(a, Qvk3Skin.DOCK_MARGIN, v)));
-        col.addView(Qvk3SoundDialog.slider(a, p, "Непрозрачность, % (40–100)", pr.getInt(Qvk3Skin.DOCK_ALPHA, 96), 100, v -> save(a, Qvk3Skin.DOCK_ALPHA, Math.max(40, v))));
-        TextView n = Qvk3Ui.text(a, "Меняется настоящая панель ВК: все вкладки и счётчики работают как раньше. Изменение видно после возврата на экран ВК. Выключите переключатель, чтобы вернуть штатный вид.", 13, p.text2, false);
-        n.setPadding(0, Qvk3Ui.dp(a, 10), 0, 0);
-        col.addView(n);
-        ScrollView sv = new ScrollView(a);
-        sv.addView(col);
-        Qvk3Ui.dialog(a).setTitle("Нижняя панель ВК").setView(sv).setPositiveButton("Готово", null).show();
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
+        LinearLayout g = Qvk3Sheet.group(a, p);
+        g.addView(Qvk3Sheet.switchRow(a, p, "Плавающая панель", "Скруглённая нижняя панель над контентом",
+                "floating".equals(pr.getString(Qvk3Skin.DOCK, "off")), v -> {
+                    Qvk3SettingsHistory.before(a, Qvk3Skin.DOCK, v ? "Плавающая нижняя панель включена" : "Нижняя панель ВК: стандартная");
+                    pr.edit().putString(Qvk3Skin.DOCK, v ? "floating" : "off").apply();
+                    Qvk3Skin.refresh();
+                }));
+        col.addView(g);
+        col.addView(Qvk3Sheet.section(a, p, "Форма"));
+        LinearLayout f = Qvk3Sheet.group(a, p);
+        f.addView(Qvk3SoundDialog.slider(a, p, "Скругление", pr.getInt(Qvk3Skin.DOCK_RADIUS, 24), 40, v -> save(a, Qvk3Skin.DOCK_RADIUS, v), v -> v + " dp"));
+        f.addView(Qvk3SoundDialog.slider(a, p, "Отступ от краёв", pr.getInt(Qvk3Skin.DOCK_MARGIN, 12), 32, v -> save(a, Qvk3Skin.DOCK_MARGIN, v), v -> v + " dp"));
+        f.addView(Qvk3SoundDialog.slider(a, p, "Непрозрачность", pr.getInt(Qvk3Skin.DOCK_ALPHA, 96), 100, v -> save(a, Qvk3Skin.DOCK_ALPHA, Math.max(40, v)), v -> Math.max(40, v) + "%"));
+        col.addView(f);
+        col.addView(Qvk3Sheet.note(a, p, "Меняется настоящая панель ВК: вкладки и счётчики работают как раньше. Изменение видно после возврата на экран ВК."));
+        Qvk3Ui.dialog(a).setTitle("Нижняя панель ВК").setView(col).setPositiveButton("Готово", null).show();
     }
 
     static void save(Activity a, String key, int v) {
@@ -54,15 +50,15 @@ final class Qvk3SkinScreen {
     static void rules(Activity a) {
         List<Qvk3Skin.Rule> rules = Qvk3Skin.rules(a);
         List<String> labels = new ArrayList<>();
-        for (Qvk3Skin.Rule r : rules) labels.add("#" + r.id + (r.hide ? " · скрыт" : (r.radius >= 0 ? " · скругление " + r.radius : "") + (r.bg != 0 ? " · цвет" : "") + (r.opacity < 100 ? " · " + r.opacity + "%" : "") + (r.margin >= 0 ? " · отступ " + r.margin : "") + (r.vmargin >= 0 ? " · интервал " + r.vmargin : "")));
-        labels.add("☝ Настроить элемент касанием на экране ВК");
-        labels.add("＋ Новое правило по имени элемента");
-        labels.add("⇪ Поделиться оформлением (код в буфер)");
-        labels.add("⇩ Вставить оформление из буфера");
-        labels.add("Как найти имя элемента (Инспектор)");
-        labels.add("Набор: убрать тени у шапки чата и панели");
-        labels.add("Набор: полупрозрачная кнопка «Написать»");
-        labels.add("Набор: плоский вид (убрать разделители и тени везде)");
+        for (Qvk3Skin.Rule r : rules) labels.add(r.id + "\n" + describe(r));
+        labels.add("Настроить касанием\nВыберите элемент прямо на экране ВК");
+        labels.add("Новое правило\nПо имени элемента");
+        labels.add("Поделиться оформлением\nКод правил копируется в буфер");
+        labels.add("Вставить оформление\nИз кода в буфере обмена");
+        labels.add("Инспектор интерфейса\nКак узнать имя элемента");
+        labels.add("Без теней\nУбрать тени у шапки чата и панели");
+        labels.add("Прозрачная «Написать»\nПолупрозрачная кнопка в чатах");
+        labels.add("Плоский вид\nУбрать разделители и тени везде");
         labels.add("Сбросить все правила");
         Qvk3Ui.dialog(a).setTitle("Правила интерфейса ВК").setItems(labels.toArray(new String[0]), (d, i) -> {
             int k = i - rules.size();
@@ -82,6 +78,17 @@ final class Qvk3SkinScreen {
                 rules(a);
             }
         }).setNegativeButton("Закрыть", null).show();
+    }
+
+    static String describe(Qvk3Skin.Rule r) {
+        List<String> d = new ArrayList<>();
+        if (r.hide) d.add("скрыт");
+        if (r.radius >= 0) d.add("скругление " + r.radius);
+        if (r.bg != 0) d.add(String.format("фон #%06X", r.bg & 0xFFFFFF));
+        if (r.opacity < 100) d.add(r.opacity + "%");
+        if (r.margin >= 0) d.add("отступ " + r.margin);
+        if (r.vmargin >= 0) d.add("интервал " + r.vmargin);
+        return d.isEmpty() ? "без изменений" : String.join(" · ", d);
     }
 
     /** Ready-made rule sets; names come from VK's own layouts (dialog_shadow, vkim_fab), rules replace same-id ones. */
@@ -104,29 +111,36 @@ final class Qvk3SkinScreen {
 
     static void edit(Activity a, List<Qvk3Skin.Rule> rules, int index) {
         Qvk3Skin.Rule r = index >= 0 ? rules.get(index) : new Qvk3Skin.Rule();
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 8), pad, Qvk3Ui.dp(a, 8));
-        EditText id = new EditText(a);
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
+        EditText id = Qvk3Sheet.field(a, p, new EditText(a));
         id.setHint("Имя элемента, например bottom_navigation");
         id.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         id.setText(r.id);
         col.addView(id);
-        Switch hide = new Switch(a);
-        hide.setText("Скрыть элемент");
-        hide.setChecked(r.hide);
-        col.addView(hide);
+        final boolean[] hidden = {r.hide};
+        LinearLayout g = Qvk3Sheet.group(a, p);
+        g.addView(Qvk3Sheet.switchRow(a, p, "Скрыть элемент", null, r.hide, v -> hidden[0] = v));
+        LinearLayout.LayoutParams glp = Qvk3Ui.match();
+        glp.topMargin = Qvk3Ui.dp(a, 12);
+        col.addView(g, glp);
+        col.addView(Qvk3Sheet.section(a, p, "Вид"));
+        LinearLayout look = Qvk3Sheet.group(a, p);
         final int[] radius = {r.radius}, opacity = {r.opacity}, margin = {r.margin};
-        col.addView(Qvk3SoundDialog.slider(a, p, "Скругление, dp (0 — квадрат)", Math.max(0, r.radius), 40, v -> radius[0] = v));
-        col.addView(Qvk3SoundDialog.slider(a, p, "Непрозрачность, %", r.opacity, 100, v -> opacity[0] = Math.max(10, v)));
-        col.addView(Qvk3SoundDialog.slider(a, p, "Отступы, dp", Math.max(0, r.margin), 32, v -> margin[0] = v));
-        EditText color = new EditText(a);
+        look.addView(Qvk3SoundDialog.slider(a, p, "Скругление", Math.max(0, r.radius), 40, v -> radius[0] = v, v -> v == 0 ? "квадрат" : v + " dp"));
+        look.addView(Qvk3SoundDialog.slider(a, p, "Непрозрачность", r.opacity, 100, v -> opacity[0] = Math.max(10, v), v -> Math.max(10, v) + "%"));
+        look.addView(Qvk3SoundDialog.slider(a, p, "Отступы", Math.max(0, r.margin), 32, v -> margin[0] = v, v -> v + " dp"));
+        col.addView(look);
+        EditText color = Qvk3Sheet.field(a, p, new EditText(a));
         color.setHint("Цвет фона #RRGGBB (необязательно)");
         color.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         if (r.bg != 0) color.setText(String.format("#%06X", r.bg & 0xFFFFFF));
-        col.addView(color);
+        LinearLayout.LayoutParams clp = Qvk3Ui.match();
+        clp.topMargin = Qvk3Ui.dp(a, 12);
+        col.addView(color, clp);
         ScrollView sv = new ScrollView(a);
         sv.addView(col);
         android.app.AlertDialog.Builder b = Qvk3Ui.dialog(a).setTitle(index >= 0 ? "Правило" : "Новое правило").setView(sv)
@@ -137,7 +151,7 @@ final class Qvk3SkinScreen {
                         return;
                     }
                     r.id = name;
-                    r.hide = hide.isChecked();
+                    r.hide = hidden[0];
                     r.radius = radius[0];
                     r.opacity = opacity[0];
                     r.margin = margin[0];

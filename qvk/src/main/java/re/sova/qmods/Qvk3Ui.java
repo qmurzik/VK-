@@ -108,15 +108,19 @@ public final class Qvk3Ui {
 
     /** Pill button with an accessible label and a 48dp minimum touch target. */
     public static TextView button(Context c, Palette p, String label, boolean filled, View.OnClickListener l) {
+        // the same buttons as the QVK sheet: filled main action, tonal accent for the rest, 16dp corners, a press spring
         TextView b = text(c, label, 15, filled ? p.onAccent : p.accent, true);
         b.setGravity(Gravity.CENTER);
-        int h = dp(c, 16);
-        b.setPadding(h, dp(c, 10), h, dp(c, 10));
-        b.setMinHeight(dp(c, 44));
+        b.setMaxLines(1);
+        b.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        int h = dp(c, 14);
+        b.setPadding(h, dp(c, 12), h, dp(c, 12));
+        b.setMinHeight(dp(c, 48));
         b.setMinWidth(dp(c, 48));
-        b.setBackground(ripple(c, filled ? p.accent : (p.dark ? 0x1FFFFFFF : 0x14000000), 0x33888888, dp(c, 22)));
+        b.setBackground(ripple(c, filled ? p.accent : (p.accent & 0x00FFFFFF) | 0x1F000000, filled ? 0x33FFFFFF : (p.accent & 0x00FFFFFF) | 0x33000000, dp(c, 16)));
         b.setOnClickListener(l);
         b.setContentDescription(label);
+        Qvk3Motion.press(b);
         return b;
     }
 
@@ -165,9 +169,9 @@ public final class Qvk3Ui {
         return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
+    /** Every QVK 3 dialog: the QVK bottom sheet (Qvk3Sheet) — VK theme colours, handle, readable text, proper buttons. */
     public static AlertDialog.Builder dialog(Activity a) {
-        return new AlertDialog.Builder(a, night(a) ? android.R.style.Theme_DeviceDefault_Dialog_Alert
-                : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert);
+        return new Qvk3Sheet.Builder(a);
     }
 
     public static void toast(Context c, String s) {

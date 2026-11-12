@@ -105,11 +105,11 @@ final class Qvk3MyTickets {
     }
 
     private static void render(Activity a, JSONObject t) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 4), pad, Qvk3Ui.dp(a, 8));
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
         col.addView(Qvk3Ui.text(a, t.optString("title"), 18, p.text, true));
         TextView st = Qvk3Ui.text(a, statusLine(t) + (t.optString("fixed_version").isEmpty() ? "" : " · " + t.optString("fixed_version")), 14, p.accent, true);
         st.setPadding(0, Qvk3Ui.dp(a, 4), 0, Qvk3Ui.dp(a, 8));
@@ -193,6 +193,39 @@ final class Qvk3MyTickets {
             }));
         }
         d.show();
+    }
+
+    /** A ticket as a card row: code chip, title, chevron. */
+    static android.view.View ticketRow(Activity a, Qvk3Ui.Palette p, String code, String title, Runnable r) {
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int pd = Qvk3Ui.dp(a, 14);
+        row.setPadding(pd, Qvk3Ui.dp(a, 12), Qvk3Ui.dp(a, 10), Qvk3Ui.dp(a, 12));
+        row.setBackground(Qvk3Ui.ripple(a, p.dark ? 0x14FFFFFF : 0x0A000000, p.dark ? 0x22FFFFFF : 0x14000000, Qvk3Ui.dp(a, 14)));
+        LinearLayout texts = new LinearLayout(a);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        TextView chip = Qvk3Ui.text(a, code, 12, p.accent, true);
+        chip.setPadding(Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 2), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 2));
+        chip.setBackground(Qvk3Ui.rounded((p.accent & 0x00FFFFFF) | 0x24000000, Qvk3Ui.dp(a, 8)));
+        LinearLayout top = new LinearLayout(a);
+        top.addView(chip);
+        texts.addView(top);
+        TextView t = Qvk3Ui.text(a, title, 15, p.text, false);
+        t.setPadding(0, Qvk3Ui.dp(a, 4), 0, 0);
+        t.setMaxLines(2);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        texts.addView(t);
+        row.addView(texts, Qvk3Ui.weight(1));
+        android.widget.ImageView chev = new android.widget.ImageView(a);
+        chev.setImageDrawable(Qvk3Icons.of(Qvk3Icons.RIGHT, (p.text2 & 0x00FFFFFF) | 0x99000000));
+        row.addView(chev, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 18), Qvk3Ui.dp(a, 18)));
+        row.setOnClickListener(v -> r.run());
+        row.setContentDescription(code + ". " + title);
+        Qvk3Motion.press(row);
+        LinearLayout.LayoutParams lp = Qvk3Ui.match();
+        lp.topMargin = Qvk3Ui.dp(a, 8);
+        row.setLayoutParams(lp);
+        return row;
     }
 
     static TextView action(Activity a, Qvk3Ui.Palette p, String label, boolean filled, Runnable r) {

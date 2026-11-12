@@ -17,7 +17,6 @@ import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -104,62 +103,20 @@ public final class Qvk3UpdatePrompt implements Application.ActivityLifecycleCall
     }
 
     static void ask(Activity a, Qvk3UpdateManifest.Release r) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
-        LinearLayout col = new LinearLayout(a);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 22);
-        col.setPadding(pad, Qvk3Ui.dp(a, 6), pad, Qvk3Ui.dp(a, 12));
-        String text = "Установлено: " + Qvk3Updates.installedName(a) + "\nНовая: " + r.versionName
-                + (r.size > 0 ? " · " + (r.size >> 20) + " МБ" : "") + (r.notes.isEmpty() ? "" : "\n\n" + clip(r.notes, 600));
-        col.addView(Qvk3Ui.text(a, text, 14, p.text2, false));
-        LinearLayout row = new LinearLayout(a);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, Qvk3Ui.dp(a, 16), 0, 0);
-        Button yes = button(a, "Да", p.accent, Color.WHITE, true);
-        Button no = button(a, "Нет", 0x22888888, p.text, true);
-        Button never = button(a, "Не показывать", 0, p.text2, false);
-        row.addView(yes, new LinearLayout.LayoutParams(0, Qvk3Ui.dp(a, 44), 1f));
-        View gap = new View(a);
-        row.addView(gap, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 8), 1));
-        row.addView(no, new LinearLayout.LayoutParams(0, Qvk3Ui.dp(a, 44), 1f));
-        // «Не показывать» sits apart, at the far right, so it is not hit by accident
-        View spacer = new View(a);
-        row.addView(spacer, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 18), 1));
-        row.addView(never, new LinearLayout.LayoutParams(-2, Qvk3Ui.dp(a, 44)));
-        col.addView(row);
-        AlertDialog d = Qvk3Ui.dialog(a).setTitle("Доступно обновление QVK — обновиться?").setView(col).create();
-        yes.setOnClickListener(v -> {
-            d.dismiss();
-            links(a, r);
-        });
-        no.setOnClickListener(v -> {
-            d.dismiss();
-            skipBar(a, r);
-        });
-        never.setOnClickListener(v -> {
-            d.dismiss();
-            prefs(a).edit().putBoolean(PREF, false).apply();
-            Qvk3Ui.toast(a, "Больше не предлагать. Включить снова: Настройки QVK → Обновления");
-        });
-        d.show();
+        String text = "Установлено: " + Qvk3Updates.installedName(a).replace("8.100-qvk-", "") + "\nНовая: " + r.versionName.replace("8.100-qvk-", "")
+                + (r.size > 0 ? " · " + (r.size >> 20) + " МБ" : "") + (r.notes.isEmpty() ? "" : "\n\n" + clip(r.notes, 900));
+        // main action filled, «Нет» tonal, «Не показывать» quiet at the bottom — not hit by accident
+        Qvk3Ui.dialog(a).setTitle("Доступно обновление QVK").setMessage(text)
+                .setPositiveButton("Обновить", (d, w) -> links(a, r))
+                .setNeutralButton("Не сейчас", (d, w) -> skipBar(a, r))
+                .setNegativeButton("Не показывать", (d, w) -> {
+                    prefs(a).edit().putBoolean(PREF, false).apply();
+                    Qvk3Ui.toast(a, "Больше не предлагать. Включить снова: Настройки QVK → Обновления");
+                }).show();
     }
 
     static String clip(String s, int max) {
         return s.length() <= max ? s : s.substring(0, max).trim() + "…";
-    }
-
-    static Button button(Activity a, String label, int bg, int fg, boolean filled) {
-        Button b = new Button(a);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setTextColor(fg);
-        b.setTextSize(filled ? 15 : 13);
-        b.setMinWidth(0);
-        b.setMinimumWidth(0);
-        b.setPadding(Qvk3Ui.dp(a, 10), 0, Qvk3Ui.dp(a, 10), 0);
-        b.setBackground(filled ? Qvk3Ui.rounded(bg, Qvk3Ui.dp(a, 14)) : null);
-        b.setStateListAnimator(null);
-        return b;
     }
 
     /** «Да»: link 1, mirrors, and an in-app download with SHA-256 and signature checks. */

@@ -35,11 +35,11 @@ final class Qvk3PortalLink {
     }
 
     static void start(Activity a, Runnable onLinked) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 22);
-        col.setPadding(pad, Qvk3Ui.dp(a, 6), pad, Qvk3Ui.dp(a, 8));
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
         TextView code = Qvk3Ui.text(a, "…", 34, p.text, true);
         code.setGravity(Gravity.CENTER);
         code.setLetterSpacing(0.08f);

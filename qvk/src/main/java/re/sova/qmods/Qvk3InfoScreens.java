@@ -10,7 +10,6 @@ import android.text.InputType;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import org.json.JSONArray;
@@ -22,9 +21,10 @@ import java.util.List;
 /** Small screens of the settings centre: Push diagnostics, updates, storage, battery, about, fault log. */
 final class Qvk3InfoScreens {
     static TextView body(Activity a, String text) {
-        TextView t = Qvk3Ui.text(a, text, 14, Qvk3Ui.night(a) ? 0xFFE6E6E6 : 0xFF1A1A1A, false);
+        TextView t = Qvk3Ui.text(a, text, 15, Qvk3Sheet.palette(a).text, false);
+        t.setLineSpacing(0, 1.2f);
         t.setTextIsSelectable(true);
-        int pad = Qvk3Ui.dp(a, 20);
+        int pad = Qvk3Ui.dp(a, 24);
         t.setPadding(pad, Qvk3Ui.dp(a, 8), pad, pad);
         return t;
     }
@@ -147,7 +147,7 @@ final class Qvk3InfoScreens {
 
     /** Logs screen: copy / save the app's own log without adb. */
     static void logs(Activity a) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, "modern");
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         TextView info = body(a, "Журнал считается...");
@@ -162,20 +162,25 @@ final class Qvk3InfoScreens {
             Qvk3Jobs.main(() -> info.setText(t));
         });
         refresh.run();
-        Switch capture = new Switch(a);
-        capture.setText("Непрерывная запись (расходует батарею)");
-        capture.setChecked(Qvk3Logs.enabled(a));
-        capture.setPadding(Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 20), Qvk3Ui.dp(a, 4));
-        capture.setOnCheckedChangeListener((v, on) -> {
+        int pad = Qvk3Ui.dp(a, 24);
+        LinearLayout g = Qvk3Sheet.group(a, p);
+        g.addView(Qvk3Sheet.switchRow(a, p, "Непрерывная запись", "Только на время поиска бага: расходует батарею", Qvk3Logs.enabled(a), on -> {
             Qvk3Logs.setEnabled(a, on);
             Qvk3Ui.toast(a, on ? "Непрерывная запись включена. Не забудьте выключить после поиска бага" : "Непрерывная запись остановлена");
-        });
-        col.addView(capture);
+        }));
+        LinearLayout.LayoutParams glp = Qvk3Ui.match();
+        glp.leftMargin = glp.rightMargin = pad;
+        col.addView(g, glp);
         LinearLayout row = new LinearLayout(a);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(Qvk3Ui.dp(a, 14), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 14), Qvk3Ui.dp(a, 8));
-        row.addView(Qvk3Ui.button(a, p, "Копировать", true, v -> Qvk3Logs.copy(a)), Qvk3Ui.weight(1));
+        TextView copy = Qvk3Ui.button(a, p, "Копировать журнал", true, v -> Qvk3Logs.copy(a));
+        LinearLayout.LayoutParams clp = Qvk3Ui.match();
+        clp.leftMargin = clp.rightMargin = pad;
+        clp.topMargin = Qvk3Ui.dp(a, 12);
+        col.addView(copy, clp);
+        row.setPadding(pad, Qvk3Ui.dp(a, 8), pad, Qvk3Ui.dp(a, 8));
         row.addView(Qvk3Ui.button(a, p, "В файл", false, v -> Qvk3Logs.save(a)), Qvk3Ui.weight(1));
+        row.addView(spacer(a));
         row.addView(Qvk3Ui.button(a, p, "Очистить", false, v -> {
             Qvk3Logs.clear(a);
             Qvk3Ui.toast(a, "Журнал очищен");
@@ -183,6 +188,12 @@ final class Qvk3InfoScreens {
         }), Qvk3Ui.weight(1));
         col.addView(row);
         dialog(a, "Логи приложения", col, null, null);
+    }
+
+    private static android.view.View spacer(Activity a) {
+        android.view.View v = new android.view.View(a);
+        v.setLayoutParams(new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 8), 1));
+        return v;
     }
 
     static void show(Activity a, String what) {
@@ -307,32 +318,39 @@ final class Qvk3InfoScreens {
     }
 
     static void updateSources(Activity a) {
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 8), pad, 0);
-        col.addView(Qvk3Ui.text(a, "Адреса манифестов QVK 3 (по одному в строке, HTTPS). Первый работающий с обновлением используется; остальные — зеркала.", 13, 0xFF888888, false));
-        EditText src = new EditText(a);
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, 0);
+        LinearLayout g = Qvk3Sheet.group(a, p);
+        final boolean[] community = {Qvk3Updates.communityEnabled(a)};
+        g.addView(Qvk3Sheet.switchRow(a, p, "Канал сообщества QVK", "Официальные сборки QVK", community[0], v -> community[0] = v));
+        col.addView(g);
+        col.addView(Qvk3Sheet.section(a, p, "Свои серверы"));
+        EditText src = Qvk3Sheet.field(a, p, new EditText(a));
         src.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_VARIATION_URI);
         src.setMinLines(3);
+        src.setGravity(android.view.Gravity.TOP);
+        src.setHint("https://…/qvk3-update.json");
         src.setText(String.join("\n", Qvk3Updates.sources(a)));
         col.addView(src);
-        Switch community = new Switch(a);
-        community.setText("Канал сообщества QVK (qmods.ru)");
-        community.setChecked(Qvk3Updates.communityEnabled(a));
-        col.addView(community);
-        col.addView(Qvk3Ui.text(a, "Доверенные открытые ключи подписи манифеста (base64, по одному в строке). Если ключ задан, неподписанные манифесты отклоняются.", 13, 0xFF888888, false));
-        EditText keys = new EditText(a);
+        col.addView(Qvk3Sheet.note(a, p, "По одному адресу в строке, только HTTPS. Используется первый работающий с обновлением, остальные — зеркала."));
+        col.addView(Qvk3Sheet.section(a, p, "Ключи подписи"));
+        EditText keys = Qvk3Sheet.field(a, p, new EditText(a));
         keys.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         keys.setMinLines(2);
+        keys.setGravity(android.view.Gravity.TOP);
+        keys.setHint("base64");
         keys.setText(Qvk3MusicSettings.prefs(a).getString(Qvk3Updates.KEYS, ""));
         col.addView(keys);
+        col.addView(Qvk3Sheet.note(a, p, "Открытые ключи, по одному в строке. Если ключ задан, неподписанные манифесты отклоняются."));
         dialog(a, "Серверы обновлений", col, "Сохранить", () -> {
             try {
                 List<String> urls = new java.util.ArrayList<>();
                 for (String s : src.getText().toString().split("\n")) if (!s.trim().isEmpty()) urls.add(s.trim());
                 Qvk3Updates.setSources(a, urls);
-                Qvk3MusicSettings.prefs(a).edit().putBoolean(Qvk3Updates.COMMUNITY, community.isChecked())
+                Qvk3MusicSettings.prefs(a).edit().putBoolean(Qvk3Updates.COMMUNITY, community[0])
                         .putString(Qvk3Updates.KEYS, keys.getText().toString().trim()).apply();
                 Qvk3Ui.toast(a, "Сохранено");
             } catch (IllegalArgumentException e) {

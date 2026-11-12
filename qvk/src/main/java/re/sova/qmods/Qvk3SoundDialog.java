@@ -2,13 +2,10 @@ package re.sova.qmods;
 
 import android.app.Activity;
 import android.text.InputType;
-import android.view.Gravity;
-import android.widget.CompoundButton;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import java.util.List;
@@ -19,37 +16,33 @@ import java.util.List;
  */
 public final class Qvk3SoundDialog {
     public static void show(Activity a) {
-        Qvk3Ui.Palette p = Qvk3Ui.palette(a, Qvk3MusicSettings.layout(a));
+        Qvk3Ui.Palette p = Qvk3Sheet.palette(a);
         Qvk3AudioEffects fx = Qvk3MusicEngine.get(a).effects();
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = Qvk3Ui.dp(a, 20);
-        col.setPadding(pad, Qvk3Ui.dp(a, 8), pad, Qvk3Ui.dp(a, 8));
-        Switch on = new Switch(a);
-        on.setText("Звуковые эффекты QVK Music");
-        on.setChecked(fx.enabled());
-        on.setOnCheckedChangeListener((CompoundButton b, boolean v) -> fx.setEnabled(v));
-        col.addView(on);
-        if (!fx.unavailable.isEmpty()) {
-            col.addView(Qvk3Ui.text(a, "На этом устройстве недоступно: " + fx.unavailable, 13, p.text2, false));
-        }
+        int pad = Qvk3Ui.dp(a, 24);
+        col.setPadding(pad, 0, pad, Qvk3Ui.dp(a, 8));
+        LinearLayout main = Qvk3Sheet.group(a, p);
+        main.addView(Qvk3Sheet.switchRow(a, p, "Звуковые эффекты", "Эквалайзер, басы и объём для QVK Music", fx.enabled(), fx::setEnabled));
+        col.addView(main);
+        if (!fx.unavailable.isEmpty()) col.addView(Qvk3Sheet.note(a, p, "На этом устройстве недоступно: " + fx.unavailable));
         if (fx.hasEqualizer()) {
+            col.addView(Qvk3Sheet.section(a, p, "Эквалайзер"));
+            LinearLayout eq = Qvk3Sheet.group(a, p);
             short[] range = fx.range();
             for (short b = 0; b < fx.bands(); b++) {
                 final short band = b;
                 int hz = fx.centerHz(b);
-                TextView label = Qvk3Ui.text(a, (hz >= 1000 ? (hz / 1000) + " кГц" : hz + " Гц") + ": " + fx.level(b) / 100 + " дБ", 13, p.text2, false);
                 SeekBar s = new SeekBar(a);
                 s.setMax(range[1] - range[0]);
                 s.setProgress(fx.level(b) - range[0]);
-                s.setContentDescription("Полоса " + label.getText());
+                LinearLayout row = Qvk3Sheet.slider(a, p, hz >= 1000 ? (hz / 1000) + " кГц" : hz + " Гц", s, v -> db(v + range[0]));
+                TextView val = Qvk3Sheet.sliderValue(row);
                 s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                     @Override
                     public void onProgressChanged(SeekBar sb, int v, boolean user) {
-                        if (!user) return;
-                        short lvl = (short) (v + range[0]);
-                        fx.setLevel(band, lvl);
-                        label.setText((hz >= 1000 ? (hz / 1000) + " кГц" : hz + " Гц") + ": " + lvl / 100 + " дБ");
+                        val.setText(db(v + range[0]));
+                        if (user) fx.setLevel(band, (short) (v + range[0]));
                     }
 
                     @Override
@@ -60,11 +53,11 @@ public final class Qvk3SoundDialog {
                     public void onStopTrackingTouch(SeekBar sb) {
                     }
                 });
-                col.addView(label);
-                col.addView(s);
+                eq.addView(row);
             }
+            col.addView(eq);
             LinearLayout presets = new LinearLayout(a);
-            presets.setGravity(Gravity.CENTER_VERTICAL);
+            presets.setPadding(0, Qvk3Ui.dp(a, 10), 0, 0);
             presets.addView(Qvk3Ui.button(a, p, "Пресеты", false, v -> {
                 String[] dev = fx.presets();
                 List<String> user = fx.userPresets();
@@ -76,27 +69,36 @@ public final class Qvk3SoundDialog {
                     else fx.useUserPreset(user.get(i - dev.length));
                     show(a);
                 }).show();
-            }));
+            }), Qvk3Ui.weight(1));
+            View gap = new View(a);
+            presets.addView(gap, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 8), 1));
             presets.addView(Qvk3Ui.button(a, p, "Сохранить свой", false, v -> {
-                EditText in = new EditText(a);
+                EditText in = Qvk3Sheet.field(a, p, new EditText(a));
                 in.setInputType(InputType.TYPE_CLASS_TEXT);
+                in.setHint("Например, «В наушниках»");
                 Qvk3Ui.dialog(a).setTitle("Название пресета").setView(in)
                         .setPositiveButton("Сохранить", (d, w) -> fx.saveUserPreset(in.getText().toString()))
                         .setNegativeButton("Отмена", null).show();
-            }));
+            }), Qvk3Ui.weight(1));
             col.addView(presets);
         }
-        if (fx.hasBass()) col.addView(slider(a, p, "Усиление басов", fx.bassStrength(), 1000, fx::setBass));
-        if (fx.hasVirtualizer()) col.addView(slider(a, p, "Объёмный звук", fx.virtualizerStrength(), 1000, fx::setVirtualizer));
-        col.addView(slider(a, p, "Кроссфейд, с (0 — без перехода, работает gapless)", Qvk3MusicSettings.crossfadeSeconds(a), 12,
+        col.addView(Qvk3Sheet.section(a, p, "Эффекты"));
+        LinearLayout more = Qvk3Sheet.group(a, p);
+        if (fx.hasBass()) more.addView(slider(a, p, "Усиление басов", fx.bassStrength(), 1000, fx::setBass, v -> v / 10 + "%"));
+        if (fx.hasVirtualizer()) more.addView(slider(a, p, "Объёмный звук", fx.virtualizerStrength(), 1000, fx::setVirtualizer, v -> v / 10 + "%"));
+        more.addView(slider(a, p, "Кроссфейд", Qvk3MusicSettings.crossfadeSeconds(a), 12,
                 v -> {
                     Qvk3SettingsHistory.before(a, Qvk3MusicSettings.CROSSFADE, "Кроссфейд");
                     Qvk3MusicSettings.prefs(a).edit().putInt(Qvk3MusicSettings.CROSSFADE, v).apply();
-                }));
-        col.addView(Qvk3Ui.text(a, "Нормализация громкости не реализована: ВК не передаёт данные о громкости треков, а без них она искажала бы звук.", 12, p.text2, false));
-        ScrollView sv = new ScrollView(a);
-        sv.addView(col);
-        Qvk3Ui.dialog(a).setTitle("Звук").setView(sv).setPositiveButton("Готово", null).show();
+                }, v -> v == 0 ? "выкл" : v + " с"));
+        col.addView(more);
+        col.addView(Qvk3Sheet.note(a, p, "Кроссфейд 0 — треки идут без паузы (gapless). Нормализации громкости нет: ВК не передаёт данные о громкости треков, а без них она искажала бы звук."));
+        Qvk3Ui.dialog(a).setTitle("Звук").setView(col).setPositiveButton("Готово", null).show();
+    }
+
+    private static String db(int milli) {
+        int v = Math.round(milli / 100f);
+        return (v > 0 ? "+" : "") + v + " дБ";
     }
 
     interface IntSink {
@@ -104,17 +106,19 @@ public final class Qvk3SoundDialog {
     }
 
     static LinearLayout slider(Activity a, Qvk3Ui.Palette p, String title, int value, int max, IntSink sink) {
-        LinearLayout l = new LinearLayout(a);
-        l.setOrientation(LinearLayout.VERTICAL);
-        TextView t = Qvk3Ui.text(a, title + ": " + value, 14, p.text, false);
+        return slider(a, p, title, value, max, sink, String::valueOf);
+    }
+
+    static LinearLayout slider(Activity a, Qvk3Ui.Palette p, String title, int value, int max, IntSink sink, Qvk3Sheet.Seek fmt) {
         SeekBar s = new SeekBar(a);
         s.setMax(max);
         s.setProgress(value);
-        s.setContentDescription(title);
+        LinearLayout row = Qvk3Sheet.slider(a, p, title, s, fmt);
+        TextView val = Qvk3Sheet.sliderValue(row);
         s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar sb, int v, boolean user) {
-                t.setText(title + ": " + v);
+                val.setText(fmt.label(v));
             }
 
             @Override
@@ -126,8 +130,6 @@ public final class Qvk3SoundDialog {
                 sink.set(sb.getProgress());
             }
         });
-        l.addView(t);
-        l.addView(s);
-        return l;
+        return row;
     }
 }

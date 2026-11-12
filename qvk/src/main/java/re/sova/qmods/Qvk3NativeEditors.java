@@ -101,7 +101,7 @@ final class Qvk3NativeEditors {
 
     static void text(Activity a, String title, String hint, String key, String def, Normalizer n) {
         LinearLayout col = new LinearLayout(a);
-        int pad = Qvk3Ui.dp(a, 20);
+        int pad = Qvk3Ui.dp(a, 24);
         col.setPadding(pad, Qvk3Ui.dp(a, 8), pad, 0);
         EditText in = new EditText(a);
         in.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
