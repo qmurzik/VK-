@@ -246,7 +246,7 @@ final class Qvk3InfoScreens {
                         + "Основа: VK " + Qvk3UpdateManifest.VK_BASE + " — без перехода на новые версии ВК\n"
                         + "Пакет: " + a.getPackageName() + "\nAndroid " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")\n"
                         + "Обновлено с: " + from + "\n\nQVK 3.0: QVK Music, центр настроек, стили и конструктор оформления, сценарии, "
-                        + "новая система обновлений, диагностика Push. Подробности — в QVK_REWORK_REPORT.md.";
+                        + "новая система обновлений, диагностика Push.\n\n" + Qvk3Kill.describe(a);
                 dialog(a, "О QVK 3.0", body(a, s), null, null);
             }
         }

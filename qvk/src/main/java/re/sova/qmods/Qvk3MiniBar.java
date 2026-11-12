@@ -54,7 +54,7 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
 
     @Override
     public void onActivityResumed(Activity a) {
-        if (!vkScreen(a) || !Qvk3MusicSettings.prefs(a).getBoolean(Qvk3MusicSettings.MINI_ON_VK, false)) return;
+        if (!vkScreen(a) || !Qvk3MusicSettings.prefs(a).getBoolean(Qvk3MusicSettings.MINI_ON_VK, false) || Qvk3Kill.off(a, "mini_on_vk")) return;
         resumed = new WeakReference<>(a);
         Qvk3MusicEngine e = Qvk3MusicEngine.peek();
         if (e == null) return;

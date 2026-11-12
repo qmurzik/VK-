@@ -65,7 +65,8 @@ public final class Qvk3UpdatePrompt implements Application.ActivityLifecycleCall
             return;
         }
         SharedPreferences p = prefs(a);
-        if (checking || shownThisRun || !p.getBoolean(PREF, true)) return;
+        // the check also runs with the prompt off: it brings the team's remote switch-offs (Qvk3Kill)
+        if (checking || shownThisRun) return;
         long now = System.currentTimeMillis();
         if (now - p.getLong(LAST_AUTO, 0) < PERIOD) return;
         if (Qvk3Updates.sources(a).isEmpty() && !Qvk3Updates.communityEnabled(a)) return;
@@ -76,8 +77,10 @@ public final class Qvk3UpdatePrompt implements Application.ActivityLifecycleCall
             Qvk3Updates.Check c = Qvk3Updates.check(app);
             Qvk3Jobs.main(() -> {
                 checking = false;
+                String notice = Qvk3Kill.takeNotice(app);
+                if (notice != null) Qvk3Ui.toast(app, notice);
                 Qvk3UpdateManifest.Release r = c.release;
-                if (r == null || r.versionCode == prefs(app).getLong(SKIP, 0)) return;
+                if (r == null || r.versionCode == prefs(app).getLong(SKIP, 0) || !prefs(app).getBoolean(PREF, true) || Qvk3Kill.off(app, "update_prompt")) return;
                 pending = r;
                 Activity top = resumed.get();
                 if (top != null && !top.isFinishing()) show(top);

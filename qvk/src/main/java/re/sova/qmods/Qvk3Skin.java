@@ -60,7 +60,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
     private final WeakHashMap<View, Orig> origs = new WeakHashMap<>();
 
     public static synchronized void install(Application app) {
-        if (instance != null) return;
+        if (instance != null || Qvk3Kill.off(app, "skin")) return; // remote switch-off applies from the next start
         instance = new Qvk3Skin();
         app.registerActivityLifecycleCallbacks(instance);
     }
@@ -112,6 +112,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
 
     /** True when the floating dock or any rule is configured. */
     static boolean active(Context c) {
+        if (Qvk3Kill.off(c, "skin")) return false;
         SharedPreferences p = prefs(c);
         return "floating".equals(p.getString(DOCK, "off")) || !rules(c).isEmpty();
     }

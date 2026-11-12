@@ -17,7 +17,7 @@ public final class Qvk3MediaWindow {
     }
 
     public static boolean skip(Activity a) {
-        if (a == null) return false;
+        if (a == null || Qvk3Kill.off(a, "media_window")) return false;
         if (media(a.getClass().getName())) return true;
         if (!clipShown(a)) return false;
         darkBars(a.getWindow());

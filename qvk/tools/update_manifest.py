@@ -47,13 +47,46 @@ def make(a):
            "apk_size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "signer_sha256": signer(a.apk),
            "urls": a.urls, "notes": a.notes, "published": datetime.date.today().isoformat(), "channel": a.channel}
     releases = [rel]
+    kills = []
     if a.merge:
         old = json.loads(json.load(open(a.merge))["payload"])
         releases += [r for r in old["releases"] if r["version_code"] != code]
-    payload = json.dumps({"schema": 3, "package": "ru.qmods.qvk", "channel": "stable",
-                          "releases": sorted(releases, key=lambda r: -r["version_code"])}, ensure_ascii=False)
-    sig = sh("openssl", "dgst", "-sha256", "-sign", a.key, data=payload.encode())
-    print(json.dumps({"payload": payload, "key_id": "main", "signature": base64.b64encode(sig).decode()}, ensure_ascii=False, indent=1))
+        kills = old.get("kill", [])  # remote switch-offs stay until removed with `unkill`
+    body = {"schema": 3, "package": "ru.qmods.qvk", "channel": "stable",
+            "releases": sorted(releases, key=lambda r: -r["version_code"])}
+    if kills:
+        body["kill"] = kills
+    emit(json.dumps(body, ensure_ascii=False), a.key, "main")
+
+
+def emit(text, key, key_id):
+    sig = sh("openssl", "dgst", "-sha256", "-sign", key, data=text.encode())
+    print(json.dumps({"payload": text, "key_id": key_id, "signature": base64.b64encode(sig).decode()}, ensure_ascii=False, indent=1))
+
+
+FEATURES = ["send_retry", "splash_weather", "catalog_ads", "search_tabs", "feed_now", "mini_on_vk", "music_takeover", "skin",
+            "shake_report", "media_window", "dock_quick", "post_tint", "settings_motion", "shell", "update_prompt"]
+
+
+def kill(a):
+    """Switch a feature off remotely for builds min..max (max 0 = all later builds too)."""
+    if a.feature not in FEATURES:
+        sys.exit("unknown feature %s; known: %s" % (a.feature, ", ".join(FEATURES)))
+    old = json.load(open(a.manifest))
+    payload = json.loads(old["payload"])
+    ks = [k for k in payload.get("kill", []) if k["feature"] != a.feature]
+    ks.append({"feature": a.feature, "min_code": a.min, "max_code": a.max, "reason": a.reason})
+    payload["kill"] = ks
+    emit(json.dumps(payload, ensure_ascii=False), a.key, old.get("key_id", "main"))
+
+
+def unkill(a):
+    old = json.load(open(a.manifest))
+    payload = json.loads(old["payload"])
+    payload["kill"] = [k for k in payload.get("kill", []) if k["feature"] != a.feature]
+    if not payload["kill"]:
+        del payload["kill"]
+    emit(json.dumps(payload, ensure_ascii=False), a.key, old.get("key_id", "main"))
 
 
 def mark(a):
@@ -63,9 +96,7 @@ def mark(a):
     if not hit:
         sys.exit("no release %d in the manifest" % a.code)
     hit[0]["channel"] = a.channel
-    text = json.dumps(payload, ensure_ascii=False)
-    sig = sh("openssl", "dgst", "-sha256", "-sign", a.key, data=text.encode())
-    print(json.dumps({"payload": text, "key_id": old.get("key_id", "main"), "signature": base64.b64encode(sig).decode()}, ensure_ascii=False, indent=1))
+    emit(json.dumps(payload, ensure_ascii=False), a.key, old.get("key_id", "main"))
 
 
 p = argparse.ArgumentParser()
@@ -76,5 +107,12 @@ m.add_argument("--key", required=True); m.add_argument("--notes", default=""); m
 m.add_argument("--channel", choices=["alpha", "stable"], default="alpha")
 k2 = sub.add_parser("mark"); k2.add_argument("manifest"); k2.add_argument("code", type=int); k2.add_argument("channel", choices=["alpha", "stable"])
 k2.add_argument("--key", required=True)
+k3 = sub.add_parser("kill", help="switch a feature off remotely for some builds")
+k3.add_argument("manifest"); k3.add_argument("feature"); k3.add_argument("--min", type=int, default=0)
+k3.add_argument("--max", type=int, default=0, help="last affected versionCode, 0 = no upper bound")
+k3.add_argument("--reason", default=""); k3.add_argument("--key", required=True)
+k4 = sub.add_parser("unkill", help="turn a remotely switched-off feature back on")
+k4.add_argument("manifest"); k4.add_argument("feature"); k4.add_argument("--key", required=True)
 a = p.parse_args()
-{"keygen": lambda: keygen(a.dir), "make": lambda: make(a), "mark": lambda: mark(a)}[a.cmd]()
+{"keygen": lambda: keygen(a.dir), "make": lambda: make(a), "mark": lambda: mark(a),
+ "kill": lambda: kill(a), "unkill": lambda: unkill(a)}[a.cmd]()

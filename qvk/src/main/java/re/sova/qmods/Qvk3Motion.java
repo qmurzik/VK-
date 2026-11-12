@@ -21,6 +21,7 @@ final class Qvk3Motion {
 
     /** Children of the container rise and fade in one after another (at most ~12 are delayed). */
     static void stagger(ViewGroup parent, boolean light) {
+        if (Qvk3Kill.off(parent.getContext(), "settings_motion")) return;
         float dy = Qvk3Ui.dp(parent.getContext(), light ? 6 : 12);
         // BUG-0029: only what is on screen animates; everything below is shown as is. Cards below the screen that started
         // transparent could stay invisible on some firmware (HyperOS) — a whole screen of «empty space» under the items.

@@ -222,7 +222,7 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
     public void onSensorChanged(SensorEvent e) {
         float x = e.values[0] / SensorManager.GRAVITY_EARTH, y = e.values[1] / SensorManager.GRAVITY_EARTH, z = e.values[2] / SensorManager.GRAVITY_EARTH;
         double g = Math.sqrt(x * x + y * y + z * z);
-        if (g < 2.6) return;
+        if (g < 2.6 || Qvk3Kill.off("shake_report")) return;
         long now = SystemClock.uptimeMillis();
         if (now - lastShake < 4000) return;
         if (firstJolt == 0 || now - firstJolt > 900) {

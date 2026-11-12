@@ -26,6 +26,7 @@ public final class Qvk3DockQuick implements Application.ActivityLifecycleCallbac
     }
 
     public static boolean open(Context c) {
+        if (Qvk3Kill.off(c, "dock_quick")) return false;
         try {
             while (c instanceof ContextWrapper && !(c instanceof Activity)) c = ((ContextWrapper) c).getBaseContext();
             if (!(c instanceof Activity)) return false;

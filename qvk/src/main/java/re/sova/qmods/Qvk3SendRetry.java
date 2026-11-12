@@ -41,7 +41,7 @@ public final class Qvk3SendRetry {
     /** Called from VK's MsgSendJob on terminal failure. Must never throw. */
     public static void failed(Object peer, int localId, Throwable error, boolean cancelled) {
         try {
-            if (cancelled || peer == null || localId == 0) return;
+            if (cancelled || peer == null || localId == 0 || Qvk3Kill.off("send_retry")) return;
             Context c = RuntimeBridge.context;
             if (c == null || !Qvk3MusicSettings.prefs(c).getBoolean(PREF, true)) return;
             if (permanent(error)) {

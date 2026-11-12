@@ -17,6 +17,10 @@ public final class Qvk3PostTint {
 
     public static void apply(ImageView v, ColorStateList list) {
         if (v == null) return;
+        if (Qvk3Kill.off("post_tint")) {
+            v.clearColorFilter();
+            return;
+        }
         if (isQvk(list)) v.setColorFilter(list.getDefaultColor(), PorterDuff.Mode.SRC_IN);
         else v.clearColorFilter();
     }

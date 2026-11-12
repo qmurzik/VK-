@@ -15,7 +15,7 @@ final class Qvk3Shell implements Application.ActivityLifecycleCallbacks {
     private static boolean installed;
 
     static synchronized void install(Application app) {
-        if (installed) return;
+        if (installed || Qvk3Kill.off(app, "shell")) return;
         installed = true;
         app.registerActivityLifecycleCallbacks(new Qvk3Shell());
     }

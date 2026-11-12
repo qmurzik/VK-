@@ -108,7 +108,7 @@ public final class Qvk3MusicEntry {
         try {
             Context c = RuntimeBridge.context;
             if (c == null || vkTracks == null || vkTracks.isEmpty() || !Qvk3MusicSettings.enabled(c)
-                    || !Qvk3MusicSettings.prefs(c).getBoolean(Qvk3MusicSettings.TAKE_OVER, true)) return false;
+                    || !Qvk3MusicSettings.prefs(c).getBoolean(Qvk3MusicSettings.TAKE_OVER, true) || Qvk3Kill.off(c, "music_takeover")) return false;
             java.util.List<Qvk3Track> list = new java.util.ArrayList<>();
             int start = startIndex == null ? 0 : startIndex, mapped = 0;
             for (int i = 0; i < vkTracks.size(); i++) {

@@ -23,6 +23,8 @@ import java.util.List;
  *             "releases": [ { "version_code", "version_name", "vk_base": "8.100", "min_sdk", "apk_size",
  *                             "sha256", "signer_sha256", "urls": [..mirrors..], "notes", "published" } ] }
  * </pre>
+ * Optional "kill": [ { "feature": "send_retry", "min_code": 0, "max_code": 23840, "reason": "…" } ] — features the team
+ * switches off remotely for the listed builds when they misbehave (see {@link Qvk3Kill}); honoured only when signed.
  * The signature covers the exact payload bytes, so no JSON canonicalisation is needed. Releases for another
  * package or another VK base are rejected — QVK stays on VK 8.100.
  */
@@ -73,15 +75,45 @@ public final class Qvk3UpdateManifest {
         }
     }
 
+    /** A feature switched off remotely for builds min..max (inclusive; max 0 = no upper bound). */
+    public static final class Kill {
+        public final String feature;
+        public final long minCode, maxCode;
+        public final String reason;
+
+        Kill(JSONObject o) {
+            feature = o.optString("feature");
+            minCode = o.optLong("min_code", 0);
+            maxCode = o.optLong("max_code", 0);
+            String r = o.optString("reason").trim();
+            reason = r.length() > 300 ? r.substring(0, 300) : r;
+        }
+
+        boolean valid() {
+            return feature.matches("[a-z0-9_.]{1,48}") && minCode >= 0 && maxCode >= 0 && (maxCode == 0 || maxCode >= minCode);
+        }
+
+        public boolean applies(long code) {
+            return code >= minCode && (maxCode == 0 || code <= maxCode);
+        }
+    }
+
     public final String channel;
     public final List<Release> releases;
+    /** Remote switch-offs listed in the payload (all builds); use {@link #killsFor}. */
+    public final List<Kill> kills;
     /** True when the payload signature was verified with a trusted key. */
     public final boolean signed;
     public final String keyId;
 
     private Qvk3UpdateManifest(String channel, List<Release> releases, boolean signed, String keyId) {
+        this(channel, releases, signed, keyId, new ArrayList<>());
+    }
+
+    private Qvk3UpdateManifest(String channel, List<Release> releases, boolean signed, String keyId, List<Kill> kills) {
         this.channel = channel;
         this.releases = releases;
+        this.kills = kills;
         this.signed = signed;
         this.keyId = keyId;
     }
@@ -134,7 +166,23 @@ public final class Qvk3UpdateManifest {
             r.validate();
             rs.add(r);
         }
-        return new Qvk3UpdateManifest(p.optString("channel", "stable"), rs, signed, keyId);
+        List<Kill> ks = new ArrayList<>();
+        JSONArray ka = p.optJSONArray("kill");
+        if (ka != null) for (int i = 0; i < ka.length() && i < 64; i++) {
+            JSONObject o = ka.optJSONObject(i);
+            if (o == null) continue;
+            Kill k = new Kill(o);
+            if (k.valid()) ks.add(k);
+        }
+        return new Qvk3UpdateManifest(p.optString("channel", "stable"), rs, signed, keyId, ks);
+    }
+
+    /** Switch-offs that apply to build {@code code}. Only a signed manifest may switch features off. */
+    public List<Kill> killsFor(long code) {
+        List<Kill> out = new ArrayList<>();
+        if (!signed) return out;
+        for (Kill k : kills) if (k.applies(code)) out.add(k);
+        return out;
     }
 
     public static boolean verify(String payload, String signatureB64, String publicKeyB64) {

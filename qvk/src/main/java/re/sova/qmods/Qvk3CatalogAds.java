@@ -21,6 +21,7 @@ public final class Qvk3CatalogAds {
 
     public static void filter(Object response, String method) {
         try {
+            if (Qvk3Kill.off("catalog_ads")) return;
             String m = method == null ? "" : method.toLowerCase(Locale.ROOT);
             if (response instanceof JSONObject && (m.startsWith("superapp.") || m.contains("showcase"))) {
                 if (RuntimeBridge.prefs == null || RuntimeBridge.prefs.getBoolean(PREF, true)) dropStoreNags((JSONObject) response, 0);

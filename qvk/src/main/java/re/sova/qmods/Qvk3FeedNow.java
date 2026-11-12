@@ -27,7 +27,7 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
     private long lastLook;
 
     static synchronized void install(Application app) {
-        if (instance != null) return;
+        if (instance != null || Qvk3Kill.off(app, "feed_now")) return; // remote switch-off applies from the next start
         instance = new Qvk3FeedNow();
         app.registerActivityLifecycleCallbacks(instance);
     }

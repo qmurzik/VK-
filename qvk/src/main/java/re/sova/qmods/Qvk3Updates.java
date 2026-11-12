@@ -183,10 +183,15 @@ public final class Qvk3Updates {
         boolean bestSigned = false;
         List<Qvk3UpdateManifest.Release> history = new ArrayList<>();
         List<String> keys = keys(c);
+        boolean killsSaved = false;
         for (String url : sources(c)) {
             try {
                 Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(get(url, 512 * 1024), keys);
                 history.addAll(m.releases);
+                if (m.signed && !killsSaved) { // remote switch-offs: only from a verified manifest, first one wins
+                    Qvk3Kill.save(c, m.killsFor(installed));
+                    killsSaved = true;
+                }
                 Qvk3UpdateManifest.Release r = m.best(installed, Build.VERSION.SDK_INT, stableOnly(c));
                 if (r != null && (best == null || r.versionCode > best.versionCode)) {
                     best = r;

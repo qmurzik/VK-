@@ -114,4 +114,36 @@ public class Qvk3UpdateManifestTest {
         assertNull(m.best(23820, 34, true));                             // already on the newest stable
         assertEquals("alpha", m.releases.get(0).channel);                // no field = alpha
     }
+
+    static String withKills(JSONArray kills) throws Exception {
+        return new JSONObject(payload(release(100, "8.100", 28))).put("kill", kills).toString();
+    }
+
+    @Test public void killsApplyOnlyToTheirBuildsAndOnlyWhenSigned() throws Exception {
+        KeyPair k = keys();
+        List<String> trusted = Collections.singletonList(Base64.getEncoder().encodeToString(k.getPublic().getEncoded()));
+        JSONArray kills = new JSONArray()
+                .put(new JSONObject().put("feature", "send_retry").put("min_code", 0).put("max_code", 50).put("reason", "ломает отправку"))
+                .put(new JSONObject().put("feature", "skin").put("min_code", 40))
+                .put(new JSONObject().put("feature", "BAD feature!").put("max_code", 0))   // invalid name: ignored
+                .put(new JSONObject().put("feature", "shell").put("min_code", 60).put("max_code", 50)); // empty range: ignored
+        String p = withKills(kills);
+        Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(wrap(p, sign(p, k)), trusted);
+        assertTrue(m.signed);
+        assertEquals(2, m.kills.size());
+        assertEquals(2, m.killsFor(45).size());
+        assertEquals("ломает отправку", m.killsFor(45).get(0).reason);
+        assertEquals(1, m.killsFor(51).size());
+        assertEquals("skin", m.killsFor(51).get(0).feature);
+        assertEquals(1, m.killsFor(10).size());
+        // the same list in an unsigned manifest switches nothing off
+        Qvk3UpdateManifest u = Qvk3UpdateManifest.parse(p, null);
+        assertFalse(u.signed);
+        assertTrue(u.killsFor(45).isEmpty());
+    }
+
+    @Test public void manifestWithoutKillsHasNone() throws Exception {
+        Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(payload(release(100, "8.100", 28)), null);
+        assertTrue(m.kills.isEmpty());
+    }
 }

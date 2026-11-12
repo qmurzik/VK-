@@ -48,7 +48,7 @@ public final class Qvk3SplashWeather {
     public static int show(Activity a, int delay) {
         try {
             SharedPreferences p = prefs(a);
-            if (!p.getBoolean(PREF, false)) return delay;
+            if (!p.getBoolean(PREF, false) || Qvk3Kill.off(a, "splash_weather")) return delay;
             refresh(a.getApplicationContext(), false);
             long at = p.getLong(AT, 0);
             if (at == 0 || System.currentTimeMillis() - at > SHOW_MAX_AGE) {
