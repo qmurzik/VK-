@@ -31,7 +31,7 @@ public final class Qvk3MusicSettingsScreen {
     static final String[][] RESET_KEYS = {
             {Qvk3MusicSettings.GAPLESS, Qvk3MusicSettings.SMOOTH, Qvk3MusicSettings.CROSSFADE, Qvk3MusicSettings.START_TAB},
             {},
-            {Qvk3MusicSettings.LAYOUT, Qvk3MusicSettings.COVER_SIZE, Qvk3MusicSettings.COVER_RADIUS, Qvk3MusicSettings.PROGRESS_STYLE},
+            {Qvk3MusicSettings.LAYOUT, Qvk3MusicSettings.COVER_SIZE, Qvk3MusicSettings.COVER_RADIUS, Qvk3MusicSettings.PROGRESS_STYLE, Qvk3MusicSettings.AMBIENT, Qvk3MusicSettings.AMBIENT_REACT},
             {}, {},
             {Qvk3MusicSettings.CACHE_LIMIT_MB},
             {Qvk3MusicSettings.LYRICS_EXTERNAL, Qvk3MusicSettings.LYRICS_SIZE, Qvk3MusicSettings.LYRICS_OVER_COVER},
@@ -172,10 +172,15 @@ public final class Qvk3MusicSettingsScreen {
             case 1:
                 return (a, p, c, r) -> c.addView(link(a, p, "Эквалайзер и эффекты", v -> Qvk3SoundDialog.show(a)));
             case 2:
-                return (a, p, c, r) -> c.addView(link(a, p, "Плеер: " + Qvk3MusicSettings.LAYOUT_TITLES[indexOf(Qvk3MusicSettings.layout(a))], v -> playerLook(a, () -> {
-                    r.run();
-                    refreshPlayer(a);
-                })));
+                return (a, p, c, r) -> {
+                    c.addView(link(a, p, "Плеер: " + Qvk3MusicSettings.LAYOUT_TITLES[indexOf(Qvk3MusicSettings.layout(a))], v -> playerLook(a, () -> {
+                        r.run();
+                        refreshPlayer(a);
+                    })));
+                    c.addView(toggle(a, "Живой фон (QVK Modern)", Qvk3MusicSettings.AMBIENT, true, () -> refreshPlayer(a)));
+                    c.addView(toggle(a, "Фон дышит в такт басам", Qvk3MusicSettings.AMBIENT_REACT, true, () -> refreshPlayer(a)));
+                    c.addView(info(a, p, "Цвета фона берутся из обложки и плавно движутся, пока играет музыка. «В такт басам» работает, если у ВКонтакте есть доступ к микрофону (для голосовых): анализируется только звук самого плеера, микрофон не включается и ничего не записывается."));
+                };
             case 3:
                 return (a, p, c, r) -> {
                     c.addView(info(a, p, Qvk3MusicLibrary.get(a).stats()));

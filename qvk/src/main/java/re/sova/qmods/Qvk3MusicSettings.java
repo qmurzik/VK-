@@ -17,6 +17,9 @@ public final class Qvk3MusicSettings {
     public static final String GAPLESS = "qvk3_music_gapless";
     /** Short volume ramps on pause / resume / manual track change / seek. */
     public static final String SMOOTH = "qvk3_music_smooth";
+    /** «Живой фон» of the Modern player and its bass reaction. */
+    public static final String AMBIENT = "qvk3_player_ambient";
+    public static final String AMBIENT_REACT = "qvk3_player_ambient_react";
     public static final String CROSSFADE = "qvk3_music_crossfade";
     public static final String PAUSE_ON_UNPLUG = "qvk3_music_pause_unplug";
     public static final String RESUME_ON_PLUG = "qvk3_music_resume_plug";

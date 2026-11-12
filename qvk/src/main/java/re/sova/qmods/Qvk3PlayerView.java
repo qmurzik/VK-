@@ -57,6 +57,8 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     private boolean land, lastLand;
     private android.view.GestureDetector gestures;
     private TextView upNext, scrubBubble;
+    private Qvk3AmbientView ambient;
+    private Boolean ambientPlaying;
     private Boolean lastPlaying;          // cover «breathing»: smaller on pause
     private int pendingDir;               // +1 next, -1 previous: where the new cover slides in from
     private boolean coverDragging;
@@ -113,6 +115,16 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             }
         }
         addView(background, new LayoutParams(-1, -1));
+        ambient = null;
+        ambientPlaying = null;
+        if (layout.equals("modern") && Qvk3MusicSettings.prefs(a).getBoolean(Qvk3MusicSettings.AMBIENT, true)) {
+            // «Живой фон»: cover colours drifting (and breathing with the bass when possible)
+            ambient = new Qvk3AmbientView(a);
+            addView(ambient, new LayoutParams(-1, -1));
+            View shade = new View(a);
+            shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x22000000, 0x11000000, 0x99000000}));
+            addView(shade, new LayoutParams(-1, -1));
+        }
         if (layout.equals("glass")) {
             View shade = new View(a);
             shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x33000000, 0xCC000000}));
@@ -761,6 +773,10 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         sub.setText(t == null ? "QVK Music" : (t.album.isEmpty() ? "QVK Music" : t.album));
         boolean playing = e.isPlaying();
         breathe(playing);
+        if (ambient != null && (ambientPlaying == null || ambientPlaying != playing)) {
+            ambientPlaying = playing;
+            ambient.setPlaying(playing, e.audioSessionId());
+        }
         Qvk3Ui.setIcon(play, playing ? Qvk3Icons.PAUSE : Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE);
         play.setContentDescription(playing ? "Пауза" : "Играть");
         boolean sh = e.queue().shuffle();
@@ -892,6 +908,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
      */
     private void tint(Bitmap bmp) {
         int base = bmp == null ? 0xFF3A3F4A : Qvk3Ui.average(bmp);
+        if (ambient != null) ambient.setCover(bmp);
         if (onDark && seek != null) Qvk3Ui.styleSeek(a, seek, vivid(base), 0x40FFFFFF);
         if (!(layout.equals("modern") || layout.equals("coverflow"))) return;
         final int from = lastBase, to = base;
