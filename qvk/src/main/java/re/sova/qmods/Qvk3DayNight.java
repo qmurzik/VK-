@@ -41,6 +41,8 @@ final class Qvk3DayNight {
                 }
             }
             e.putString(ACTIVE, mode).apply();
+            // the style chosen for this theme brings its own shape (components, radius) — BUG-0016
+            if (!active.isEmpty()) Qvk3Appearance.syncShape(p, "night".equals(mode));
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.daynight.sync", t);
         }

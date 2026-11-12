@@ -54,14 +54,37 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
 
     @Override
     public void onActivityResumed(Activity a) {
-        if (!vkScreen(a) || !Qvk3MusicSettings.prefs(a).getBoolean(Qvk3MusicSettings.MINI_ON_VK, false) || Qvk3Kill.off(a, "mini_on_vk")) return;
+        // BUG-0032: every «why not» goes to the log (tag QVK3Mini), so a report shows the reason
+        String n = a.getClass().getSimpleName();
+        if (!vkScreen(a)) return;
+        if (!Qvk3MusicSettings.prefs(a).getBoolean(Qvk3MusicSettings.MINI_ON_VK, false)) {
+            log(n + ": off in settings");
+            return;
+        }
+        if (Qvk3Kill.off(a, "mini_on_vk")) {
+            log(n + ": switched off by the team");
+            return;
+        }
         resumed = new WeakReference<>(a);
         Qvk3MusicEngine e = Qvk3MusicEngine.peek();
-        if (e == null) return;
+        if (e == null) {
+            log(n + ": music engine not started yet");
+            return;
+        }
         engineCreated(e);
-        if (e.current() == null || e.state() == Qvk3MusicEngine.IDLE) return;
-        if (e.current().key().equals(hiddenFor)) return; // swiped away in "hide" mode
+        if (e.current() == null || e.state() == Qvk3MusicEngine.IDLE) {
+            log(n + ": nothing playing (state " + e.state() + ")");
+            return;
+        }
+        if (e.current().key().equals(hiddenFor)) {
+            log(n + ": hidden by a swipe until the next track");
+            return;
+        }
         attach(a, e);
+    }
+
+    static void log(String s) {
+        android.util.Log.i("QVK3Mini", s);
     }
 
     @Override
@@ -73,7 +96,10 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
     private void attach(Activity a, Qvk3MusicEngine e) {
         detach();
         ViewGroup content = a.findViewById(android.R.id.content);
-        if (!(content instanceof FrameLayout)) return;
+        if (!(content instanceof FrameLayout)) {
+            log(a.getClass().getSimpleName() + ": no content frame (" + (content == null ? "null" : content.getClass().getName()) + ")");
+            return;
+        }
         host = new WeakReference<>(a);
         bar = build(a, e);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, Qvk3Ui.dp(a, 60), Gravity.BOTTOM);
@@ -85,6 +111,10 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         bar.setTranslationY(Qvk3Ui.dp(a, 24));
         bar.animate().alpha(1f).translationY(0).setDuration(220).start();
         onState(e);
+        View shown = bar;
+        shown.postDelayed(() -> log(a.getClass().getSimpleName() + ": shown " + shown.getWidth() + "x" + shown.getHeight()
+                + " at y=" + shown.getTop() + " in " + content.getWidth() + "x" + content.getHeight() + ", visible=" + (shown.getVisibility() == View.VISIBLE)
+                + ", attached=" + shown.isAttachedToWindow()), 600);
     }
 
     /** IDEA-0005: the bar steps aside while the keyboard is open (typing a message), and comes back after. */

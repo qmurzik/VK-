@@ -85,15 +85,78 @@ public final class Qvk3Appearance {
      * user's own QVK theme untouched — styles and themes no longer overwrite each other's colours behind the user's back.
      */
     public static void apply(Activity a, Qvk3DesignTokens t, boolean colors) throws Exception {
+        apply(a, t, colors, BOTH);
+    }
+
+    /** Which VK theme a style goes to (BUG-0016: a day style and a night style must not overwrite each other). */
+    public static final int BOTH = 0, DAY_ONLY = 1, NIGHT_ONLY = 2;
+    static final String SLOT_DAY = "qvk3_style_slot_day", SLOT_NIGHT = "qvk3_style_slot_night";
+
+    /** The active VK theme is the night one (same choice as the palette slot, else Android's night mode). */
+    static boolean nightNow(Activity a) {
+        try {
+            String slot = ThemeProfiles.slot(a);
+            if (ThemeProfiles.NIGHT.equals(slot)) return true;
+            if (ThemeProfiles.DAY.equals(slot)) return false;
+        } catch (Throwable ignored) {
+        }
+        return Qvk3Ui.night(a);
+    }
+
+    /** Title of the style remembered for the day (false) or night (true) theme; null when none was set per theme. */
+    public static String slotTitle(Context c, boolean night) {
+        try {
+            JSONObject o = new JSONObject(prefs(c).getString(night ? SLOT_NIGHT : SLOT_DAY, "{}"));
+            return o.has("title") ? o.optString("title") : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static JSONObject shape(Qvk3DesignTokens t, boolean weak) throws Exception {
+        JSONObject o = new JSONObject().put("style", t.id).put("title", t.title).put("radius", t.radius);
+        if ("custom".equals(t.id)) o.put("tokens", t.toJson().toString());
+        JSONObject f = new JSONObject();
+        for (Map.Entry<String, Boolean> x : t.componentFlags(weak).entrySet()) f.put(x.getKey(), x.getValue());
+        return o.put("flags", f);
+    }
+
+    private static void writeShape(SharedPreferences.Editor e, JSONObject s) {
+        JSONObject f = s.optJSONObject("flags");
+        if (f != null) for (java.util.Iterator<String> it = f.keys(); it.hasNext(); ) {
+            String k = it.next();
+            e.putBoolean(k, f.optBoolean(k));
+        }
+        int r = s.optInt("radius", 12);
+        e.putInt("qvk_ios_radius", Math.max(0, Math.min(28, r)));
+        e.putInt("qvk_material3_radius", Math.max(12, Math.min(28, r)));
+        e.putString(STYLE, s.optString("style", "classic"));
+        if (s.has("tokens")) e.putString(TOKENS, s.optString("tokens"));
+    }
+
+    /** On a day ↔ night switch: the shape (components, radius, style) of the style chosen for that theme. */
+    static void syncShape(SharedPreferences p, boolean night) {
+        String own = p.getString(night ? SLOT_NIGHT : SLOT_DAY, "");
+        if (own.isEmpty()) return;
+        try {
+            SharedPreferences.Editor e = p.edit();
+            writeShape(e, new JSONObject(own));
+            e.apply();
+        } catch (Exception ex) {
+            RuntimeFaults.record("qvk3.appearance.syncShape", ex);
+        }
+    }
+
+    public static void apply(Activity a, Qvk3DesignTokens t, boolean colors, int scope) throws Exception {
         SharedPreferences p = prefs(a);
         backup(p);
         SharedPreferences.Editor e = p.edit();
-        for (Map.Entry<String, Boolean> f : t.componentFlags(weakDevice(a)).entrySet()) e.putBoolean(f.getKey(), f.getValue());
-        int r = t.radius;
-        e.putInt("qvk_ios_radius", Math.max(0, Math.min(28, r)));
-        e.putInt("qvk_material3_radius", Math.max(12, Math.min(28, r)));
-        e.putString(STYLE, t.id);
-        if ("custom".equals(t.id)) e.putString(TOKENS, t.toJson().toString());
+        boolean night = nightNow(a);
+        JSONObject sh = shape(t, weakDevice(a));
+        // the shape follows the theme it was chosen for; the active theme's shape is written right away
+        if (scope == BOTH || (scope == NIGHT_ONLY) == night) writeShape(e, sh);
+        if (scope == BOTH || scope == DAY_ONLY) e.putString(SLOT_DAY, sh.toString());
+        if (scope == BOTH || scope == NIGHT_ONLY) e.putString(SLOT_NIGHT, sh.toString());
         if (!colors) {
             e.commit();
             ThemePalette.refresh(a);
@@ -101,11 +164,14 @@ public final class Qvk3Appearance {
             return;
         }
         // Both variants; ThemeProfiles picks one by the system light/dark mode, and VK's theme follows the system.
-        String day = t.variant(false).toTheme().toString(), night = t.variant(true).toTheme().toString();
+        // only the chosen theme's palette changes; the other theme keeps its own colours
+        String dayTheme = scope == NIGHT_ONLY ? p.getString(ThemeProfiles.DAY, "") : ThemePalette.validate(t.variant(false).toTheme().toString());
+        String nightTheme = scope == DAY_ONLY ? p.getString(ThemeProfiles.NIGHT, "") : ThemePalette.validate(t.variant(true).toTheme().toString());
         e.putString(ThemeProfiles.MODE, MODE_VK);
-        e.putString(ThemeProfiles.DAY, ThemePalette.validate(day));
-        e.putString(ThemeProfiles.NIGHT, ThemePalette.validate(night));
-        e.putString("qmods_theme_palette", ThemePalette.validate(Qvk3Ui.night(a) ? night : day));
+        if (!dayTheme.isEmpty()) e.putString(ThemeProfiles.DAY, dayTheme);
+        if (!nightTheme.isEmpty()) e.putString(ThemeProfiles.NIGHT, nightTheme);
+        String active = night ? nightTheme : dayTheme;
+        if (!active.isEmpty()) e.putString("qmods_theme_palette", active);
         e.commit();
         p.edit().putString(THEME_HASH, themeHash(p)).apply();
         try {
@@ -114,7 +180,7 @@ public final class Qvk3Appearance {
             RuntimeFaults.record("qvk3.appearance.systemMode", x);
         }
         ThemePalette.refresh(a);
-        Qvk3SettingsHistory.record(a, STYLE, "Стиль оформления: " + t.title);
+        Qvk3SettingsHistory.record(a, STYLE, "Стиль оформления: " + t.title + (scope == DAY_ONLY ? " (светлая тема)" : scope == NIGHT_ONLY ? " (тёмная тема)" : ""));
     }
 
     private static void backup(SharedPreferences p) {
@@ -137,6 +203,8 @@ public final class Qvk3Appearance {
         k.add("qvk_material3_radius");
         k.add(STYLE);
         k.add(TOKENS);
+        k.add(SLOT_DAY);
+        k.add(SLOT_NIGHT);
         return k;
     }
 

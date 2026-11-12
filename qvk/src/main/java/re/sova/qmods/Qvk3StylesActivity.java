@@ -126,15 +126,22 @@ public final class Qvk3StylesActivity extends Activity {
         bar.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
         apply = button("Применить", true);
         apply.setOnClickListener(v -> {
-            if (!Qvk3Appearance.hasOwnTheme(this)) {
-                applyStyle(true);
-                return;
+            // BUG-0016: a style can go to both VK themes or to one of them; the other keeps its own style and colours
+            String dayNow = Qvk3Appearance.slotTitle(this, false), nightNow = Qvk3Appearance.slotTitle(this, true);
+            java.util.List<String> items = new java.util.ArrayList<>();
+            java.util.List<Runnable> acts = new java.util.ArrayList<>();
+            items.add("Светлая и тёмная тема\nОдин стиль для обеих");
+            acts.add(() -> applyStyle(true, Qvk3Appearance.BOTH));
+            items.add("Только светлая тема\n" + (dayNow == null ? "Тёмная останется как есть" : "Сейчас: «" + dayNow + "»"));
+            acts.add(() -> applyStyle(true, Qvk3Appearance.DAY_ONLY));
+            items.add("Только тёмная тема\n" + (nightNow == null ? "Светлая останется как есть" : "Сейчас: «" + nightNow + "»"));
+            acts.add(() -> applyStyle(true, Qvk3Appearance.NIGHT_ONLY));
+            if (Qvk3Appearance.hasOwnTheme(this)) {
+                items.add("Только форма\nСкругления, шрифты и элементы — цвета вашей темы останутся");
+                acts.add(() -> applyStyle(false, Qvk3Appearance.BOTH));
             }
-            // the user has their own theme: say plainly what the style will do to it
             Qvk3Ui.dialog(this).setTitle("Применить «" + draft.title + "»")
-                    .setMessage("У вас своя тема с цветами. Стиль может заменить её своими цветами (вашу тему можно вернуть кнопкой «Отменить» в настройках) или поменять только форму, скругления и шрифты, оставив ваши цвета.")
-                    .setPositiveButton("Стиль с цветами", (d, w) -> applyStyle(true))
-                    .setNeutralButton("Только форма", (d, w) -> applyStyle(false))
+                    .setItems(items.toArray(new String[0]), (d, w) -> acts.get(w).run())
                     .setNegativeButton("Отмена", null).show();
         });
         bar.addView(apply, Qvk3Ui.weight(2));
@@ -158,10 +165,11 @@ public final class Qvk3StylesActivity extends Activity {
         return t;
     }
 
-    private void applyStyle(boolean colors) {
+    private void applyStyle(boolean colors, int scope) {
         try {
-            Qvk3Appearance.apply(this, draft, colors);
-            Qvk3Ui.toast(this, "Стиль «" + draft.title + "» применён" + (colors ? "" : " без замены цветов"));
+            Qvk3Appearance.apply(this, draft, colors, scope);
+            Qvk3Ui.toast(this, "Стиль «" + draft.title + "» применён" + (!colors ? " без замены цветов"
+                    : scope == Qvk3Appearance.DAY_ONLY ? " к светлой теме" : scope == Qvk3Appearance.NIGHT_ONLY ? " к тёмной теме" : ""));
             finish();
         } catch (Exception e) {
             Qvk3Ui.toast(this, "Не удалось применить: " + Qvk3Jobs.message(e));
