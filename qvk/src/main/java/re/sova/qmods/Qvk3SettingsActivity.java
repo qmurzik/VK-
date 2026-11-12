@@ -414,7 +414,38 @@ public final class Qvk3SettingsActivity extends Activity {
                 markFavorite(r);
                 r.setContentDescription("В избранном. " + r.getContentDescription());
             }
+            if (Qvk3NewBadge.isNew(this, it.target)) {
+                newPill(r);
+                r.setContentDescription("Новое. " + r.getContentDescription());
+            }
         }
+    }
+
+    /** «Новое» pill after the title (the item came in the last few builds and was not opened yet). */
+    private void newPill(LinearLayout row) {
+        for (int i = 0; i < row.getChildCount(); i++) {
+            View c = row.getChildAt(i);
+            if (!(c instanceof LinearLayout) || !(((LinearLayout) c).getChildAt(0) instanceof TextView)) continue;
+            LinearLayout texts = (LinearLayout) c;
+            TextView title = (TextView) texts.getChildAt(0);
+            texts.removeViewAt(0);
+            LinearLayout line = new LinearLayout(this);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.addView(title, new LinearLayout.LayoutParams(-2, -2, 0f));
+            TextView pill = Qvk3Ui.text(this, "Новое", 11, Color.WHITE, true);
+            pill.setPadding(dp(7), dp(1), dp(7), dp(2));
+            pill.setBackground(Qvk3Ui.rounded(p.accent, dp(8)));
+            LinearLayout.LayoutParams pl = Qvk3Ui.wrap();
+            pl.leftMargin = dp(8);
+            line.addView(pill, pl);
+            texts.addView(line, 0);
+            return;
+        }
+    }
+
+    private boolean sectionHasNew(int s) {
+        for (Qvk3SettingsIndex.Item it : index.section(s)) if (Qvk3NewBadge.isNew(this, it.target)) return true;
+        return false;
     }
 
     /** Small accent star after the title of a favourite (instead of a «★» glyph in the text). */
@@ -667,11 +698,21 @@ public final class Qvk3SettingsActivity extends Activity {
         name.setMaxLines(1);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.addView(name);
+        if (sectionHasNew(s)) {
+            // a small accent dot in the tile's corner: something new inside this section
+            android.graphics.drawable.GradientDrawable dot = new android.graphics.drawable.GradientDrawable();
+            dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            dot.setColor(p.accent);
+            dot.setSize(dp(8), dp(8));
+            name.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, dot, null);
+            name.setCompoundDrawablePadding(dp(6));
+            t.setContentDescription("Есть новое. ");
+        }
         TextView hint = Qvk3Ui.text(this, Qvk3SettingsIndex.SECTION_HINTS[s], 12, p.text2, false);
         hint.setMaxLines(2);
         hint.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.addView(hint);
-        t.setContentDescription(Qvk3SettingsIndex.SECTIONS[s] + ". " + Qvk3SettingsIndex.SECTION_HINTS[s]);
+        t.setContentDescription((t.getContentDescription() == null ? "" : t.getContentDescription()) + Qvk3SettingsIndex.SECTIONS[s] + ". " + Qvk3SettingsIndex.SECTION_HINTS[s]);
         t.setOnClickListener(v -> openSection(s));
         Qvk3Motion.press(t);
         return t;
@@ -786,6 +827,7 @@ public final class Qvk3SettingsActivity extends Activity {
 
     private void open(Qvk3SettingsIndex.Item it) {
         String t = it.target;
+        Qvk3NewBadge.markSeen(this, t);
         try {
             if (t.startsWith("qvk3:")) qvk3(t.substring(5));
             else if (Qvk3NativeEditors.handles(t)) Qvk3NativeEditors.open(this, t);
