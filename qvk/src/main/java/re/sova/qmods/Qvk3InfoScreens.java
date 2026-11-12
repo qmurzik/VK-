@@ -49,10 +49,36 @@ final class Qvk3InfoScreens {
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         col.addView(t);
-        dialog(a, "Диагностический центр Push", col, "Локальная проверка", () -> {
+        ScrollView sv = new ScrollView(a);
+        sv.addView(col);
+        AlertDialog.Builder b = Qvk3Ui.dialog(a).setTitle("Диагностический центр Push").setView(sv);
+        b.setPositiveButton("Локальная проверка", (d, w) -> {
             boolean ok = PushSupport.localTest(a);
             Qvk3Ui.toast(a, ok ? "Тестовое уведомление показано. Это проверка Android, а не сервера ВК"
                     : "Android не разрешает уведомления QVK: проверьте разрешение и каналы");
+        });
+        if (Qvk3MicroG.installed(a)) {
+            b.setNeutralButton("Проверить microG", (d, w) -> microgCheck(a));
+        }
+        b.setNegativeButton("Закрыть", null).show();
+    }
+
+    /** Live microG push check: request a real FCM token through microG and report the true result. */
+    static void microgCheck(Activity a) {
+        TextView t = body(a, "Запрашиваем токен FCM через microG…");
+        AlertDialog dlg = Qvk3Ui.dialog(a).setTitle("Проверка microG")
+                .setView(wrapScroll(a, t))
+                .setPositiveButton("Настройки microG", (d, w) -> {
+                    if (!Qvk3MicroG.openSettings(a)) {
+                        Qvk3Ui.toast(a, "Не удалось открыть настройки microG");
+                    }
+                })
+                .setNegativeButton("Закрыть", null).show();
+        Qvk3Jobs.io(() -> {
+            Qvk3MicroG.Result r = Qvk3MicroG.check(a);
+            Qvk3Jobs.main(() -> {
+                if (dlg.isShowing()) t.setText(r.text);
+            });
         });
     }
 

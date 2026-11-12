@@ -64,8 +64,12 @@ public final class Qvk3Push {
         out.add(new Line("Сервисы Google", gms.isEmpty() ? "не установлены — FCM недоступен, нужен Long Poll/фоновая доставка QVK" : gms,
                 gms.isEmpty() ? -1 : 0));
         if (gms.startsWith("microG")) {
-            out.add(new Line("microG", "найден. Включите в microG «Cloud Messaging» и разрешите регистрацию для QVK; "
-                    + "доставка всё равно зависит от того, примет ли сервер ВК токен этой сборки (см. отчёт QVK ниже)", 0));
+            Boolean cm = Qvk3MicroG.cloudMessagingEnabled(c);
+            String note = "FCM обслуживает microG, а не Google. Включите в microG «Cloud Messaging» и выполните "
+                    + "регистрацию устройства; подмена подписи QVK не нужна — microG регистрирует токен под пакетом "
+                    + "и сертификатом сборки. Кнопка «Проверить microG» ниже запрашивает реальный токен.";
+            out.add(new Line("microG", (cm != null ? (cm ? "Cloud Messaging включён. " : "Cloud Messaging выключен — включите его. ") : "") + note,
+                    cm != null && !cm ? -1 : 0));
         }
         String mode;
         try {
