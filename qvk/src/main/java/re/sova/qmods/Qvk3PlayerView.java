@@ -56,6 +56,11 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     private GradientDrawable gradient;
     private boolean land, lastLand;
     private android.view.GestureDetector gestures;
+    private TextView upNext, scrubBubble;
+    private Boolean lastPlaying;          // cover «breathing»: smaller on pause
+    private int pendingDir;               // +1 next, -1 previous: where the new cover slides in from
+    private boolean coverDragging;
+    static final String REMAINING = "qvk3_player_remaining";
 
     public Qvk3PlayerView(Activity a) {
         super(a);
@@ -80,6 +85,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         // player keeps the chosen layout in landscape instead of a stretched queue Cover Flow (BUG-0007).
         layout = Qvk3MusicSettings.layout(a);
         lastLand = land;
+        lastPlaying = null;
         Qvk3Ui.Palette p = Qvk3Ui.palette(a, layout.equals("classic") ? "classic" : "modern");
         onDark = !layout.equals("classic") || p.dark;
         fg = onDark ? Color.WHITE : p.text;
@@ -206,7 +212,80 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                     Qvk3QueueDialog.show(a);
                 }
             });
-            cover.setOnTouchListener((v, ev) -> coverGestures.onTouchEvent(ev));
+            // the cover follows the finger sideways; let go far enough and it flies off — next / previous track
+            final float[] down = new float[2];
+            final int slop = android.view.ViewConfiguration.get(a).getScaledTouchSlop() * 2;
+            final android.view.VelocityTracker[] vt = new android.view.VelocityTracker[1];
+            cover.setOnTouchListener((v, ev) -> {
+                switch (ev.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        down[0] = ev.getRawX();
+                        down[1] = ev.getRawY();
+                        coverDragging = false;
+                        if (vt[0] != null) vt[0].recycle();
+                        vt[0] = android.view.VelocityTracker.obtain();
+                        vt[0].addMovement(ev);
+                        v.animate().cancel();
+                        break;
+                    case android.view.MotionEvent.ACTION_MOVE: {
+                        if (vt[0] != null) vt[0].addMovement(ev);
+                        float dx = ev.getRawX() - down[0], dy = ev.getRawY() - down[1];
+                        if (!coverDragging && Math.abs(dx) > slop && Math.abs(dx) > Math.abs(dy) * 1.4f && !lyricsMode) {
+                            coverDragging = true;
+                            v.getParent().requestDisallowInterceptTouchEvent(true);
+                            android.view.MotionEvent c = android.view.MotionEvent.obtain(ev);
+                            c.setAction(android.view.MotionEvent.ACTION_CANCEL);
+                            coverGestures.onTouchEvent(c); // no tap / long press after a drag
+                            c.recycle();
+                        }
+                        if (coverDragging) {
+                            float cw = Math.max(1, v.getWidth());
+                            v.setTranslationX(dx);
+                            v.setRotation(dx / cw * 7f);
+                            v.setAlpha(1f - Math.min(0.5f, Math.abs(dx) / cw * 0.6f));
+                            return true;
+                        }
+                        break;
+                    }
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL: {
+                        if (!coverDragging) break;
+                        coverDragging = false;
+                        float dx = ev.getRawX() - down[0], cw = Math.max(1, v.getWidth());
+                        float vx = 0;
+                        if (vt[0] != null) {
+                            vt[0].addMovement(ev);
+                            vt[0].computeCurrentVelocity(1000);
+                            vx = vt[0].getXVelocity();
+                            vt[0].recycle();
+                            vt[0] = null;
+                        }
+                        boolean go = ev.getActionMasked() == android.view.MotionEvent.ACTION_UP
+                                && (Math.abs(dx) > cw * 0.28f || (Math.abs(vx) > 1200 && Math.signum(vx) == Math.signum(dx) && Math.abs(dx) > slop));
+                        if (go) {
+                            int dir = dx < 0 ? 1 : -1;
+                            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
+                            v.animate().translationX(-dir * cw * 1.25f).rotation(-dir * 10f).alpha(0f).setDuration(170)
+                                    .setInterpolator(new android.view.animation.AccelerateInterpolator()).withEndAction(() -> {
+                                        pendingDir = dir;
+                                        if (dir > 0) engine.next();
+                                        else engine.previous();
+                                        // same track again (end of queue, restart of the track): bring the cover back
+                                        v.postDelayed(() -> {
+                                            if (v.getAlpha() < 0.05f && !coverDragging) slideIn(dir);
+                                        }, 450);
+                                    }).start();
+                        } else {
+                            v.animate().translationX(0).rotation(0).alpha(1f).setDuration(320)
+                                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.2f)).start();
+                        }
+                        return true;
+                    }
+                    default:
+                        break;
+                }
+                return coverGestures.onTouchEvent(ev);
+            });
             cover.setClickable(true);
         }
         lyricsList = new ListView(a);
@@ -226,7 +305,15 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             }
         });
         lyricsList.setOnItemClickListener((parent, view, position, id) -> {
-            showLyrics(false); // a tap on the text hides it
+            if (lyrics != null && lyrics.synced && position < lyrics.lines.size()) {
+                // synced text: a tap on a line jumps there
+                engine.seekTo(lyrics.lines.get(position).time);
+                manualScrollUntil = 0;
+                lastLine = -2;
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                return;
+            }
+            showLyrics(false); // plain text: a tap hides it
         });
         lyricsList.setOnItemLongClickListener((parent, view, position, id) -> {
             if (lyrics == null) return false;
@@ -284,26 +371,57 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
-                if (fromUser) pos.setText(Qvk3Track.time(progress));
+                if (!fromUser) return;
+                pos.setText(Qvk3Track.time(progress));
+                updateDur(progress, s.getMax());
+                placeBubble(s, progress);
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar s) {
                 userSeeking = true;
+                s.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                placeBubble(s, s.getProgress());
+                scrubBubble.animate().cancel();
+                scrubBubble.setVisibility(VISIBLE);
+                scrubBubble.setScaleX(0.6f);
+                scrubBubble.setScaleY(0.6f);
+                scrubBubble.setAlpha(0f);
+                scrubBubble.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start();
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar s) {
                 userSeeking = false;
                 engine.seekTo(s.getProgress());
+                scrubBubble.animate().alpha(0f).scaleX(0.6f).scaleY(0.6f).setDuration(160)
+                        .withEndAction(() -> scrubBubble.setVisibility(INVISIBLE)).start();
             }
         });
-        col.addView(seek, Qvk3Ui.match());
+        // while dragging, the time floats above the thumb in a large bubble
+        FrameLayout seekBox = new FrameLayout(a);
+        seekBox.setClipChildren(false);
+        seekBox.setClipToPadding(false);
+        seekBox.addView(seek, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL));
+        scrubBubble = Qvk3Ui.text(a, "0:00", 15, onDark ? 0xFF111318 : Color.WHITE, true);
+        scrubBubble.setPadding(dp(12), dp(5), dp(12), dp(6));
+        scrubBubble.setBackground(Qvk3Ui.rounded(onDark ? Color.WHITE : accent, dp(14)));
+        scrubBubble.setElevation(dp(4));
+        scrubBubble.setVisibility(INVISIBLE);
+        seekBox.addView(scrubBubble, new FrameLayout.LayoutParams(-2, -2, Gravity.START | Gravity.TOP));
+        col.setClipChildren(false);
+        col.addView(seekBox, Qvk3Ui.match());
         LinearLayout times = new LinearLayout(a);
         times.setPadding(dp(8), 0, dp(8), 0);
         pos = Qvk3Ui.text(a, "0:00", 12, fg2, false);
         dur = Qvk3Ui.text(a, "0:00", 12, fg2, false);
         dur.setGravity(Gravity.END);
+        dur.setOnClickListener(v -> {
+            boolean r = !Qvk3MusicSettings.prefs(a).getBoolean(REMAINING, false);
+            Qvk3MusicSettings.prefs(a).edit().putBoolean(REMAINING, r).apply();
+            updateDur(engine.position(), engine.duration());
+        });
+        dur.setContentDescription("Длительность. Нажмите, чтобы показывать, сколько осталось");
         times.addView(pos, Qvk3Ui.weight(1));
         times.addView(dur, Qvk3Ui.weight(1));
         col.addView(times, Qvk3Ui.match());
@@ -315,7 +433,11 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         shuffle = Qvk3Ui.icon(a, Qvk3Icons.SHUFFLE, fg, 52, 22, "Перемешивание", v -> engine.setShuffle(!engine.queue().shuffle()));
         repeat = Qvk3Ui.icon(a, Qvk3Icons.REPEAT, fg, 52, 22, "Повтор", v -> engine.setRepeat((engine.queue().repeat() + 1) % 3));
         controls.addView(shuffle, weightBox(52));
-        controls.addView(Qvk3Ui.icon(a, Qvk3Icons.PREV, fg, 60, 32, "Предыдущий трек", v -> engine.previous()), weightBox(60));
+        controls.addView(Qvk3Ui.icon(a, Qvk3Icons.PREV, fg, 60, 32, "Предыдущий трек", v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            pendingDir = -1;
+            engine.previous();
+        }), weightBox(60));
         FrameLayout playBox = new FrameLayout(a);
         playBg = new View(a);
         GradientDrawable circle = new GradientDrawable();
@@ -325,13 +447,31 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         playBg.setElevation(dp(6));
         int ps = land ? 52 : 72;
         playBox.addView(playBg, new FrameLayout.LayoutParams(dp(ps), dp(ps), Gravity.CENTER));
-        play = Qvk3Ui.icon(a, Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE, ps, land ? 26 : 34, "Играть", v -> engine.toggle());
+        play = Qvk3Ui.icon(a, Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE, ps, land ? 26 : 34, "Играть", v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            // a small spring of the round button
+            for (View b : new View[]{playBg, play}) {
+                b.animate().cancel();
+                b.animate().scaleX(0.86f).scaleY(0.86f).setDuration(90).withEndAction(() ->
+                        b.animate().scaleX(1f).scaleY(1f).setDuration(320).setInterpolator(new android.view.animation.OvershootInterpolator(2.4f)).start()).start();
+            }
+            engine.toggle();
+        });
         play.setElevation(dp(7));
         playBox.addView(play, new FrameLayout.LayoutParams(dp(ps), dp(ps), Gravity.CENTER));
         controls.addView(playBox, weightBox(land ? 56 : 80));
-        controls.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, fg, 60, 32, "Следующий трек", v -> engine.next()), weightBox(60));
+        controls.addView(Qvk3Ui.icon(a, Qvk3Icons.NEXT, fg, 60, 32, "Следующий трек", v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            pendingDir = 1;
+            engine.next();
+        }), weightBox(60));
         controls.addView(repeat, weightBox(52));
         col.addView(controls, Qvk3Ui.match());
+        upNext = Qvk3Ui.line(a, "", 13, fg2, false);
+        upNext.setGravity(Gravity.CENTER);
+        upNext.setPadding(dp(24), 0, dp(24), dp(6));
+        upNext.setOnClickListener(v -> Qvk3QueueDialog.show(a));
+        if (!land) col.addView(upNext, Qvk3Ui.match());
 
         // secondary actions
         extra = new LinearLayout(a);
@@ -350,17 +490,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                     if (onClose != null) onClose.run(); // swipe down collapses the player
                     return true;
                 }
-                if (cover != null && Math.abs(dx) > dp(70) && Math.abs(dx) > Math.abs(dy) * 1.6f && Math.abs(vx) > 700) {
-                    int[] loc = new int[2];
-                    cover.getLocationOnScreen(loc);
-                    float x = e1.getRawX(), y = e1.getRawY();
-                    if (x >= loc[0] && x <= loc[0] + cover.getWidth() && y >= loc[1] && y <= loc[1] + cover.getHeight()) {
-                        if (dx < 0) engine.next();
-                        else engine.previous();
-                        return true;
-                    }
-                }
-                return false;
+                return false; // sideways on the cover: the cover's own drag handles it (follows the finger)
             }
         });
         if (lyricsMode) showLyrics(true);
@@ -632,6 +762,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         artist.setText(t == null ? "" : t.artist);
         sub.setText(t == null ? "QVK Music" : (t.album.isEmpty() ? "QVK Music" : t.album));
         boolean playing = e.isPlaying();
+        breathe(playing);
         Qvk3Ui.setIcon(play, playing ? Qvk3Icons.PAUSE : Qvk3Icons.PLAY, onDark ? 0xFF111318 : Color.WHITE);
         play.setContentDescription(playing ? "Пауза" : "Играть");
         boolean sh = e.queue().shuffle();
@@ -659,9 +790,18 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             seek.setProgress((int) e.position());
             pos.setText(Qvk3Track.time(e.position()));
         }
-        dur.setText(Qvk3Track.time(e.duration()));
+        if (!userSeeking) updateDur(e.position(), e.duration());
+        Qvk3Track nx = e.queue().peekNext();
+        if (upNext != null) {
+            upNext.setText(nx == null ? "" : "Далее: " + nx.title + (nx.artist.isEmpty() ? "" : " · " + nx.artist));
+            upNext.setVisibility(nx == null || land ? GONE : VISIBLE);
+            upNext.setContentDescription(nx == null ? null : "Далее: " + nx.label() + ". Нажмите, чтобы открыть очередь");
+        }
         if (t != null && !t.key().equals(coverFor)) {
+            boolean first = coverFor.isEmpty();
             coverFor = t.key();
+            if (!first && cover != null && !coverDragging) slideIn(pendingDir);
+            pendingDir = 0;
             updateHeart(t);
             lyrics = null;
             lyricsFor = "";
@@ -697,6 +837,51 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
 
     private int accentOn() {
         return onDark ? 0xFF8EC5FF : accent;
+    }
+
+    /** New cover comes in from the side it was swiped to (or fades in when the track changed elsewhere). */
+    private void slideIn(int dir) {
+        if (cover == null) return;
+        ImageView v = cover;
+        v.animate().cancel();
+        float w = Math.max(1, v.getWidth());
+        v.setTranslationX(dir * w * 0.55f);
+        v.setRotation(dir * 6f);
+        v.setAlpha(0f);
+        v.animate().translationX(0).rotation(0).alpha(1f).setDuration(dir == 0 ? 220 : 340)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
+    }
+
+    /** Apple-Music-like: the cover shrinks a little on pause and springs back on play. */
+    private void breathe(boolean playing) {
+        if (cover == null || (lastPlaying != null && lastPlaying == playing)) return;
+        boolean firstTime = lastPlaying == null;
+        lastPlaying = playing;
+        float s = playing ? 1f : 0.86f;
+        if (firstTime || Qvk3Appearance.weakDevice(a)) {
+            cover.setScaleX(s);
+            cover.setScaleY(s);
+            return;
+        }
+        cover.animate().scaleX(s).scaleY(s).setDuration(playing ? 420 : 300)
+                .setInterpolator(playing ? new android.view.animation.OvershootInterpolator(1.4f) : new android.view.animation.DecelerateInterpolator()).start();
+    }
+
+    private void updateDur(long position, long duration) {
+        if (dur == null) return;
+        boolean remaining = Qvk3MusicSettings.prefs(a).getBoolean(REMAINING, false);
+        dur.setText(remaining && duration > 0 ? "−" + Qvk3Track.time(Math.max(0, duration - position)) : Qvk3Track.time(duration));
+    }
+
+    private void placeBubble(SeekBar s, int progress) {
+        if (scrubBubble == null) return;
+        scrubBubble.setText(Qvk3Track.time(progress));
+        scrubBubble.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
+        int track = s.getWidth() - s.getPaddingLeft() - s.getPaddingRight();
+        float x = s.getPaddingLeft() + track * (progress / (float) Math.max(1, s.getMax())) - scrubBubble.getMeasuredWidth() / 2f;
+        x = Math.max(0, Math.min(s.getWidth() - scrubBubble.getMeasuredWidth(), x));
+        scrubBubble.setTranslationX(x);
+        scrubBubble.setTranslationY(-scrubBubble.getMeasuredHeight() - dp(2));
     }
 
     private int lastBase = 0xFF3A3F4A;
