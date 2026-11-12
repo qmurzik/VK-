@@ -78,7 +78,12 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         flow.setCaptionOnTop(true);
         flow.setListener((index, settled) -> {
             Qvk3MusicSettings.prefs(a).edit().putInt(SELECTED, index).apply();
-            if (!settled) flipOpen(index);
+            if (!settled) {
+                flipOpen(index);
+            } else if (flow.settledByUser() && !flow.settledByFling()) {
+                // BUG-0013: a calm swipe that stops on another album starts it (a fast fling only browses).
+                playCover(index);
+            }
         });
         LayoutParams fl = new LayoutParams(-1, -1);
         fl.topMargin = byRotation ? dp(4) : dp(52);
@@ -543,6 +548,42 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
     }
 
     // ------------------------------------------------------------------ playback
+
+    /**
+     * BUG-0013: swiping the Cover Flow to another album and releasing starts that album from its first track,
+     * without opening the track list. A fast fling (browsing) does not trigger this — only a calm, deliberate swipe.
+     */
+    private void playCover(int index) {
+        if (index < 0 || index >= albums.size()) return;
+        if (index == playingAlbum()) return; // already playing this album
+        final Qvk3MusicSource.Playlist pl = sources.get(albums.get(index));
+        final String localName = albums.get(index).name;
+        Qvk3Jobs.io(() -> {
+            List<Qvk3Track> tracks = new ArrayList<>();
+            if (pl != null) {
+                try {
+                    for (int off = 0; off < 2000; ) {
+                        Qvk3MusicSource.Page<Qvk3Track> pg = Qvk3MusicSource.playlistTracks(pl, off);
+                        for (Qvk3Track t : pg.items) tracks.add(Qvk3MusicLibrary.get(a).withDownload(t));
+                        if (pg.items.isEmpty() || tracks.size() >= pg.total) break;
+                        off += pg.items.size();
+                    }
+                } catch (Exception e) {
+                    RuntimeFaults.record("qvk3.coverflow.playcover", e);
+                }
+            } else {
+                tracks = Qvk3MusicLibrary.get(a).group("my", "album", localName);
+            }
+            final List<Qvk3Track> got = tracks;
+            Qvk3Jobs.main(() -> {
+                if (got.isEmpty()) {
+                    Qvk3Ui.toast(a, "Треки альбома недоступны");
+                    return;
+                }
+                engine.play(got, 0);
+            });
+        });
+    }
 
     private void playAlbum(int index) {
         if (index < 0 || index >= openTracks.size()) return;

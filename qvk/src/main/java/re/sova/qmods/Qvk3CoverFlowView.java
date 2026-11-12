@@ -75,6 +75,8 @@ public final class Qvk3CoverFlowView extends View {
     private float radius;
     private Listener listener;
     private boolean byUser, settledByUser;
+    /** True when the settle came from a fast fling (browsing many covers) rather than a calm single swipe. */
+    private boolean fling, settledByFling;
     private int lastSettled = -1;
     private boolean fastFling;
 
@@ -127,6 +129,7 @@ public final class Qvk3CoverFlowView extends View {
         pos = items.isEmpty() ? 0 : Math.max(0, Math.min(select, items.size() - 1));
         lastSettled = -1;
         byUser = false;
+        fling = false;
         settle();
         invalidate();
     }
@@ -134,6 +137,11 @@ public final class Qvk3CoverFlowView extends View {
     /** Valid inside Listener.onItem(index, true): true when the finger (not code) moved the covers to this one. */
     public boolean settledByUser() {
         return settledByUser;
+    }
+
+    /** Valid inside Listener.onItem(index, true): true when a fast fling (browsing) brought us here, not a calm swipe. */
+    public boolean settledByFling() {
+        return settledByFling;
     }
 
     public int selected() {
@@ -398,7 +406,9 @@ public final class Qvk3CoverFlowView extends View {
         if (c != lastSettled) {
             lastSettled = c;
             settledByUser = byUser;
+            settledByFling = fling;
             byUser = false;
+            fling = false;
             setContentDescription(items.get(c).title + ", " + items.get(c).subtitle + ". Альбом " + (c + 1) + " из " + items.size());
             sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
             if (listener != null) listener.onItem(c, true);
@@ -414,6 +424,7 @@ public final class Qvk3CoverFlowView extends View {
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 byUser = true;
+                fling = false;
                 scroller.forceFinished(true);
                 downX = lastX = e.getX();
                 dragging = false;
@@ -435,6 +446,7 @@ public final class Qvk3CoverFlowView extends View {
                 if (!dragging) {
                     tap(e.getX());
                 } else if (Math.abs(vx) > minFling) {
+                    fling = true;
                     // Inertia with weight (IDEA-0019): albums are heavy — a flick moves a few, even a very strong swipe
                     // at most ~12 (a soft saturation curve instead of 120), and they glide a little longer.
                     // The end point is an exact album, so the motion always finishes centred.
