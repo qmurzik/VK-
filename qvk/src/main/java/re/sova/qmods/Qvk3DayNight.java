@@ -42,7 +42,26 @@ final class Qvk3DayNight {
             }
             e.putString(ACTIVE, mode).apply();
             // the style chosen for this theme brings its own shape (components, radius) — BUG-0016
-            if (!active.isEmpty()) Qvk3Appearance.syncShape(p, "night".equals(mode));
+            boolean shape = !active.isEmpty() && Qvk3Appearance.syncShape(p, "night".equals(mode));
+            if (!active.isEmpty()) {
+                // BUG-0016 (alpha37): the QVK 2 style engines keep what they drew with until restart — a day ↔ night
+                // switch left day colours and shapes on night screens (and back). Drop their caches and redraw once.
+                try {
+                    IosAppearance.reset();
+                } catch (Throwable t) {
+                    RuntimeFaults.record("qvk3.daynight.ios", t);
+                }
+                try {
+                    MaterialAppearance.reset();
+                } catch (Throwable t) {
+                    RuntimeFaults.record("qvk3.daynight.material", t);
+                }
+                android.util.Log.i("QVK3Look", "day/night → " + mode + (shape ? " (style shape switched)" : "") + ", redraw");
+                android.view.View root = a.getWindow() == null ? null : a.getWindow().getDecorView();
+                if (root != null) root.post(() -> {
+                    if (!a.isFinishing() && !a.isDestroyed()) a.recreate();
+                });
+            }
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.daynight.sync", t);
         }

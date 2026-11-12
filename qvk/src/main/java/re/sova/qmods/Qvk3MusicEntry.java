@@ -46,7 +46,12 @@ public final class Qvk3MusicEntry {
             Object builder = navigator.getClass().getField("a").get(navigator);
             android.os.Bundle args = (android.os.Bundle) builder.getClass().getField("W3").get(builder);
             if (args != null) {
-                if (args.containsKey("query") || args.containsKey("key_url")) return false;
+                String url = args.getString("key_url");
+                android.util.Log.i("QVK3Music", "navigator: keys=" + args.keySet() + (url != null ? " url=" + url : ""));
+                if (args.containsKey("query")) return false;
+                // BUG-0034: the «Музыка» tile of «Сервисы» opens VK music by its root link — that is the user's own
+                // music too; links to a specific playlist / artist / section still open in VK
+                if (url != null && !musicRoot(url)) return false;
                 Object owner = args.get("owner_id");
                 if (owner != null) {
                     long id = ((Number) owner.getClass().getMethod("getValue").invoke(owner)).longValue();
@@ -74,12 +79,21 @@ public final class Qvk3MusicEntry {
         try {
             Context c = RuntimeBridge.context;
             boolean on = c != null && Qvk3MusicSettings.enabled(c) && !classicWanted();
-            if (on) android.util.Log.i("QVK3Music", "menu «Музыка» → QVK Music");
+            android.util.Log.i("QVK3Music", "menu «Музыка» → " + (on ? "QVK Music" : "VK (QVK Music off or «Музыка ВК» asked)"));
             return on;
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.music.menu", t);
             return false;
         }
+    }
+
+    /** vk.com/audio, /audios123, /music (optionally with ?section=…/my/main): the root of VK music. */
+    static boolean musicRoot(String url) {
+        String u = url.toLowerCase(java.util.Locale.ROOT).replaceFirst("^https?://", "").replaceFirst("^(m\\.|www\\.)", "");
+        int q = u.indexOf('?');
+        String path = q < 0 ? u : u.substring(0, q), query = q < 0 ? "" : u.substring(q + 1);
+        if (!path.matches("(vk\\.(com|ru)|vkontakte\\.ru)/(audio|audios\\d*|music)(/(my|main|recent|playlists))?/?")) return false;
+        return query.isEmpty() || query.matches("(section=(all|my|main|recent|recoms|playlists)|ref=[\\w.]*)(&[\\w.]+=[\\w.]*)*");
     }
 
     private static final java.util.WeakHashMap<Object, Qvk3MusicScreen> tabs = new java.util.WeakHashMap<>();

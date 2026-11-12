@@ -1,6 +1,7 @@
 package re.sova.qmods;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 
 import java.util.ArrayList;
@@ -33,10 +34,40 @@ public final class Qvk3SearchTabs {
     private Qvk3SearchTabs() {
     }
 
+    /**
+     * VK builds the tab list once, when DiscoverSearchTabs is first loaded — that can be before QVK has its
+     * preferences (RuntimeBridge.prefs null), and the filter silently did nothing (BUG-0048 after alpha37). The
+     * application itself is always there: read QVK's preference file through it.
+     */
     private static SharedPreferences prefs() {
         SharedPreferences p = RuntimeBridge.prefs;
-        if (p == null && RuntimeBridge.context != null) p = Qvk3MusicSettings.prefs(RuntimeBridge.context);
+        android.content.Context c = RuntimeBridge.context;
+        if (c == null) {
+            try {
+                Object app = Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null);
+                if (app instanceof android.content.Context) c = (android.content.Context) app;
+            } catch (Throwable ignored) {
+            }
+        }
+        if (p == null && c != null) p = Qvk3MusicSettings.prefs(c);
         return p;
+    }
+
+    /** Restarts VK so the search tabs are built again. */
+    static void restart(Activity a) {
+        try {
+            Intent i = a.getPackageManager().getLaunchIntentForPackage(a.getPackageName());
+            if (i == null) return;
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            android.app.PendingIntent pi = android.app.PendingIntent.getActivity(a, 0x51ab, i,
+                    android.app.PendingIntent.FLAG_CANCEL_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+            android.app.AlarmManager am = a.getSystemService(android.app.AlarmManager.class);
+            if (am != null) am.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 400, pi);
+            a.finishAffinity();
+            android.os.Process.killProcess(android.os.Process.myPid());
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.search.restart", t);
+        }
     }
 
     /** NetworkBridge response hook (patch 0018): only the music subscription-offer filter remains here. */
@@ -93,7 +124,8 @@ public final class Qvk3SearchTabs {
             }));
         }
         col.addView(g);
-        col.addView(Qvk3Sheet.note(a, pal, "«Все» остаётся всегда. Изменения применятся после перезапуска ВК."));
-        Qvk3Ui.dialog(a).setTitle("Разделы поиска").setView(col).setPositiveButton("Готово", null).show();
+        col.addView(Qvk3Sheet.note(a, pal, "«Все» остаётся всегда. ВК собирает вкладки поиска при запуске — изменения видны после перезапуска."));
+        Qvk3Ui.dialog(a).setTitle("Разделы поиска").setView(col).setPositiveButton("Готово", null)
+                .setNeutralButton("Перезапустить ВК", (d, w) -> restart(a)).show();
     }
 }

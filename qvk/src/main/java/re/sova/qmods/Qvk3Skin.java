@@ -258,17 +258,32 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         // BUG-0033: VK keeps the screen content above the bar (bottomMargin = bar height), so around a floating bar
         // the page background showed instead of the feed. Content now runs under the bar, as a floating bar should.
         if (host != null) freeBottom(host);
+        else if (!loggedNoHost) {
+            loggedNoHost = true;
+            android.util.Log.w("QVK3Skin", "dock: no content host next to the bar in " + (container.getParent() == null ? "-" : container.getParent().getClass().getName()));
+        }
     }
 
-    /** VK's screen host (bottom_nav_content's FitSystemWindowsFrameLayout next to the bar container). */
+    private boolean loggedNoHost;
+
+    private static Orig instanceOrig(View v) {
+        Qvk3Skin k = instance;
+        return k == null ? null : k.origs.get(v);
+    }
+
+    /** VK's screen host: the full-height sibling of the bar container that VK keeps above the bar. */
     private static View contentHost(View container) {
         if (!(container.getParent() instanceof ViewGroup)) return null;
         ViewGroup parent = (ViewGroup) container.getParent();
         for (int i = 0; i < parent.getChildCount(); i++) {
             View c = parent.getChildAt(i);
-            if (c == container || !c.getClass().getName().endsWith("FitSystemWindowsFrameLayout")) continue;
+            if (c == container || c.getVisibility() == View.GONE) continue;
+            // BUG-0033 (alpha37): the host is whatever view VK passed in (not always a FitSystemWindowsFrameLayout) —
+            // recognise it by what VK does to it: full height with the bar's height as bottom margin
             ViewGroup.LayoutParams lp = c.getLayoutParams();
-            if (lp instanceof ViewGroup.MarginLayoutParams && lp.height == ViewGroup.LayoutParams.MATCH_PARENT) return c;
+            if (!(lp instanceof ViewGroup.MarginLayoutParams) || lp.height != ViewGroup.LayoutParams.MATCH_PARENT) continue;
+            Orig o = instanceOrig(c);
+            if (((ViewGroup.MarginLayoutParams) lp).bottomMargin > 0 || (o != null && o.margins != null)) return c;
         }
         return null;
     }
@@ -278,6 +293,7 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         if (m.bottomMargin <= 0) return;
         Orig o = orig(host);
         o.margins = new int[]{m.leftMargin, m.topMargin, m.rightMargin, m.bottomMargin};
+        android.util.Log.i("QVK3Skin", "dock: content runs under the bar (" + m.bottomMargin + " px freed, " + host.getClass().getSimpleName() + ")");
         m.bottomMargin = 0;
         host.setLayoutParams(m);
     }

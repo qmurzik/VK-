@@ -179,12 +179,50 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
         });
     }
 
+    /** Hidden by QVK's «Скрыть диалог» and not revealed right now. */
+    static boolean hidden(long peer) {
+        try {
+            return HiddenDialogs.contains(peer) && !HiddenDialogs.revealed();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    static boolean hiddenSaved(long peer) {
+        try {
+            return HiddenDialogs.contains(peer);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private void menu() {
+        int hiddenCount;
+        boolean revealed;
+        try {
+            hiddenCount = HiddenDialogs.count();
+            revealed = HiddenDialogs.revealed();
+        } catch (Throwable t) {
+            hiddenCount = 0;
+            revealed = false;
+        }
+        String hiddenItem = hiddenCount == 0 ? "Скрытые чаты\nСкрыть чат: удержание чата → «Скрыть диалог»"
+                : revealed ? "Спрятать скрытые чаты" : "Показать скрытые чаты (" + hiddenCount + ")";
         Qvk3Ui.dialog(a).setTitle("Сообщения").setItems(new String[]{
                 "Отметить все прочитанными\nВо всех чатах с непрочитанными",
                 "Обновить\nЗагрузить список заново",
                 "Открыть мессенджер ВК\nШтатный экран ВКонтакте",
-                "Настройки мессенджера QVK"}, (d, w) -> {
+                "Настройки мессенджера QVK",
+                hiddenItem}, (d, w) -> {
+            if (w == 4) {
+                try {
+                    HiddenDialogs.toggle();
+                } catch (Throwable t) {
+                    RuntimeFaults.record("qvk3.im.reveal", t);
+                }
+                adapter.notifyDataSetChanged();
+                return;
+            }
             switch (w) {
                 case 0:
                     for (Qvk3ImModel.Conversation c : new ArrayList<>(store.conversations)) if (c.unread > 0) {
@@ -230,6 +268,17 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
             store.conversations.remove(c);
             store.byPeer.remove(c.peer);
         }));
+        boolean isHidden = hiddenSaved(c.peer);
+        items.add(isHidden ? "Показать диалог\nВернуть в общий список" : "Скрыть диалог\nСкрытые видны по «Показать скрытые» в меню");
+        acts.add(() -> {
+            try {
+                HiddenDialogs.toggle(c.peer);
+            } catch (Throwable t) {
+                RuntimeFaults.record("qvk3.im.hide", t);
+            }
+            adapter.notifyDataSetChanged();
+            Qvk3Ui.toast(a, isHidden ? "Диалог снова в списке" : "Диалог скрыт");
+        });
         items.add("Открыть в ВК\nШтатный экран чата");
         acts.add(() -> Qvk3ImEntry.openStock(a, c.peer));
         items.add("Удалить чат\nИстория удалится только у вас");
@@ -271,6 +320,7 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
             shown = new ArrayList<>();
             for (Qvk3ImModel.Conversation c : store.conversations) {
                 if (!query.isEmpty() && !Qvk3Lyrics.normal(c.title).contains(query)) continue;
+                if (hidden(c.peer)) continue; // BUG-0036: QVK's hidden chats stay hidden here too
                 shown.add(c);
             }
             super.notifyDataSetChanged();

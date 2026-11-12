@@ -218,7 +218,21 @@ public final class Qvk3MusicSource {
         JSONObject r = response("catalog.getAudio", args("need_blocks", "1"));
         trace.append("getAudio keys=").append(keys(r));
         JSONObject sec = r.optJSONObject("section");
-        List<Block> out = sec == null ? new ArrayList<>() : blocks(r, sec);
+        List<Block> out = new ArrayList<>();
+        // BUG-0010 (alpha37): the default section is «Моя музыка» for many accounts (10 recent tracks and nothing else);
+        // VK's picks — джемы, плейлисты дня, подборки, чарты — are in «Главная». Ask for that one first.
+        JSONObject cat0 = r.optJSONObject("catalog");
+        String mainId = homeSectionId(cat0);
+        if (mainId != null && (sec == null || !mainId.equals(sec.optString("id")))) {
+            try {
+                JSONObject rs = response("catalog.getSection", args("section_id", mainId));
+                out = blocks(rs, rs.optJSONObject("section"));
+                trace.append(" main=").append(mainId.length() > 12 ? mainId.substring(0, 12) : mainId).append(" blocks=").append(out.size());
+            } catch (Exception e) {
+                trace.append(" main failed: ").append(e.getClass().getSimpleName());
+            }
+        }
+        if (out.isEmpty() && sec != null) out = blocks(r, sec);
         trace.append(" section=").append(sec == null ? "-" : sec.optString("id")).append(" blocks=").append(out.size());
         if (out.isEmpty()) {
             // the home section by its id, then the first sections of the catalog until one has content
@@ -239,6 +253,21 @@ public final class Qvk3MusicSource {
         }
         lastHomeTrace = trace.toString();
         return out;
+    }
+
+    /** The «Главная» section of VK music (by title, then by a main / home / recommendations url). */
+    static String homeSectionId(JSONObject cat) {
+        JSONArray secs = cat == null ? null : cat.optJSONArray("sections");
+        if (secs == null) return null;
+        String byUrl = null;
+        for (int i = 0; i < secs.length(); i++) {
+            JSONObject o = secs.optJSONObject(i);
+            if (o == null || o.optString("id").isEmpty()) continue;
+            String t = o.optString("title").trim().toLowerCase(java.util.Locale.ROOT), u = o.optString("url").toLowerCase(java.util.Locale.ROOT);
+            if (t.equals("главная") || t.equals("main") || t.equals("home")) return o.optString("id");
+            if (byUrl == null && (u.contains("section=main") || u.contains("section=recoms") || u.contains("/main"))) byUrl = o.optString("id");
+        }
+        return byUrl;
     }
 
     static String keys(JSONObject o) {

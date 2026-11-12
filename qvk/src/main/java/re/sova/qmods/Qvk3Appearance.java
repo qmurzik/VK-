@@ -135,15 +135,17 @@ public final class Qvk3Appearance {
     }
 
     /** On a day ↔ night switch: the shape (components, radius, style) of the style chosen for that theme. */
-    static void syncShape(SharedPreferences p, boolean night) {
+    static boolean syncShape(SharedPreferences p, boolean night) {
         String own = p.getString(night ? SLOT_NIGHT : SLOT_DAY, "");
-        if (own.isEmpty()) return;
+        if (own.isEmpty()) return false;
         try {
             SharedPreferences.Editor e = p.edit();
             writeShape(e, new JSONObject(own));
-            e.apply();
+            e.commit();
+            return true;
         } catch (Exception ex) {
             RuntimeFaults.record("qvk3.appearance.syncShape", ex);
+            return false;
         }
     }
 

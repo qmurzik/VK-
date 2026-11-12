@@ -142,9 +142,14 @@ public final class Qvk3CoverFlowView extends View {
 
     /** Animated jump ("к текущему альбому"). */
     public void smoothScrollTo(int index) {
+        scrollTo(index, false);
+    }
+
+    /** BUG-0013: a slow swipe ends here too — the finger moved the covers, so the album it stops on is the user's choice. */
+    private void scrollTo(int index, boolean user) {
         if (items.isEmpty()) return;
         index = Math.max(0, Math.min(index, items.size() - 1));
-        byUser = false;
+        byUser = user;
         scroller.forceFinished(true);
         int from = Math.round(pos * UNIT);
         int dist = Math.round(index * UNIT) - from;
@@ -444,13 +449,13 @@ public final class Qvk3CoverFlowView extends View {
                     scroller.startScroll(start, 0, dist, 0, duration);
                     postInvalidateOnAnimation();
                 } else {
-                    smoothScrollTo(Math.round(pos));
+                    scrollTo(Math.round(pos), true);
                 }
                 recycle();
                 return true;
             }
             case MotionEvent.ACTION_CANCEL:
-                smoothScrollTo(Math.round(pos));
+                scrollTo(Math.round(pos), false);
                 recycle();
                 return true;
             default:
