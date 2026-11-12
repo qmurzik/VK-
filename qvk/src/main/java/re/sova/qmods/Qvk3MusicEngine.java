@@ -547,7 +547,7 @@ public final class Qvk3MusicEngine {
         boolean fade = Qvk3MusicSettings.smooth(app) && !player.isPlaying();
         player.setVolume(fade ? 0f : target, fade ? 0f : target);
         player.start();
-        if (fade) ramp(player, 0f, target, 300, null);
+        if (fade) ramp(player, 0f, target, 700, null); // BUG-0054: long enough to hear
         applySpeed();
         state = PLAYING;
         Qvk3MusicService.ensureRunning(app);
@@ -589,7 +589,7 @@ public final class Qvk3MusicEngine {
         }
         playWhenReady = false;
         final MediaPlayer mp = player;
-        ramp(mp, ducked ? 0.2f : 1f, 0f, 220, () -> {
+        ramp(mp, ducked ? 0.2f : 1f, 0f, 450, () -> {
             if (mp == player && !playWhenReady) pauseInternal(false);
         });
     }
@@ -601,11 +601,11 @@ public final class Qvk3MusicEngine {
             return;
         }
         final MediaPlayer mp = player;
-        ramp(mp, ducked ? 0.2f : 1f, 0f, 180, () -> {
+        ramp(mp, ducked ? 0.2f : 1f, 0f, 350, () -> {
             if (mp != player) return;
             change.run();
             // nothing to switch to (start / end of the queue) and still playing: bring the sound back
-            if (mp == player && safeIsPlaying()) ramp(mp, 0f, ducked ? 0.2f : 1f, 260, null);
+            if (mp == player && safeIsPlaying()) ramp(mp, 0f, ducked ? 0.2f : 1f, 500, null);
         });
     }
 

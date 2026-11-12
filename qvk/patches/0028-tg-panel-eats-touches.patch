@@ -1,0 +1,16 @@
+diff -ru a/smali_classes21/re/sova/qmods/TelegramPanel$State.smali b/smali_classes21/re/sova/qmods/TelegramPanel$State.smali
+--- a/smali_classes21/re/sova/qmods/TelegramPanel$State.smali	2026-11-12 09:41:01.884129048 +0000
++++ b/smali_classes21/re/sova/qmods/TelegramPanel$State.smali	2026-11-12 09:41:01.901848569 +0000
+@@ -300,6 +300,12 @@
+ 
+     iput-object v0, p0, Lre/sova/qmods/TelegramPanel$State;->overlay:Landroid/widget/LinearLayout;
+ 
++    # QVK 3.0 (BUG-0050): the panel lies over VK's sticker keyboard; taps on its empty parts fell through and sent
++    # a recent VK sticker. The panel keeps its touches.
++    const/4 v1, 0x1
++
++    invoke-virtual {v0, v1}, Landroid/view/View;->setClickable(Z)V
++
+     .line 191
+     iget-object v0, p0, Lre/sova/qmods/TelegramPanel$State;->overlay:Landroid/widget/LinearLayout;
+ 

@@ -54,6 +54,13 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
             listening = true;
         }
         onState(e);
+        // BUG-0053: right after resume the header is not laid out yet — look again shortly instead of on the next tick
+        View root = a.getWindow() != null ? a.getWindow().getDecorView() : null;
+        if (root != null) for (long d : new long[]{150, 600}) root.postDelayed(() -> {
+            if (resumed.get() != a || button.get() != null) return;
+            lastLook = 0;
+            onState(e);
+        }, d);
     }
 
     @Override
@@ -84,7 +91,7 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
         if (b == null) {
             if (!show) return;
             long now = SystemClock.uptimeMillis();
-            if (now - lastLook < 3000) return;
+            if (now - lastLook < 800) return; // BUG-0053: was 3 s — the button came late
             lastLook = now;
             b = attach(a, e);
             if (b == null) return;
@@ -113,7 +120,7 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
             int depth = d.poll();
             if (v.getVisibility() != View.VISIBLE) continue;
             if (v instanceof ViewGroup && v.getId() != View.NO_ID && headerName(a, v.getId())
-                    && v.getWidth() >= screenW * 0.85f && v.getHeight() >= Qvk3Ui.dp(a, 44) && v.getHeight() <= Qvk3Ui.dp(a, 84)
+                    && v.getWidth() >= screenW * 0.7f && v.getHeight() >= Qvk3Ui.dp(a, 44) && v.getHeight() <= Qvk3Ui.dp(a, 84)
                     && v.isShown() && v.getGlobalVisibleRect(r) && r.top < maxTop && r.height() > Qvk3Ui.dp(a, 30)) return v;
             if (v instanceof ViewGroup && depth < 16) {
                 ViewGroup g = (ViewGroup) v;
@@ -146,10 +153,18 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
         try {
             View head = findHeader(a);
             if (head == null) return null;
-            ViewGroup container;
+            ViewGroup container = null;
             if (free((ViewGroup) head) && !head.getClass().getName().contains("Toolbar")) container = (ViewGroup) head;
-            else if (head.getParent() instanceof ViewGroup && free((ViewGroup) head.getParent())) container = (ViewGroup) head.getParent();
-            else return null;
+            else {
+                // BUG-0053: «Чаты» keep the Toolbar in a horizontal LinearLayout — use the nearest free ancestor
+                View content = a.findViewById(android.R.id.content);
+                for (android.view.ViewParent v = head.getParent(); v instanceof ViewGroup && container == null; v = v.getParent()) {
+                    if (free((ViewGroup) v)) container = (ViewGroup) v;
+                    if (v == content) break;
+                }
+            }
+            if (container == null) return null;
+            final ViewGroup host = container;
             int tint = 0xFF888888;
             ImageTint:
             for (View v : rightIcons(head)) {
@@ -172,8 +187,10 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
                 return true;
             });
             int size = Qvk3Ui.dp(a, 44);
-            container.addView(b, size, size);
-            Runnable place = () -> position(container, head, b);
+            int plate = headerColor(head);
+            if (plate != 0) b.setPlate(plate);
+            container.addView(b, plate != 0 ? size + Qvk3Ui.dp(a, 20) : size, size);
+            Runnable place = () -> position(host, head, b);
             View.OnLayoutChangeListener l = (v, x1, y1, x2, y2, o1, o2, o3, o4) -> place.run();
             head.addOnLayoutChangeListener(l);
             b.addOnLayoutChangeListener(l);
@@ -199,6 +216,22 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
             RuntimeFaults.record("qvk3.feedNow.attach", t);
             return null;
         }
+    }
+
+    /** Opaque colour of the header (or the nearest ancestor that paints one); 0 when unknown. */
+    static int headerColor(View head) {
+        for (View v = head; v != null; v = v.getParent() instanceof View ? (View) v.getParent() : null) {
+            android.graphics.drawable.Drawable d = v.getBackground();
+            if (d instanceof android.graphics.drawable.ColorDrawable) {
+                int c = ((android.graphics.drawable.ColorDrawable) d).getColor();
+                if ((c >>> 24) == 0xFF) return c;
+            }
+            if (d instanceof android.graphics.drawable.GradientDrawable && d.getConstantState() != null) {
+                android.content.res.ColorStateList cs = ((android.graphics.drawable.GradientDrawable) d).getColor();
+                if (cs != null && (cs.getDefaultColor() >>> 24) == 0xFF) return cs.getDefaultColor();
+            }
+        }
+        return 0;
     }
 
     /** Visible icon-like views in the right half of the header (one level of nesting: action menus, button containers). */

@@ -52,6 +52,7 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
     private final TextView contextTitle, contextText;
     private final TextView cantWrite;
     private final TextView toBottom;
+    private boolean built;
     private final LinearLayout selectionBar;
     private final TextView selectionCount;
     private boolean loadingOlder, firstLoad = true;
@@ -148,6 +149,8 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
 
             @Override
             public void onScroll(AbsListView v, int first, int visible, int total) {
+                // BUG-0051/0052: Android 16 calls onScroll inside setOnScrollListener, before the rest is built
+                if (!built) return;
                 if (first <= 3 && total > 0 && !firstLoad) loadOlder();
                 boolean atBottom = first + visible >= total - 1;
                 toBottom.setVisibility(atBottom ? GONE : VISIBLE);
@@ -235,6 +238,7 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
         cantWrite.setVisibility(GONE);
         addView(cantWrite, Qvk3Ui.match());
         composerHolder = composer;
+        built = true;
 
         String draft = Qvk3ImDrafts.get(a, peer);
         if (!draft.isEmpty()) {

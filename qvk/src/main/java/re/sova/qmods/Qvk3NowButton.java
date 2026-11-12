@@ -18,6 +18,15 @@ final class Qvk3NowButton extends View {
     private float progress;
     private boolean playing;
     private Drawable icon;
+    /** BUG-0053: header colour under the button with a soft left edge, so a long title fades out instead of overlapping. */
+    private int plate;
+    private final Paint platePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    void setPlate(int color) {
+        plate = color;
+        platePaint.setShader(null);
+        invalidate();
+    }
 
     Qvk3NowButton(Context c, int color, int accent) {
         super(c);
@@ -47,11 +56,24 @@ final class Qvk3NowButton extends View {
     }
 
     @Override
+    protected void onSizeChanged(int w, int h, int ow, int oh) {
+        super.onSizeChanged(w, h, ow, oh);
+        platePaint.setShader(null);
+    }
+
+    @Override
     protected void onDraw(Canvas c) {
         float s = Math.min(getWidth(), getHeight()), stroke = s * 0.07f, pad = s * 0.16f;
         track.setStrokeWidth(stroke);
         arc.setStrokeWidth(stroke);
-        float cx = getWidth() / 2f, cy = getHeight() / 2f, rad = s / 2f - pad;
+        if ((plate >>> 24) != 0) {
+            float fade = Math.max(1f, getWidth() - s);
+            if (platePaint.getShader() == null)
+                platePaint.setShader(new android.graphics.LinearGradient(0, 0, fade, 0, plate & 0x00FFFFFF, plate, android.graphics.Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, getWidth(), getHeight(), platePaint);
+        }
+        // the ring sits at the right end; the extra width on the left is the fade
+        float cx = getWidth() - s / 2f, cy = getHeight() / 2f, rad = s / 2f - pad;
         r.set(cx - rad, cy - rad, cx + rad, cy + rad);
         c.drawOval(r, track);
         if (progress > 0f) c.drawArc(r, -90f, 360f * progress, false, arc);
