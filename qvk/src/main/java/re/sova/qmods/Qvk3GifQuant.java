@@ -25,12 +25,13 @@ public final class Qvk3GifQuant {
             int x = i % width, y = i / width;
             float t = (BAYER[(y & 7) * 8 + (x & 7)] + 0.5f) / 64f;    // 0..1
             int c = argb[i];
-            int a = c >>> 24;
-            if (a * (1f / 255f) <= t * 0.98f + 0.01f) {
-                argb[i] = 0;                                         // transparent at this spot of the pattern
-                continue;
-            }
-            int r = level((c >> 16) & 255, 7, t), g = level((c >> 8) & 255, 7, t), b = level(c & 255, 3, t);
+            // BUG-0015 (2): VK turns the GIF into a video and paints transparent pixels black or white at random, so
+            // animated stickers showed «outlines on black». Every pixel is composited over white instead: one steady
+            // white background in all frames, soft edges kept.
+            float a = (c >>> 24) / 255f;
+            int r0 = Math.round(((c >> 16) & 255) * a + 255 * (1 - a)), g0 = Math.round(((c >> 8) & 255) * a + 255 * (1 - a)),
+                    b0 = Math.round((c & 255) * a + 255 * (1 - a));
+            int r = level(r0, 7, t), g = level(g0, 7, t), b = level(b0, 3, t);
             argb[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
         }
     }

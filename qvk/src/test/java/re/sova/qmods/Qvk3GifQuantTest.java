@@ -28,16 +28,19 @@ public class Qvk3GifQuantTest {
     }
 
     @Test
-    public void halfTransparentBecomesAStipple() {
+    public void transparencyBecomesSteadyWhite() {
         int w = 64, h = 64;
         int[] px = new int[w * h];
-        java.util.Arrays.fill(px, 0x80FFFFFF);
+        java.util.Arrays.fill(px, 0x80000000);           // half-transparent black → mid grey over white
         Qvk3GifQuant.prepare(px, w);
-        int visible = 0;
-        for (int c : px) if ((c >>> 24) >= 128) visible++;
-        assertTrue(visible > px.length * 0.4 && visible < px.length * 0.6);
+        long sum = 0;
+        for (int c : px) {
+            assertEquals(0xFF, c >>> 24);                  // nothing transparent: VK cannot fill it with black
+            sum += (c >> 8) & 255;
+        }
+        assertEquals(128, sum / px.length, 10);
         int[] clear = new int[16];
         Qvk3GifQuant.prepare(clear, 4);
-        for (int c : clear) assertEquals(0, c);
+        for (int c : clear) assertTrue(((c >> 8) & 255) > 230); // fully transparent → white
     }
 }
