@@ -21,6 +21,7 @@ final class Qvk3NewBadge {
             {"qvk3:report", 23830L}, {"qvk3:myTickets", 23830L}, {"qvk3:ideas", 23830L}, {"qvk3:channel", 23830L},
             {"qvk3:settingsCode", 23833L},
             {"qvk3:about", 23835L},     // remote switch-offs are listed there
+            {"qvk3:searchTabs", 23836L}, // BUG-0048: rebuilt per-tab editor
     };
 
     private Qvk3NewBadge() {
