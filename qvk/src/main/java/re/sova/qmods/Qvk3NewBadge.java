@@ -22,6 +22,7 @@ final class Qvk3NewBadge {
             {"qvk3:settingsCode", 23833L},
             {"qvk3:about", 23835L},     // remote switch-offs are listed there
             {"qvk3:searchTabs", 23836L}, // BUG-0048: rebuilt per-tab editor
+            {"qvk3:quick", 23837L},      // IDEA-0023
     };
 
     private Qvk3NewBadge() {

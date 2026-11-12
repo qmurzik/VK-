@@ -34,7 +34,8 @@ public final class Qvk3SplashWeather {
     static final String TEMP = "qvk3_weather_temp", CODE = "qvk3_weather_code", AT = "qvk3_weather_at";
     /** BUG-0028: a city typed by the user when Android has no last known location (or location is not allowed). */
     static final String CITY = "qvk3_weather_city", CITY_LAT = "qvk3_weather_lat", CITY_LON = "qvk3_weather_lon";
-    static final long FRESH = 30 * 60_000L, SHOW_MAX_AGE = 6 * 3_600_000L;
+    static final long FRESH = 30 * 60_000L, SHOW_MAX_AGE = 24 * 3_600_000L; // alpha37: a 6-hour-old reading is better than nothing
+    static final String LAST_ERROR = "qvk3_weather_error";
     private static volatile boolean loading;
 
     private Qvk3SplashWeather() {
@@ -55,7 +56,24 @@ public final class Qvk3SplashWeather {
                 // BUG-0028: say why there is no weather instead of silently showing nothing
                 boolean noPlace = p.getString(CITY, "").isEmpty() && systemLocation(a) == null;
                 android.util.Log.i("QVK3Weather", "splash: no fresh weather (at=" + at + ", noPlace=" + noPlace + ")");
-                if (!noPlace) return delay;
+                if (!noPlace) {
+                    // BUG-0028: the place is known but nothing has loaded yet — say so instead of a silent logo
+                    ViewGroup r1 = a.findViewById(android.R.id.content);
+                    if (r1 != null && r1.getChildCount() > 0 && r1.getChildAt(0) instanceof FrameLayout) {
+                        String err = p.getString(LAST_ERROR, "");
+                        TextView hint = new TextView(a);
+                        hint.setText(err.isEmpty() ? "Погода загружается…" : "Погода: нет связи с сервисом погоды");
+                        hint.setTextSize(13);
+                        TextView logo1 = findText(r1.getChildAt(0), "QVK");
+                        hint.setTextColor(logo1 == null ? 0xCCFFFFFF : (logo1.getCurrentTextColor() & 0x00FFFFFF) | 0xAA000000);
+                        hint.setGravity(Gravity.CENTER);
+                        FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM);
+                        hl.bottomMargin = Qvk3Ui.dp(a, 120);
+                        ((FrameLayout) r1.getChildAt(0)).addView(hint, hl);
+                        return delay + 400;
+                    }
+                    return delay;
+                }
                 ViewGroup root0 = a.findViewById(android.R.id.content);
                 if (root0 == null || root0.getChildCount() == 0 || !(root0.getChildAt(0) instanceof FrameLayout)) return delay;
                 TextView hint = new TextView(a);
@@ -145,15 +163,28 @@ public final class Qvk3SplashWeather {
                     android.util.Log.i("QVK3Weather", "refresh: no location (no city, no last known location or no permission)");
                     return;
                 }
-                String url = String.format(Locale.ROOT,
-                        "https://api.open-meteo.com/v1/forecast?latitude=%.1f&longitude=%.1f&current=temperature_2m,weather_code",
-                        l.getLatitude(), l.getLongitude());
-                JSONObject cur = new JSONObject(get(url)).getJSONObject("current");
-                p.edit().putFloat(TEMP, (float) cur.getDouble("temperature_2m")).putInt(CODE, cur.optInt("weather_code", -1))
-                        .putLong(AT, System.currentTimeMillis()).apply();
-                android.util.Log.i("QVK3Weather", "refresh: ok " + temperature((float) cur.getDouble("temperature_2m")));
+                float temp;
+                int code;
+                try {
+                    String url = String.format(Locale.ROOT,
+                            "https://api.open-meteo.com/v1/forecast?latitude=%.1f&longitude=%.1f&current=temperature_2m,weather_code",
+                            l.getLatitude(), l.getLongitude());
+                    JSONObject cur = new JSONObject(get(url)).getJSONObject("current");
+                    temp = (float) cur.getDouble("temperature_2m");
+                    code = cur.optInt("weather_code", -1);
+                } catch (Throwable first) {
+                    // BUG-0028: Open-Meteo is not reachable from every network — a second service, temperature only
+                    android.util.Log.w("QVK3Weather", "open-meteo failed (" + first + "), trying wttr.in");
+                    String url = String.format(Locale.ROOT, "https://wttr.in/%.1f,%.1f?format=j1", l.getLatitude(), l.getLongitude());
+                    JSONObject cur = new JSONObject(get(url)).getJSONArray("current_condition").getJSONObject(0);
+                    temp = (float) cur.getDouble("temp_C");
+                    code = -1;
+                }
+                p.edit().putFloat(TEMP, temp).putInt(CODE, code).putLong(AT, System.currentTimeMillis()).remove(LAST_ERROR).apply();
+                android.util.Log.i("QVK3Weather", "refresh: ok " + temperature(temp));
             } catch (Throwable t) {
                 android.util.Log.w("QVK3Weather", "refresh failed: " + t);
+                p.edit().putString(LAST_ERROR, String.valueOf(t.getMessage())).apply();
                 RuntimeFaults.record("qvk3.weather.refresh", t);
             } finally {
                 loading = false;
@@ -198,7 +229,7 @@ public final class Qvk3SplashWeather {
         try {
             if (con.getResponseCode() != 200) throw new java.io.IOException("HTTP " + con.getResponseCode());
             try (InputStream in = con.getInputStream()) {
-                byte[] b = new byte[16384];
+                byte[] b = new byte[256 * 1024]; // wttr.in answers ~50 KB
                 int n = Qvk3Id3.readFully(in, b);
                 return new String(b, 0, n, "UTF-8");
             }
@@ -215,10 +246,11 @@ public final class Qvk3SplashWeather {
         long at = p.getLong(AT, 0);
         String state = !on ? "Сейчас выключено." : at > 0 ? "Последняя погода: " + temperature(p.getFloat(TEMP, 0f)) + " " + sky(p.getInt(CODE, -1))
                 + (city.isEmpty() ? "" : " · " + city) : (city.isEmpty() && systemLocation(a) == null
-                ? "Погоды пока нет: Android не знает местоположения. Укажите город." : "Погода загрузится в фоне и появится при следующем запуске.");
+                ? "Погоды пока нет: Android не знает местоположения. Укажите город." : !p.getString(LAST_ERROR, "").isEmpty()
+                ? "Погода не загрузилась: " + p.getString(LAST_ERROR, "") + ". QVK попробует снова при следующем запуске." : "Погода загрузится в фоне и появится при следующем запуске.");
         String msg = state + "\n\nПод логотипом QVK при запуске с иконки — температура, в дождь, снег или грозу — подпись.\n\n"
                 + "Откуда берётся: " + (city.isEmpty() ? "последнее известное Android местоположение (GPS не включается)" : "город «" + city + "»")
-                + ". Округлённые координаты (около 10 км) уходят в сервис погоды Open-Meteo, без аккаунта и ключа. Обновление — не чаще раза в 30 минут, в фоне; запуск сеть не ждёт.";
+                + ". Округлённые координаты (около 10 км) уходят в сервис погоды Open-Meteo (если он недоступен — wttr.in), без аккаунта и ключа. Обновление — не чаще раза в 30 минут, в фоне; запуск сеть не ждёт.";
         Qvk3Ui.dialog(a).setTitle("Погода на экране запуска").setMessage(msg)
                 .setPositiveButton(on ? "Выключить" : "Включить", (d, w) -> {
                     p.edit().putBoolean(PREF, !on).apply();

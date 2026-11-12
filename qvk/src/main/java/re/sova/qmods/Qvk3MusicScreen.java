@@ -589,6 +589,27 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             ((Row) o).longClick.run();
             return true;
         });
+        // IDEA-0024: swipe left / right on a section switches to the neighbouring one, like VK's own music tabs
+        android.view.GestureDetector swipe = new android.view.GestureDetector(a, new android.view.GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
+                if (e1 == null || !back.isEmpty()) return false;
+                float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
+                if (Math.abs(dx) < Qvk3Ui.dp(a, 90) || Math.abs(dx) < Math.abs(dy) * 2 || Math.abs(vx) < 700) return false;
+                int next = tab + (dx < 0 ? 1 : -1);
+                if (next < 0 || next >= TABS.length) return false;
+                list.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                selectTab(next);
+                View chip = tabs.getChildAt(next);
+                if (chip != null && tabs.getParent() instanceof HorizontalScrollView)
+                    ((HorizontalScrollView) tabs.getParent()).smoothScrollTo(Math.max(0, chip.getLeft() - Qvk3Ui.dp(a, 24)), 0);
+                return true;
+            }
+        });
+        list.setOnTouchListener((v, e) -> {
+            swipe.onTouchEvent(e);
+            return false; // the list keeps scrolling and taps as before
+        });
         if (embedded) {
             list.setClipToPadding(false);
             list.setPadding(0, 0, 0, Qvk3Ui.dp(a, 8)); // room for the floating mini-player and VK's bottom bar

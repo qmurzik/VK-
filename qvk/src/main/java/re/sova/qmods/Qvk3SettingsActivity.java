@@ -269,6 +269,7 @@ public final class Qvk3SettingsActivity extends Activity {
     static Qvk3SettingsIndex buildIndex(Activity a) {
         Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
         // QVK 3.0 items first so they lead their cards
+        idx.addScreen("qvk3:quick", "Быстрые настройки", "Главное в одном окне: код настроек, стиль, реклама, QVK Music, оболочка, стикеры, нижняя панель", 0, "QVK 3.0");
         idx.addScreen("qvk3:styles", "Стили и конструктор", "8 стилей, цвета, форма, шрифт, плотность — с живым предпросмотром", 0, "QVK 3.0");
         idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
         idx.addScreen("qvk3:settingsCode", "Код настроек", "Все переключатели QVK одной короткой строкой: скопировать, поделиться, вставить", 7, "Резервные копии");
@@ -868,6 +869,9 @@ public final class Qvk3SettingsActivity extends Activity {
             case "ideas":
                 Qvk3MyTickets.ideas(this);
                 break;
+            case "quick":
+                quick();
+                break;
             case "settingsCode":
                 settingsCode();
                 break;
@@ -1072,6 +1076,116 @@ public final class Qvk3SettingsActivity extends Activity {
     }
 
     /** IDEA-0017: every switch in one short code; paste applies it after showing how many settings change. */
+    // ------------------------------------------------------------------ IDEA-0023: «Быстрые настройки»
+
+    private TextView quickTile(String title, String sub, int color, Runnable click) {
+        TextView t = Qvk3Ui.text(this, title + (sub == null ? "" : "\n" + sub), 15, Color.WHITE, true);
+        t.setGravity(android.view.Gravity.CENTER);
+        t.setPadding(dp(10), dp(14), dp(10), dp(14));
+        t.setBackground(Qvk3Ui.ripple(this, color, 0x33FFFFFF, dp(18)));
+        t.setOnClickListener(v -> click.run());
+        return t;
+    }
+
+    private LinearLayout quickPair(View l, View r) {
+        LinearLayout row = new LinearLayout(this);
+        row.setBaselineAligned(false);
+        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, -1, 1f), b = new LinearLayout.LayoutParams(0, -1, 1f);
+        a.rightMargin = dp(5);
+        b.leftMargin = dp(5);
+        row.addView(l, a);
+        row.addView(r, b);
+        row.setPadding(0, 0, 0, dp(10));
+        return row;
+    }
+
+    private void go(android.app.Dialog d, String route) {
+        d.dismiss();
+        try {
+            qvk3(route);
+        } catch (Throwable e) {
+            Qvk3Ui.toast(this, "Не удалось открыть: " + Qvk3Jobs.message(e));
+        }
+    }
+
+    /** Switches of the catalogue that hide ads (title says so); «on» = ads hidden. */
+    private java.util.List<Qvk3SettingsIndex.Item> adSwitches() {
+        java.util.List<Qvk3SettingsIndex.Item> out = new java.util.ArrayList<>();
+        for (Qvk3SettingsIndex.Item it : index.all()) {
+            if (it.type != Qvk3SettingsIndex.SWITCH || it.key == null) continue;
+            String t = Qvk3SettingsIndex.normal(it.title);
+            boolean ads = t.contains("реклам") || t.contains("промо") || t.contains("баннер") || t.contains("предложения подписки");
+            boolean hides = t.startsWith("скры") || t.startsWith("убра") || t.startsWith("отключ") || t.startsWith("блок") || t.startsWith("без ");
+            if (ads && hides) out.add(it);
+        }
+        return out;
+    }
+
+    private void quick() {
+        android.app.Dialog[] dlg = new android.app.Dialog[1];
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(20), dp(4), dp(20), dp(8));
+        int acc = p.accent, acc2 = 0xFF000000 | ((((p.accent >> 16) & 255) * 3 / 4) << 16) | ((((p.accent >> 8) & 255) * 3 / 4) << 8) | ((p.accent & 255) * 3 / 4);
+        col.addView(Qvk3Sheet.section(this, p, "Код настроек"));
+        col.addView(quickPair(
+                quickTile("Скопировать", "все переключатели", acc, () -> {
+                    String code = Qvk3SettingsCode.encode(this::switchValue);
+                    getSystemService(android.content.ClipboardManager.class).setPrimaryClip(android.content.ClipData.newPlainText("QVK", code));
+                    Qvk3Ui.toast(this, "Скопировано в буфер обмена");
+                }),
+                quickTile("Вставить", "код с другого телефона", acc2, () -> {
+                    dlg[0].dismiss();
+                    pasteSettingsCode();
+                })));
+        col.addView(Qvk3Sheet.section(this, p, "Оформление"));
+        col.addView(quickPair(
+                quickTile("Стили и темы", "выбрать и настроить", acc, () -> go(dlg[0], "styles")),
+                quickTile("День и ночь", "режим и цвета", acc2, () -> go(dlg[0], "dayNight"))));
+        LinearLayout g = Qvk3Sheet.group(this, p);
+        java.util.List<Qvk3SettingsIndex.Item> ads = adSwitches();
+        boolean allOff = !ads.isEmpty();
+        for (Qvk3SettingsIndex.Item it : ads) allOff &= value(it);
+        g.addView(Qvk3Sheet.switchRow(this, p, "Скрыть всю рекламу", ads.size() + " переключателей рекламы QVK (клипы в ленте не трогаются)", allOff, on -> {
+            for (Qvk3SettingsIndex.Item it : ads) if (value(it) != on) flip(it);
+            Qvk3Ui.toast(this, on ? "Реклама скрыта" : "Переключатели рекламы выключены");
+        }));
+        g.addView(Qvk3Sheet.divider(this, p));
+        g.addView(Qvk3Sheet.switchRow(this, p, "QVK Music", "Свой плеер и интерфейс музыки вместо раздела ВК", Qvk3MusicSettings.enabled(this), on -> {
+            Qvk3SettingsHistory.before(this, Qvk3MusicSettings.ENABLED, on ? "QVK Music включён" : "QVK Music выключен");
+            Qvk3MusicSettings.prefs(this).edit().putBoolean(Qvk3MusicSettings.ENABLED, on).apply();
+        }));
+        g.addView(Qvk3Sheet.divider(this, p));
+        g.addView(Qvk3Sheet.switchRow(this, p, "Оболочка QVK при запуске", "Свой экран «Чаты / Музыка / Ещё» вместо ВК", Qvk3Shell.enabledByUser(this), on -> {
+            Qvk3SettingsHistory.before(this, Qvk3ShellActivity.ENABLED, on ? "Оболочка QVK при старте включена" : "Оболочка QVK при старте выключена");
+            Qvk3MusicSettings.prefs(this).edit().putBoolean(Qvk3ShellActivity.ENABLED, on).apply();
+        }));
+        col.addView(g);
+        LinearLayout nav = Qvk3Sheet.group(this, p);
+        nav.addView(Qvk3Sheet.navRow(this, p, "Уведомления QVK", v -> go(dlg[0], "push")));
+        nav.addView(Qvk3Sheet.divider(this, p));
+        nav.addView(Qvk3Sheet.navRow(this, p, "Стикеры из Telegram", v -> {
+            dlg[0].dismiss();
+            try {
+                startActivity(new Intent(this, TelegramStickersActivity.class));
+            } catch (Throwable e) {
+                Qvk3Ui.toast(this, "Не удалось открыть: " + Qvk3Jobs.message(e));
+            }
+        }));
+        nav.addView(Qvk3Sheet.divider(this, p));
+        nav.addView(Qvk3Sheet.navRow(this, p, "Нижняя панель ВК", v -> go(dlg[0], "dock")));
+        nav.addView(Qvk3Sheet.divider(this, p));
+        nav.addView(Qvk3Sheet.navRow(this, p, "Найти настройку…", v -> {
+            dlg[0].dismiss();
+            search.requestFocus();
+            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(search, 0);
+        }));
+        LinearLayout.LayoutParams nl = Qvk3Ui.match();
+        nl.topMargin = dp(10);
+        col.addView(nav, nl);
+        dlg[0] = Qvk3Ui.dialog(this).setTitle("Быстрые настройки").setView(col).setPositiveButton("Готово", (d, w) -> refresh()).show();
+    }
+
     private void settingsCode() {
         String code = Qvk3SettingsCode.encode(this::switchValue);
         LinearLayout col = new LinearLayout(this);

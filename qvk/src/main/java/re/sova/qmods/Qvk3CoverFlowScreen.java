@@ -299,9 +299,10 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         flow.setVisibility(VISIBLE);
         empty.setVisibility(GONE);
         // BUG-0025: the album, not its (re-signed every time) link, is the cache identity of the cover
+        // (alpha37: the identity was «pl:…» once the playlists had loaded and «album:…» before — after a restart the
+        // other one was used and every cover came from the network again. One identity per album, always.)
         for (Qvk3MusicLibrary.Group g : list) {
-            Qvk3MusicSource.Playlist src = sources.get(g);
-            Qvk3Images.alias(g.cover, src != null ? "pl:" + src.key() : "album:" + g.artist + "|" + g.name);
+            Qvk3Images.alias(g.cover, "album:" + g.artist.trim().toLowerCase(java.util.Locale.ROOT) + "|" + g.name.trim().toLowerCase(java.util.Locale.ROOT));
         }
         List<Qvk3CoverFlowView.Item> items = new ArrayList<>();
         for (Qvk3MusicLibrary.Group g : albums) items.add(new Qvk3CoverFlowView.Item(g.cover, g.name, label(g)));
