@@ -378,6 +378,8 @@ public final class Qvk3SettingsActivity extends Activity {
             trailing = chev;
             chev.setLayoutParams(new LinearLayout.LayoutParams(dp(20), dp(20)));
         }
+        // a plain View added with wrap_content measures to the scroll viewport's height on real devices (BUG-0029/0031)
+        if (trailing.getLayoutParams() == null && trailing.getClass() == View.class) trailing.setLayoutParams(new LinearLayout.LayoutParams(0, 0));
         r.addView(trailing);
         if (click != null) r.setOnClickListener(v -> click.run());
         if (longClick != null) r.setOnLongClickListener(v -> {
@@ -410,6 +412,30 @@ public final class Qvk3SettingsActivity extends Activity {
         }
     }
 
+    /** BUG-0029/0031 diagnostics: a card taller than the screen is written to the log with the sizes of its rows. */
+    private void reportTallCards() {
+        int vh = scroll.getHeight();
+        if (vh <= 0) return;
+        for (int i = 0; i < content.getChildCount(); i++) {
+            View v = content.getChildAt(i);
+            if (v.getHeight() <= vh * 0.9f) continue;
+            StringBuilder b = new StringBuilder("tall card #" + i + " of " + content.getChildCount() + " in «" + title.getText() + "»: h=" + v.getHeight() + " viewport=" + vh);
+            if (v instanceof android.view.ViewGroup) {
+                android.view.ViewGroup g = (android.view.ViewGroup) v;
+                for (int k = 0; k < g.getChildCount() && k < 40; k++) {
+                    View c = g.getChildAt(k);
+                    b.append(" | ").append(c.getClass().getSimpleName()).append(' ').append(c.getHeight());
+                    if (c instanceof android.view.ViewGroup) for (int j = 0; j < ((android.view.ViewGroup) c).getChildCount(); j++) {
+                        View cc = ((android.view.ViewGroup) c).getChildAt(j);
+                        b.append(j == 0 ? " [" : ",").append(cc.getClass().getSimpleName()).append(' ').append(cc.getWidth()).append('x').append(cc.getHeight());
+                        if (j == ((android.view.ViewGroup) c).getChildCount() - 1) b.append(']');
+                    }
+                }
+            }
+            android.util.Log.w("QVK3Settings", b.toString());
+        }
+    }
+
     private void begin(String heading, String sub, boolean home) {
         content.removeAllViews();
         boolean changed = !heading.contentEquals(title.getText());
@@ -431,6 +457,7 @@ public final class Qvk3SettingsActivity extends Activity {
         content.postDelayed(() -> {
             content.setAlpha(1f);
             content.setTranslationX(0f);
+            reportTallCards();
             for (int i = 0; i < content.getChildCount(); i++) {
                 View v = content.getChildAt(i);
                 if (v.getAlpha() < 1f) {
@@ -565,7 +592,7 @@ public final class Qvk3SettingsActivity extends Activity {
             line.addView(sectionTile(order[k]), Qvk3Ui.weight(1));
             line.addView(gap());
             if (k + 1 < order.length) line.addView(sectionTile(order[k + 1]), Qvk3Ui.weight(1));
-            else line.addView(new View(this), Qvk3Ui.weight(1));
+            else line.addView(new View(this), new LinearLayout.LayoutParams(0, 0, 1f)); // a bare View with wrap_content takes the whole viewport height on devices (BUG-0031)
             content.addView(line, ll);
         }
         TextView hint = Qvk3Ui.text(this, "Удерживайте настройку, чтобы добавить её в избранное.", 13, p.text2, false);
@@ -689,9 +716,18 @@ public final class Qvk3SettingsActivity extends Activity {
             if (first == null && !switches.isEmpty()) first = switches.get(0);
         }
         if (first != null) {
-            LinearLayout c = card();
-            ((LinearLayout.LayoutParams) c.getLayoutParams()).topMargin = dp(24);
-            row(c, null, 0, "Сбросить переключатели раздела", "Вернуть значения по умолчанию; PIN не сбрасывается", new View(this), () -> resetSection(s), null);
+            // BUG-0029/0031: a quiet text action instead of a whole card — on some phones that last card grew into a screen of white
+            TextView reset = Qvk3Ui.text(this, "Сбросить переключатели раздела", 14, p.text2, false);
+            reset.setGravity(Gravity.CENTER);
+            reset.setPadding(dp(16), dp(14), dp(16), dp(14));
+            reset.setMinHeight(dp(48));
+            reset.setBackground(Qvk3Ui.ripple(this, 0, p.dark ? 0x22FFFFFF : 0x14000000, dp(14)));
+            reset.setContentDescription("Сбросить переключатели раздела. Вернуть значения по умолчанию; PIN не сбрасывается");
+            reset.setOnClickListener(v -> resetSection(s));
+            LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(-2, -2);
+            rl.gravity = Gravity.CENTER_HORIZONTAL;
+            rl.topMargin = dp(16);
+            content.addView(reset, rl);
         }
     }
 
