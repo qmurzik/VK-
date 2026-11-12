@@ -269,18 +269,12 @@ public final class Qvk3SettingsActivity extends Activity {
     static Qvk3SettingsIndex buildIndex(Activity a) {
         Qvk3SettingsIndex idx = new Qvk3SettingsIndex();
         // QVK 3.0 items first so they lead their cards
-        idx.addScreen("qvk3:quick", "Быстрые настройки", "Главное в одном окне: код настроек, стиль, реклама, QVK Music, оболочка, стикеры, нижняя панель", 0, "QVK 3.0");
-        idx.addScreen("qvk3:styles", "Стили и конструктор", "8 стилей, цвета, форма, шрифт, плотность — с живым предпросмотром", 0, "QVK 3.0");
-        idx.addScreen("qvk3:scenarios", "Сценарии", "Обычный, Работа, Ночь, Музыка, Фокус и свои", 0, "QVK 3.0");
+        idx.addScreen("qvk3:quick", "Быстрые настройки", "Главное в одном окне: код настроек, тема, реклама, QVK Music, оболочка, стикеры", 0, "QVK 3.0");
         idx.addScreen("qvk3:settingsCode", "Код настроек", "Все переключатели QVK одной короткой строкой: скопировать, поделиться, вставить", 7, "Резервные копии");
-        idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
-        idx.addScreen("qvk3:dock", "Нижняя панель ВК", "Плавающая, скруглённая, полупрозрачная — настоящая панель ВК", 0, "Интерфейс ВК");
+        idx.addScreen("qvk3:resetLook", "Сбросить тему", "Вернуть тему к предустановленной; данные не затрагиваются", 0, "Темы и цвета");
         idx.addScreen("qvk3:searchTabs", "Разделы поиска ВК", "Скрыть ненужные вкладки поиска: игры, клипы, товары, сервисы", 1, "Интерфейс ВК");
         idx.addSwitch(Qvk3ImEntry.PREF, "Мессенджер QVK (бета)", "Свой список чатов и экран чата QVK вместо штатных: ответы, пересылка, реакции, правка, голосовые, фото и файлы, черновики, свайп для ответа. Звонки и настройки бесед — в ВК", 2, "Мессенджер QVK", false);
         idx.addSwitch(Qvk3SendRetry.PREF, "Повторять неотправленное", "Если фото, видео, файл или сообщение не ушли — QVK сам повторит отправку (до 2 раз, когда есть сеть)", 2, "Чаты и диалоги", true);
-        idx.addScreen("qvk3:pick", "Настроить элемент касанием", "Коснитесь любого элемента ВК: скрыть, скруглить, прозрачность, цвет", 0, "Интерфейс ВК");
-        idx.addScreen("qvk3:rules", "Правила интерфейса ВК", "Скрыть, скруглить, перекрасить любой элемент по его имени", 0, "Интерфейс ВК");
-        idx.addScreen("qvk3:inspect", "Инспектор интерфейса", "Снять список элементов экрана ВК — для правил и для разработчика", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:music", "Открыть QVK Music", "Собственный музыкальный раздел и плеер", 4, "QVK Music");
         idx.addSwitch(Qvk3MusicService.KEEP_AFTER_CLOSE, "Музыка играет после закрытия приложения", "Если выключено — смахивание QVK из недавних останавливает музыку и завершает приложение", 4, "QVK Music", false);
         idx.addSwitch(Qvk3CatalogAds.PREF, "Скрывать предложения подписки", "Баннеры «Целый месяц — 0 ₽ … Подключить» в музыке ВК", 4, "QVK Music", true);
@@ -592,21 +586,10 @@ public final class Qvk3SettingsActivity extends Activity {
         look.addView(top);
         LinearLayout chips = new LinearLayout(this);
         chips.setPadding(0, dp(16), 0, 0);
-        chips.addView(heroChip("Стили", true, this::styles), Qvk3Ui.weight(1));
-        chips.addView(gap());
-        chips.addView(heroChip("Сценарии", false, this::scenarios), Qvk3Ui.weight(1));
-        chips.addView(gap());
-        chips.addView(heroChip("День/ночь", false, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
+        chips.addView(heroChip("Светлая и тёмная тема", true, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
         look.addView(chips);
         Qvk3Motion.press(look);
-        look.setOnClickListener(v -> styles());
-
-        // scenario
-        Qvk3Scenarios.Scenario sc = Qvk3Scenarios.find(this, Qvk3Scenarios.active(this));
-        LinearLayout scCard = card();
-        ((LinearLayout.LayoutParams) scCard.getLayoutParams()).topMargin = dp(12);
-        row(scCard, Qvk3Icons.WAND, 0xFF5AC8FA, "Сценарий: " + (sc == null ? "не выбран" : sc.title),
-                sc == null ? "Обычный, Работа, Ночь, Музыка, Фокус" : sc.description, null, this::scenarios, null);
+        look.setOnClickListener(v -> Qvk3InfoScreens.dayNight(this));
 
         // favourites
         Set<String> fav = favorites();
@@ -881,35 +864,16 @@ public final class Qvk3SettingsActivity extends Activity {
             case "myTickets":
                 Qvk3MyTickets.show(this);
                 break;
-            case "styles":
-            case "editor":
-                styles();
-                break;
             case "resetLook":
-                Qvk3Ui.dialog(this).setTitle("Сбросить всё оформление?")
-                        .setMessage("Будут сброшены тема, стили iOS/Material и стиль QVK 3.0. Остальные настройки и данные не изменятся.")
+                Qvk3Ui.dialog(this).setTitle("Сбросить тему?")
+                        .setMessage("Тема вернётся к предустановленной. Остальные настройки и данные не изменятся.")
                         .setPositiveButton("Сбросить", (d, w) -> Qvk3Appearance.reset(this)).setNegativeButton("Отмена", null).show();
-                break;
-            case "scenarios":
-                scenarios();
-                break;
-            case "dock":
-                Qvk3SkinScreen.dock(this);
-                break;
-            case "rules":
-                Qvk3SkinScreen.rules(this);
                 break;
             case "weather":
                 Qvk3SplashWeather.settings(this);
                 break;
             case "searchTabs":
                 Qvk3SearchTabs.settings(this);
-                break;
-            case "pick":
-                Qvk3ElementPicker.arm(this);
-                break;
-            case "inspect":
-                Qvk3SkinScreen.inspector(this);
                 break;
             case "music":
                 startActivity(new Intent(this, Qvk3MusicActivity.class));
@@ -969,78 +933,6 @@ public final class Qvk3SettingsActivity extends Activity {
             default:
                 throw new IllegalArgumentException(what);
         }
-    }
-
-    private void styles() {
-        startActivity(new Intent(this, Qvk3StylesActivity.class));
-    }
-
-    private void quickTheme() {
-        try {
-            Qvk3Appearance.apply(this, Qvk3DesignTokens.PRESETS.get(Qvk3Appearance.current(this).dark ? "classic" : "amoled"));
-        } catch (Exception e) {
-            Qvk3Ui.toast(this, "Не удалось применить: " + Qvk3Jobs.message(e));
-        }
-    }
-
-    private void scenarios() {
-        List<Qvk3Scenarios.Scenario> all = Qvk3Scenarios.all(this);
-        List<String> labels = new ArrayList<>();
-        String active = Qvk3Scenarios.active(this);
-        for (Qvk3Scenarios.Scenario s : all) labels.add(s.title + "\n" + (s.id.equals(active) ? "Включён · " : "") + s.description);
-        labels.add("Сохранить текущие настройки\nКак новый сценарий");
-        if (Qvk3Scenarios.canUndo(this)) labels.add("Вернуть как было\nДо применения сценария");
-        Qvk3Ui.dialog(this).setTitle("Сценарии").setItems(labels.toArray(new String[0]), (d, i) -> {
-            try {
-                if (i < all.size()) {
-                    Qvk3Scenarios.Scenario s = all.get(i);
-                    StringBuilder what = new StringBuilder();
-                    for (String k : s.values.keySet()) {
-                        Qvk3SettingsIndex.Item it = index.get(k);
-                        Object v = s.values.get(k);
-                        what.append("• ").append(it != null ? it.title : k).append(": ")
-                                .append(v instanceof Boolean ? ((Boolean) v ? "вкл" : "выкл") : v).append('\n');
-                    }
-                    if (!s.style.isEmpty() && Qvk3DesignTokens.PRESETS.containsKey(s.style)) what.append("• Стиль: ").append(Qvk3DesignTokens.PRESETS.get(s.style).title);
-                    android.app.AlertDialog.Builder b = Qvk3Ui.dialog(this).setTitle(s.title).setMessage(s.description + "\n\nБудет изменено:\n" + what)
-                            .setPositiveButton("Применить", (d2, w) -> {
-                                try {
-                                    Qvk3Scenarios.apply(this, s);
-                                } catch (Exception e) {
-                                    Qvk3Ui.toast(this, Qvk3Jobs.message(e));
-                                }
-                            }).setNegativeButton("Отмена", null);
-                    if (!s.builtin) b.setNeutralButton("Удалить", (d2, w) -> {
-                        try {
-                            Qvk3Scenarios.delete(this, s.id);
-                        } catch (Exception e) {
-                            Qvk3Ui.toast(this, Qvk3Jobs.message(e));
-                        }
-                    });
-                    b.show();
-                } else if (i == all.size()) {
-                    EditText in = new EditText(this);
-                    in.setInputType(InputType.TYPE_CLASS_TEXT);
-                    in.setHint("Название сценария");
-                    Qvk3Ui.dialog(this).setTitle("Новый сценарий").setView(in).setPositiveButton("Сохранить", (d2, w) -> {
-                        List<String> keys = new ArrayList<>();
-                        for (Qvk3SettingsIndex.Item it : index.all()) if (it.type == Qvk3SettingsIndex.SWITCH) keys.add(it.key);
-                        keys.add(Qvk3MusicSettings.LAYOUT);
-                        try {
-                            String name = in.getText().toString().trim();
-                            Qvk3Scenarios.saveCurrent(this, name.isEmpty() ? "Мой сценарий" : name, keys);
-                            Qvk3Ui.toast(this, "Сценарий сохранён");
-                        } catch (Exception e) {
-                            Qvk3Ui.toast(this, Qvk3Jobs.message(e));
-                        }
-                    }).setNegativeButton("Отмена", null).show();
-                } else {
-                    Qvk3Scenarios.undo(this);
-                }
-            } catch (Exception e) {
-                Qvk3Ui.toast(this, Qvk3Jobs.message(e));
-            }
-        }).show();
     }
 
     private void resetSection(int s) {
@@ -1139,9 +1031,7 @@ public final class Qvk3SettingsActivity extends Activity {
                     pasteSettingsCode();
                 })));
         col.addView(Qvk3Sheet.section(this, p, "Оформление"));
-        col.addView(quickPair(
-                quickTile("Стили и темы", "выбрать и настроить", acc, () -> go(dlg[0], "styles")),
-                quickTile("День и ночь", "режим и цвета", acc2, () -> go(dlg[0], "dayNight"))));
+        col.addView(quickTile("Светлая и тёмная тема", "режим и цвета", acc, () -> go(dlg[0], "dayNight")));
         LinearLayout g = Qvk3Sheet.group(this, p);
         java.util.List<Qvk3SettingsIndex.Item> ads = adSwitches();
         boolean allOff = !ads.isEmpty();
@@ -1172,8 +1062,6 @@ public final class Qvk3SettingsActivity extends Activity {
                 Qvk3Ui.toast(this, "Не удалось открыть: " + Qvk3Jobs.message(e));
             }
         }));
-        nav.addView(Qvk3Sheet.divider(this, p));
-        nav.addView(Qvk3Sheet.navRow(this, p, "Нижняя панель ВК", v -> go(dlg[0], "dock")));
         nav.addView(Qvk3Sheet.divider(this, p));
         nav.addView(Qvk3Sheet.navRow(this, p, "Найти настройку…", v -> {
             dlg[0].dismiss();
