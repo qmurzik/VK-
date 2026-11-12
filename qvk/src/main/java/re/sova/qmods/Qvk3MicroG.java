@@ -58,23 +58,18 @@ public final class Qvk3MicroG {
     }
 
     /**
-     * Which GmsCore package QVK's push (FCM) path should talk to. Called from the patched FCM Rpc (xsna.ygx).
+     * Which GmsCore package QVK's push (FCM) path talks to. Called from the patched FCM Rpc (xsna.ygx).
      *
-     * <p>Safety: this returns the real {@code com.google.android.gms} whenever it exists — so devices with real
-     * Google Play services or a standard microG (installed as com.google.android.gms) are completely unaffected.
-     * Only when there is no com.google.android.gms at all and ReVanced GmsCore is present do we redirect FCM
-     * registration to {@code app.revanced.android.gms}. With the SPOOFED_PACKAGE_* meta-data in the manifest,
-     * ReVanced GmsCore then registers the token under VK's real package and certificate.</p>
+     * <p>QVK's own package and signature are not registered in VK's Firebase project, so it can never get a token
+     * from real Google Play services — that is the «Firebase Installations Service is unavailable» error testers
+     * saw. The only way QVK receives push is through a GmsCore that spoofs VK's identity, i.e. ReVanced GmsCore
+     * (which reads SPOOFED_PACKAGE_NAME / SPOOFED_PACKAGE_SIGNATURE from the manifest). So the FCM path always
+     * targets {@code app.revanced.android.gms}; the stock com.google.android.gms is no longer used for push.
+     * If ReVanced GmsCore is absent the service query simply finds nothing and QVK falls back to its own
+     * Long Poll delivery, exactly as before.</p>
      */
     public static String gmsPackage(Context c) {
-        try {
-            if (c != null && !has(c, GMS) && has(c, REVANCED_GMS)) {
-                return REVANCED_GMS;
-            }
-        } catch (Throwable ignored) {
-            // fall back to the standard package
-        }
-        return GMS;
+        return REVANCED_GMS;
     }
 
     /** True when {@code com.google.android.gms} on this device is provided by microG, not Google Play services. */

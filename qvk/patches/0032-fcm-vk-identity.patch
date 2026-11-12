@@ -1,0 +1,25 @@
+diff -ru a/smali_classes3/com/google/firebase/installations/remote/c.smali b/smali_classes3/com/google/firebase/installations/remote/c.smali
+--- a/smali_classes3/com/google/firebase/installations/remote/c.smali	2026-11-12 19:56:44.477664915 +0000
++++ b/smali_classes3/com/google/firebase/installations/remote/c.smali	2026-11-12 19:56:44.527921873 +0000
+@@ -1610,6 +1610,11 @@
+ .method public final f()Ljava/lang/String;
+     .locals 5
+ 
++    # QVK 3.0: X-Android-Cert = VK app signing certificate SHA-1, to match com.vkontakte.android in VK's Firebase project
++    const-string v0, "48761EEF50EE53AFC4CC9C5F10E6BDE7F8F5B82F"
++
++    return-object v0
++
+     .line 1
+     const-string v0, "ContentValues"
+ 
+@@ -1958,6 +1963,9 @@
+     .line 51
+     const-string v1, "X-Android-Package"
+ 
++    # QVK 3.0: FCM registers as VK so a spoofing GmsCore (ReVanced) accepts the token (Firebase Installations)
++    const-string v0, "com.vkontakte.android"
++
+     .line 52
+     .line 53
+     invoke-virtual {p1, v1, v0}, Ljava/net/URLConnection;->addRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
