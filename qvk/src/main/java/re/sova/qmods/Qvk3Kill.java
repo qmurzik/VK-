@@ -37,6 +37,7 @@ final class Qvk3Kill {
             {"settings_motion", "Анимации настроек"},
             {"shell", "Оболочка «Чаты» QVK"},
             {"update_prompt", "Окно «Доступно обновление»"},
+            {"messenger", "Мессенджер QVK"},
     };
 
     private static volatile Map<String, String> cache;

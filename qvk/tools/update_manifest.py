@@ -65,7 +65,7 @@ def emit(text, key, key_id):
 
 
 FEATURES = ["send_retry", "splash_weather", "catalog_ads", "search_tabs", "feed_now", "mini_on_vk", "music_takeover", "skin",
-            "shake_report", "media_window", "dock_quick", "post_tint", "settings_motion", "shell", "update_prompt"]
+            "shake_report", "media_window", "dock_quick", "post_tint", "settings_motion", "shell", "update_prompt", "messenger"]
 
 
 def kill(a):

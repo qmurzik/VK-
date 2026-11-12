@@ -224,6 +224,9 @@ final class Qvk3Sheet {
         return t;
     }
 
+    /** The sheet shown last (a custom view inside it can close it, e.g. the reaction row of the messenger). */
+    static volatile android.app.Dialog lastShown;
+
     static final class Builder extends AlertDialog.Builder {
         private final Context c;
         private CharSequence title, message;
@@ -283,6 +286,7 @@ final class Qvk3Sheet {
         public AlertDialog show() {
             AlertDialog d = create();
             d.show();
+            lastShown = d;
             return d;
         }
     }

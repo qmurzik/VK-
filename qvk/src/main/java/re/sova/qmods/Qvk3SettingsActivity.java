@@ -275,6 +275,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:resetLook", "Сбросить всё оформление", "Только темы и стили; данные не затрагиваются", 0, "QVK 3.0");
         idx.addScreen("qvk3:dock", "Нижняя панель ВК", "Плавающая, скруглённая, полупрозрачная — настоящая панель ВК", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:searchTabs", "Разделы поиска ВК", "Скрыть ненужные вкладки поиска: игры, клипы, товары, сервисы", 1, "Интерфейс ВК");
+        idx.addSwitch(Qvk3ImEntry.PREF, "Мессенджер QVK (бета)", "Свой список чатов и экран чата QVK вместо штатных: ответы, пересылка, реакции, правка, голосовые, фото и файлы, черновики, свайп для ответа. Звонки и настройки бесед — в ВК", 2, "Мессенджер QVK", false);
         idx.addSwitch(Qvk3SendRetry.PREF, "Повторять неотправленное", "Если фото, видео, файл или сообщение не ушли — QVK сам повторит отправку (до 2 раз, когда есть сеть)", 2, "Чаты и диалоги", true);
         idx.addScreen("qvk3:pick", "Настроить элемент касанием", "Коснитесь любого элемента ВК: скрыть, скруглить, прозрачность, цвет", 0, "Интерфейс ВК");
         idx.addScreen("qvk3:rules", "Правила интерфейса ВК", "Скрыть, скруглить, перекрасить любой элемент по его имени", 0, "Интерфейс ВК");
@@ -853,6 +854,10 @@ public final class Qvk3SettingsActivity extends Activity {
     private void qvk3(String what) throws Exception {
         if (what.startsWith("ticket:")) {
             Qvk3MyTickets.card(this, what.substring(7));
+            return;
+        }
+        if (what.startsWith("section:")) {
+            openSection(Integer.parseInt(what.substring(8)));
             return;
         }
         switch (what) {

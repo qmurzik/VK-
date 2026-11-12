@@ -1,0 +1,363 @@
+--- a/smali_classes10/com/vk/im/ui/fragments/DialogsFragment.smali
++++ b/smali_classes10/com/vk/im/ui/fragments/DialogsFragment.smali
+@@ -3801,6 +3801,20 @@
+ .method public onBackPressed()Z
+     .locals 3
+ 
++    # QVK 3.0 messenger: back inside QVK's view.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_back_vk
++
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->back(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    return v0
++
++    :qvk3_im_back_vk
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->N:Lxsna/npy;
+ 
+@@ -3835,6 +3849,18 @@
+ .method public onConfigurationChanged(Landroid/content/res/Configuration;)V
+     .locals 1
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5180
++
++    invoke-super {p0, p1}, Lcom/vk/im/ui/fragments/ImFragment;->onConfigurationChanged(Landroid/content/res/Configuration;)V
++
++    return-void
++
++    :qvk3_im_vk_5180
+     .line 1
+     invoke-super {p0, p1}, Lcom/vk/im/ui/fragments/ImFragment;->onConfigurationChanged(Landroid/content/res/Configuration;)V
+ 
+@@ -3983,6 +4009,16 @@
+ .method public onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;
+     .locals 3
+ 
++    # QVK 3.0 messenger: the tab shows QVK's conversation list (VK's own when the messenger is off).
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3ImEntry;->listView(Ljava/lang/Object;Landroid/view/LayoutInflater;)Landroid/view/View;
++
++    move-result-object v0
++
++    if-eqz v0, :qvk3_im_vk_view
++
++    return-object v0
++
++    :qvk3_im_vk_view
+     .line 1
+     iget-object p3, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->B:Lcom/vk/im/engine/reporters/performance/OpenChatListReporter;
+ 
+@@ -4052,6 +4088,18 @@
+ .method public onDestroyView()V
+     .locals 3
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5144
++
++    invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onDestroyView()V
++
++    return-void
++
++    :qvk3_im_vk_5144
+     .line 1
+     invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onDestroyView()V
+ 
+@@ -4331,6 +4379,18 @@
+ .method public onPause()V
+     .locals 1
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5132
++
++    invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onPause()V
++
++    return-void
++
++    :qvk3_im_vk_5132
+     .line 1
+     invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onPause()V
+ 
+@@ -4377,6 +4437,18 @@
+ .method public onResume()V
+     .locals 4
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5120
++
++    invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onResume()V
++
++    return-void
++
++    :qvk3_im_vk_5120
+     .line 1
+     invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onResume()V
+ 
+@@ -4506,6 +4578,18 @@
+ .method public onSaveInstanceState(Landroid/os/Bundle;)V
+     .locals 1
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5156
++
++    invoke-super {p0, p1}, Lcom/vk/im/ui/fragments/ImFragment;->onSaveInstanceState(Landroid/os/Bundle;)V
++
++    return-void
++
++    :qvk3_im_vk_5156
+     .line 1
+     invoke-super {p0, p1}, Lcom/vk/core/fragments/FragmentImpl;->onSaveInstanceState(Landroid/os/Bundle;)V
+ 
+@@ -4544,6 +4628,18 @@
+ .method public onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+     .locals 3
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5108
++
++    invoke-super {p0, p1, p2}, Lcom/vk/im/ui/fragments/ImFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
++
++    return-void
++
++    :qvk3_im_vk_5108
+     .line 1
+     invoke-super {p0, p1, p2}, Lcom/vk/core/fragments/FragmentImpl;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+ 
+@@ -4969,6 +5065,18 @@
+ .method public onViewStateRestored(Landroid/os/Bundle;)V
+     .locals 1
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_5168
++
++    invoke-super {p0, p1}, Lcom/vk/im/ui/fragments/ImFragment;->onViewStateRestored(Landroid/os/Bundle;)V
++
++    return-void
++
++    :qvk3_im_vk_5168
+     .line 1
+     invoke-super {p0, p1}, Lcom/vk/core/fragments/FragmentImpl;->onViewStateRestored(Landroid/os/Bundle;)V
+ 
+--- a/smali_classes10/com/vk/im/ui/dialogs_list/ImDialogsFragment.smali
++++ b/smali_classes10/com/vk/im/ui/dialogs_list/ImDialogsFragment.smali
+@@ -2719,6 +2719,20 @@
+ .method public onBackPressed()Z
+     .locals 5
+ 
++    # QVK 3.0 messenger: back inside QVK's view.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_back_vk
++
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->back(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    return v0
++
++    :qvk3_im_back_vk
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/dialogs_list/ImDialogsFragment;->G:Lxsna/npy;
+ 
+@@ -2787,6 +2801,16 @@
+ .method public onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;
+     .locals 1
+ 
++    # QVK 3.0 messenger: the tab shows QVK's conversation list (VK's own when the messenger is off).
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3ImEntry;->listView(Ljava/lang/Object;Landroid/view/LayoutInflater;)Landroid/view/View;
++
++    move-result-object v0
++
++    if-eqz v0, :qvk3_im_vk_view
++
++    return-object v0
++
++    :qvk3_im_vk_view
+     .line 1
+     sget p3, Lxsna/tj90;->d:I
+ 
+@@ -3022,6 +3046,18 @@
+ .method public onDestroyView()V
+     .locals 2
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_3708
++
++    invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onDestroyView()V
++
++    return-void
++
++    :qvk3_im_vk_3708
+     .line 1
+     invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onDestroyView()V
+ 
+@@ -3212,6 +3248,18 @@
+ .method public onPause()V
+     .locals 1
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_3696
++
++    invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onPause()V
++
++    return-void
++
++    :qvk3_im_vk_3696
+     .line 1
+     invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onPause()V
+ 
+@@ -3232,6 +3280,18 @@
+ .method public onResume()V
+     .locals 1
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_3684
++
++    invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onResume()V
++
++    return-void
++
++    :qvk3_im_vk_3684
+     .line 1
+     invoke-super {p0}, Lcom/vk/im/ui/fragments/ImFragment;->onResume()V
+ 
+@@ -3281,6 +3341,18 @@
+ .method public onSaveInstanceState(Landroid/os/Bundle;)V
+     .locals 2
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_3720
++
++    invoke-super {p0, p1}, Lcom/vk/im/ui/fragments/ImFragment;->onSaveInstanceState(Landroid/os/Bundle;)V
++
++    return-void
++
++    :qvk3_im_vk_3720
+     .line 1
+     invoke-super {p0, p1}, Lcom/vk/core/fragments/FragmentImpl;->onSaveInstanceState(Landroid/os/Bundle;)V
+ 
+@@ -3327,6 +3399,18 @@
+ .method public onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+     .locals 2
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_3672
++
++    invoke-super {p0, p1, p2}, Lcom/vk/im/ui/fragments/ImFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
++
++    return-void
++
++    :qvk3_im_vk_3672
+     .line 1
+     invoke-super {p0, p1, p2}, Lcom/vk/core/fragments/FragmentImpl;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+ 
+@@ -3497,6 +3581,18 @@
+ .method public onViewStateRestored(Landroid/os/Bundle;)V
+     .locals 2
+ 
++    # QVK 3.0 messenger: VK's screen hosts QVK's view — skip VK's own view logic (only the base fragment runs).
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_vk_3732
++
++    invoke-super {p0, p1}, Lcom/vk/im/ui/fragments/ImFragment;->onViewStateRestored(Landroid/os/Bundle;)V
++
++    return-void
++
++    :qvk3_im_vk_3732
+     .line 1
+     invoke-super {p0, p1}, Lcom/vk/core/fragments/FragmentImpl;->onViewStateRestored(Landroid/os/Bundle;)V
+ 
+--- a/smali_classes12/com/vk/navigation/d.smali
++++ b/smali_classes12/com/vk/navigation/d.smali
+@@ -856,6 +856,16 @@
+ .method public final m(Lcom/vk/navigation/a;I)V
+     .locals 7
+ 
++    # QVK 3.0 messenger: VK opening a chat goes to QVK's chat screen (VK's own when the messenger is off).
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3ImEntry;->fromNavigator(Ljava/lang/Object;Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_nav_855
++
++    return-void
++
++    :qvk3_im_nav_855
+     .line 1
+     invoke-virtual {p0}, Lcom/vk/navigation/d;->x()Z
+ 
+@@ -1079,6 +1089,16 @@
+ .method public final t(Lcom/vk/navigation/a;)V
+     .locals 3
+ 
++    # QVK 3.0 messenger: VK opening a chat goes to QVK's chat screen (VK's own when the messenger is off).
++    invoke-static {p0, p1}, Lre/sova/qmods/Qvk3ImEntry;->fromNavigator(Ljava/lang/Object;Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_nav_1078
++
++    return-void
++
++    :qvk3_im_nav_1078
+     .line 1
+     invoke-virtual {p0}, Lcom/vk/navigation/d;->x()Z
+ 

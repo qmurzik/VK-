@@ -305,6 +305,10 @@ public final class Qvk3ImModel {
         /** Local state for messages being sent: 0 sent, 1 sending, 2 failed. */
         public int local;
         public long randomId;
+        /** What a failed send needs for «повторить». */
+        public java.util.List<Long> forwardsPending;
+        public java.util.List<String> attachmentsPending;
+        public long replyPending;
 
         public boolean service() {
             return !action.isEmpty();
@@ -436,6 +440,7 @@ public final class Qvk3ImModel {
         public Message last;
         public long sortId;
         public boolean archived;
+        public Message pinnedMessage;
 
         public boolean chat() {
             return "chat".equals(type);
@@ -471,6 +476,7 @@ public final class Qvk3ImModel {
         if (cs != null) {
             c.title = cs.optString("title");
             c.members = cs.optInt("members_count");
+            c.pinnedMessage = message(cs.optJSONObject("pinned_message"));
             JSONObject ph = cs.optJSONObject("photo");
             if (ph != null) c.photo = photo(ph);
         } else {
