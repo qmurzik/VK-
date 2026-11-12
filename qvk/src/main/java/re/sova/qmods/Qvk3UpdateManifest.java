@@ -41,6 +41,11 @@ public final class Qvk3UpdateManifest {
         public final String sha256;
         public final String signerSha256;
         public final List<String> urls;
+        /**
+         * BUG-0061: the APK in pieces (each ≤ 100 MB, so a plain git file host can serve it), joined in order. Optional and
+         * tried after {@link #urls}; older QVK builds ignore it. Empty when the manifest has none.
+         */
+        public final List<String> parts;
         public final String notes;
         public final String published;
         /** "alpha" (every build, the default) or "stable" (builds the team marked as stable). */
@@ -59,6 +64,10 @@ public final class Qvk3UpdateManifest {
             if (arr != null) for (int i = 0; i < arr.length(); i++) u.add(arr.optString(i));
             if (u.isEmpty() && !o.optString("apk_url").isEmpty()) u.add(o.optString("apk_url"));
             urls = u;
+            List<String> pp = new ArrayList<>();
+            JSONArray pa = o.optJSONArray("parts");
+            if (pa != null) for (int i = 0; i < pa.length() && i < 16; i++) pp.add(pa.optString(i));
+            parts = pp;
             notes = o.optString("notes", o.optString("text"));
             published = o.optString("published");
             channel = "stable".equals(o.optString("channel")) ? "stable" : "alpha";
@@ -72,6 +81,7 @@ public final class Qvk3UpdateManifest {
             if (!signerSha256.isEmpty() && !signerSha256.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Неверный отпечаток подписи");
             if (urls.isEmpty() || urls.size() > 16) throw new IllegalArgumentException("Нет адресов загрузки");
             for (String u : urls) httpsUrl(u);
+            for (String u : parts) httpsUrl(u);
         }
     }
 

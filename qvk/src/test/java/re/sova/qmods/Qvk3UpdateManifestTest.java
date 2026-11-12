@@ -146,4 +146,17 @@ public class Qvk3UpdateManifestTest {
         Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(payload(release(100, "8.100", 28)), null);
         assertTrue(m.kills.isEmpty());
     }
+
+    /** BUG-0061: the real alpha38 manifest (with the optional «parts» list) parses, verifies and exposes the pieces. */
+    @org.junit.Test
+    public void partsListFromPublishedManifest() throws Exception {
+        String body = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(System.getProperty("qvk.manifest", "../dist/qvk3-update.json"))), "UTF-8");
+        Qvk3UpdateManifest m = Qvk3UpdateManifest.parse(body, java.util.Collections.<String>emptyList());
+        Qvk3UpdateManifest.Release r = m.releases.get(0);
+        if (System.getProperty("qvk.manifest") != null) {
+            org.junit.Assert.assertEquals(2, r.parts.size());
+            org.junit.Assert.assertTrue(r.parts.get(0).startsWith("https://raw.githubusercontent.com/"));
+        }
+        org.junit.Assert.assertFalse(r.urls.isEmpty());
+    }
 }

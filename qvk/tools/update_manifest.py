@@ -46,6 +46,8 @@ def make(a):
     rel = {"version_code": code, "version_name": name, "vk_base": "8.100", "min_sdk": 28,
            "apk_size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "signer_sha256": signer(a.apk),
            "urls": a.urls, "notes": a.notes, "published": datetime.date.today().isoformat(), "channel": a.channel}
+    if a.parts:
+        rel["parts"] = a.parts  # BUG-0061: the APK in ≤100 MB pieces (GitHub), joined in order; older builds ignore it
     releases = [rel]
     kills = []
     if a.merge:
@@ -106,6 +108,7 @@ k = sub.add_parser("keygen"); k.add_argument("dir")
 m = sub.add_parser("make"); m.add_argument("apk"); m.add_argument("urls", nargs="+")
 m.add_argument("--key", required=True); m.add_argument("--notes", default=""); m.add_argument("--merge")
 m.add_argument("--channel", choices=["alpha", "stable"], default="alpha")
+m.add_argument("--parts", nargs="*", default=[], help="HTTPS URLs of the APK pieces, in order")
 k2 = sub.add_parser("mark"); k2.add_argument("manifest"); k2.add_argument("code", type=int); k2.add_argument("channel", choices=["alpha", "stable"])
 k2.add_argument("--key", required=True)
 k3 = sub.add_parser("kill", help="switch a feature off remotely for some builds")

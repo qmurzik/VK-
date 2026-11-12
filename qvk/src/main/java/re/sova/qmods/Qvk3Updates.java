@@ -77,11 +77,17 @@ public final class Qvk3Updates {
      * Used when the user has not set own sources; the signature is checked with the key in assets/qvk3_update_keys.json.
      */
     public static final String DEFAULT_SOURCE = "https://yadi.sk/d/CEfYrKqqYoX6PQ";
+    /**
+     * BUG-0061: Yandex Disk caps downloads of public files per day («Превышен лимит скачивания») — then neither the manifest
+     * nor the APK could be fetched. The same signed manifest also lives in the public QVK repository and is always tried.
+     */
+    public static final String GITHUB_SOURCE = "https://raw.githubusercontent.com/qmurzik/VK-/claude/vk-8100-modified-client-dlaqw9/dist/qvk3-update.json";
 
     public static List<String> sources(Context c) {
         List<String> out = new ArrayList<>();
         for (String s : prefs(c).getString(SOURCES, "").split("\n")) if (!s.trim().isEmpty()) out.add(s.trim());
         if (out.isEmpty()) out.add(DEFAULT_SOURCE);
+        if (!out.contains(GITHUB_SOURCE)) out.add(GITHUB_SOURCE);
         return out;
     }
 
@@ -94,13 +100,35 @@ public final class Qvk3Updates {
     static String direct(String url) throws IOException {
         if (!yandexPublic(url)) return url;
         String api = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=" + java.net.URLEncoder.encode(url, "UTF-8");
+        HttpURLConnection con = (HttpURLConnection) new URL(api).openConnection();
+        con.setConnectTimeout(8000);
+        con.setReadTimeout(12000);
+        con.setRequestProperty("Accept", "application/json");
         try {
-            String href = new JSONObject(plain(api, 64 * 1024)).optString("href");
-            if (href.isEmpty()) throw new IOException("Яндекс Диск не дал ссылку на файл");
+            int code = con.getResponseCode();
+            InputStream in = code >= 400 ? con.getErrorStream() : con.getInputStream();
+            String body = "";
+            if (in != null) try (InputStream i = in) {
+                byte[] b = new byte[64 * 1024];
+                body = new String(b, 0, Qvk3Id3.readFully(i, b), "UTF-8");
+            }
+            JSONObject o;
+            try {
+                o = new JSONObject(body);
+            } catch (org.json.JSONException e) {
+                throw new IOException("Яндекс Диск: неожиданный ответ (HTTP " + code + ")");
+            }
+            // BUG-0061: «href»: null came back as the text "null"; Yandex says why in «message» (e.g. the daily download limit)
+            String href = o.isNull("href") ? "" : o.optString("href");
+            if (href.isEmpty()) {
+                String why = o.isNull("message") ? "" : o.optString("message");
+                if ("DiskResourceDownloadLimitExceededError".equals(o.optString("error"))) why = "превышен суточный лимит скачивания";
+                throw new IOException("Яндекс Диск: " + (why.isEmpty() ? "нет ссылки на файл (HTTP " + code + ")" : why));
+            }
             Qvk3UpdateManifest.httpsUrl(href);
             return href;
-        } catch (org.json.JSONException e) {
-            throw new IOException("Яндекс Диск: неожиданный ответ");
+        } finally {
+            con.disconnect();
         }
     }
 
@@ -347,7 +375,83 @@ public final class Qvk3Updates {
                 }
             }
         }
+        if (!r.parts.isEmpty()) {
+            try {
+                File joined = new File(d, "qvk-" + r.versionCode + ".apk.join");
+                fetchParts(r.parts, joined, r.size);
+                if (joined.length() != r.size) throw new IOException("Размер не совпадает");
+                if (!sha256(joined).equals(r.sha256)) {
+                    joined.delete();
+                    throw new IOException("Контрольная сумма не совпала");
+                }
+                if (done.exists()) done.delete();
+                if (!joined.renameTo(done)) throw new IOException("Не удалось сохранить APK");
+                return done;
+            } catch (InterruptedIOException e) {
+                throw e;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
         throw last != null ? last : new IOException("Нет адресов загрузки");
+    }
+
+    /**
+     * BUG-0061: the APK as pieces (GitHub serves files up to 100 MB). Pieces are appended in order; an interrupted download
+     * continues from the bytes already saved (the piece holding that offset is resumed with a Range request).
+     */
+    static void fetchParts(List<String> parts, File out, long size) throws IOException {
+        long have = out.isFile() ? out.length() : 0;
+        long start = 0;
+        for (String url : parts) {
+            Qvk3UpdateManifest.httpsUrl(url);
+            long partSize = -1;
+            HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+            con.setConnectTimeout(10000);
+            con.setReadTimeout(30000);
+            con.setInstanceFollowRedirects(true);
+            long offset = Math.max(0, have - start);
+            if (offset > 0) con.setRequestProperty("Range", "bytes=" + offset + "-");
+            try {
+                int code = con.getResponseCode();
+                if (code == 416) { // this piece is already complete
+                    String cr = con.getHeaderField("Content-Range");
+                    partSize = cr != null && cr.contains("/") ? Long.parseLong(cr.substring(cr.indexOf('/') + 1).trim()) : offset;
+                    start += partSize;
+                    continue;
+                }
+                if (code != 200 && code != 206) throw new IOException("HTTP " + code);
+                if (code == 200 && offset > 0) { // no Range support: drop what this piece had and take it whole
+                    try (RandomAccessFile f = new RandomAccessFile(out, "rw")) {
+                        f.setLength(start);
+                    }
+                    have = start;
+                    offset = 0;
+                }
+                long len = con.getContentLengthLong();
+                partSize = len < 0 ? -1 : offset + len;
+                try (InputStream in = con.getInputStream(); RandomAccessFile f = new RandomAccessFile(out, "rw")) {
+                    f.setLength(have);
+                    f.seek(have);
+                    byte[] buf = new byte[65536];
+                    int n, lastP = -1;
+                    while ((n = in.read(buf)) != -1) {
+                        if (cancel.get()) throw new InterruptedIOException("cancel");
+                        if (have + n > size) throw new IOException("Файл больше заявленного");
+                        f.write(buf, 0, n);
+                        have += n;
+                        int p = (int) (have * 100 / size);
+                        if (p != lastP) {
+                            lastP = p;
+                            set("Загрузка обновления · " + p + "% · " + host(url), p);
+                        }
+                    }
+                }
+                start = have;
+            } finally {
+                con.disconnect();
+            }
+        }
     }
 
     static void fetch(String url, File part, long size) throws IOException {
