@@ -1,0 +1,51 @@
+diff -ru a/smali_classes3/xsna/ygx.smali b/smali_classes3/xsna/ygx.smali
+--- a/smali_classes3/xsna/ygx.smali	2026-11-12 19:20:54.876408670 +0000
++++ b/smali_classes3/xsna/ygx.smali	2026-11-12 19:20:54.941947381 +0000
+@@ -286,7 +286,10 @@
+ 
+     .line 5
+     .line 6
+-    const-string v0, "com.google.android.gms"
++    # QVK 3.0: FCM can talk to ReVanced GmsCore when no real com.google.android.gms exists (safe: real GMS/microG unchanged)
++    iget-object v0, p0, Lxsna/ygx;->a:Landroid/content/Context;
++    invoke-static {v0}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v0
+ 
+     .line 7
+     .line 8
+@@ -386,7 +389,10 @@
+ 
+     .line 15
+     .line 16
+-    const-string v2, "com.google.android.gms"
++    # QVK 3.0: FCM can talk to ReVanced GmsCore when no real com.google.android.gms exists (safe: real GMS/microG unchanged)
++    iget-object v2, p0, Lxsna/ygx;->a:Landroid/content/Context;
++    invoke-static {v2}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v2
+ 
+     .line 17
+     .line 18
+@@ -466,7 +472,10 @@
+     .line 49
+     .line 50
+     .line 51
+-    const-string v4, "com.google.android.gms"
++    # QVK 3.0: FCM can talk to ReVanced GmsCore when no real com.google.android.gms exists (safe: real GMS/microG unchanged)
++    iget-object v4, p0, Lxsna/ygx;->a:Landroid/content/Context;
++    invoke-static {v4}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v4
+ 
+     .line 52
+     .line 53
+@@ -526,7 +535,10 @@
+     .line 77
+     .line 78
+     .line 79
+-    const-string v4, "com.google.android.gms"
++    # QVK 3.0: FCM can talk to ReVanced GmsCore when no real com.google.android.gms exists (safe: real GMS/microG unchanged)
++    iget-object v4, p0, Lxsna/ygx;->a:Landroid/content/Context;
++    invoke-static {v4}, Lre/sova/qmods/Qvk3MicroG;->gmsPackage(Landroid/content/Context;)Ljava/lang/String;
++    move-result-object v4
+ 
+     .line 80
+     .line 81

@@ -19,6 +19,18 @@ final class Qvk3DayNight {
     private Qvk3DayNight() {
     }
 
+    /**
+     * BUG-0016: «Сбросить тему» must also drop the per-theme day/night overrides this class stashes
+     * (qvk3_dn_active and qvk3_dn_{day,night}:key). Otherwise a reset left old values that got re-applied
+     * on the next theme switch, so the reset «did nothing». Caller commits the editor.
+     */
+    static void clear(SharedPreferences.Editor e) {
+        e.remove(ACTIVE);
+        for (String mode : new String[]{"day", "night"}) {
+            for (String k : KEYS) e.remove("qvk3_dn_" + mode + ":" + k);
+        }
+    }
+
     static void sync(Activity a) {
         try {
             SharedPreferences p = RuntimeBridge.prefs;

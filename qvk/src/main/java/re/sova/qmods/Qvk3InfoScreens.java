@@ -57,7 +57,7 @@ final class Qvk3InfoScreens {
             Qvk3Ui.toast(a, ok ? "Тестовое уведомление показано. Это проверка Android, а не сервера ВК"
                     : "Android не разрешает уведомления QVK: проверьте разрешение и каналы");
         });
-        if (Qvk3MicroG.installed(a)) {
+        if (Qvk3MicroG.installed(a) || Qvk3MicroG.revanced(a)) {
             b.setNeutralButton("Проверить microG", (d, w) -> microgCheck(a));
         }
         b.setNegativeButton("Закрыть", null).show();

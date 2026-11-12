@@ -61,8 +61,16 @@ public final class Qvk3Push {
     public static List<Line> diagnostics(Context c) {
         List<Line> out = new ArrayList<>();
         String gms = gmsProvider(c);
-        out.add(new Line("Сервисы Google", gms.isEmpty() ? "не установлены — FCM недоступен, нужен Long Poll/фоновая доставка QVK" : gms,
-                gms.isEmpty() ? -1 : 0));
+        boolean rv = gms.isEmpty() && Qvk3MicroG.revanced(c);
+        out.add(new Line("Сервисы Google", gms.isEmpty()
+                ? (rv ? "нет com.google.android.gms, но установлен ReVanced GmsCore — QVK направляет FCM в него"
+                      : "не установлены — FCM недоступен, нужен Long Poll/фоновая доставка QVK")
+                : gms,
+                rv ? 0 : gms.isEmpty() ? -1 : 0));
+        if (rv) {
+            out.add(new Line("ReVanced GmsCore", "FCM пойдёт через app.revanced.android.gms; в манифесте QVK подменяет имя и подпись на ВК. "
+                    + "Включите в GmsCore Cloud Messaging и выполните регистрацию устройства. Кнопка «Проверить microG» ниже запрашивает реальный токен.", 0));
+        }
         if (gms.startsWith("microG")) {
             Boolean cm = Qvk3MicroG.cloudMessagingEnabled(c);
             String note = "FCM обслуживает microG, а не Google. Включите в microG «Cloud Messaging» и выполните "

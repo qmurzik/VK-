@@ -1,4 +1,8 @@
 <!-- QVK 3.0 components, inserted before </application> by qvk/build.py. -->
+<!-- ReVanced GmsCore push support: when FCM runs through app.revanced.android.gms, GmsCore registers the
+     token under VK's real identity (ignored by Google Play services and standard microG). -->
+<meta-data android:name="app.revanced.android.gms.SPOOFED_PACKAGE_NAME" android:value="com.vkontakte.android" />
+<meta-data android:name="app.revanced.android.gms.SPOOFED_PACKAGE_SIGNATURE" android:value="48761eef50ee53afc4cc9c5f10e6bde7f8f5b82f" />
 <activity android:name="re.sova.qmods.Qvk3WallShare" android:exported="true" android:label="Медиа стены (QVK)"
     android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" android:noHistory="true">
     <intent-filter>

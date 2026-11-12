@@ -37,8 +37,44 @@ import java.util.Locale;
 public final class Qvk3MicroG {
 
     public static final String GMS = "com.google.android.gms";
+    /** ReVanced GmsCore installs under its own package to coexist with real Play services. */
+    public static final String REVANCED_GMS = "app.revanced.android.gms";
 
     private Qvk3MicroG() {
+    }
+
+    private static boolean has(Context c, String pkg) {
+        try {
+            c.getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** True when ReVanced GmsCore (app.revanced.android.gms) is installed. */
+    public static boolean revanced(Context c) {
+        return c != null && has(c, REVANCED_GMS);
+    }
+
+    /**
+     * Which GmsCore package QVK's push (FCM) path should talk to. Called from the patched FCM Rpc (xsna.ygx).
+     *
+     * <p>Safety: this returns the real {@code com.google.android.gms} whenever it exists — so devices with real
+     * Google Play services or a standard microG (installed as com.google.android.gms) are completely unaffected.
+     * Only when there is no com.google.android.gms at all and ReVanced GmsCore is present do we redirect FCM
+     * registration to {@code app.revanced.android.gms}. With the SPOOFED_PACKAGE_* meta-data in the manifest,
+     * ReVanced GmsCore then registers the token under VK's real package and certificate.</p>
+     */
+    public static String gmsPackage(Context c) {
+        try {
+            if (c != null && !has(c, GMS) && has(c, REVANCED_GMS)) {
+                return REVANCED_GMS;
+            }
+        } catch (Throwable ignored) {
+            // fall back to the standard package
+        }
+        return GMS;
     }
 
     /** True when {@code com.google.android.gms} on this device is provided by microG, not Google Play services. */
@@ -149,8 +185,42 @@ public final class Qvk3MicroG {
      */
     public static Result check(Context c) {
         if (!installed(c)) {
+            if (revanced(c)) {
+                // ReVanced GmsCore lives under its own package; QVK's FCM path is now redirected to it
+                // (patch 0031) when no real com.google.android.gms exists, with SPOOFED_PACKAGE_* in the manifest.
+                boolean ok;
+                Throwable err = null;
+                try {
+                    PushSupport.changedVendor();
+                } catch (Throwable ignored) {
+                }
+                try {
+                    ok = PushSupport.nativeToken();
+                } catch (Throwable t) {
+                    ok = false;
+                    err = t;
+                }
+                StringBuilder s = new StringBuilder("Обнаружен ReVanced GmsCore (app.revanced.android.gms).\n"
+                        + "QVK направляет регистрацию push в него, а в манифесте есть подмена имени и подписи на ВК.\n\n");
+                if (ok) {
+                    s.append("✓ Токен FCM получен через ReVanced GmsCore. Доставку подтвердит только реальное входящее "
+                            + "сообщение с другого аккаунта.");
+                } else {
+                    s.append("✗ Токен FCM пока не получен.");
+                    if (err != null) {
+                        try {
+                            s.append('\n').append(PushSupport.errorLabel(err));
+                        } catch (Throwable t2) {
+                            s.append('\n').append(Qvk3Jobs.message(err));
+                        }
+                    }
+                    s.append("\n\nПроверьте в ReVanced GmsCore: выполнена регистрация устройства (checkin) и включён "
+                            + "Cloud Messaging; снимите ограничения батареи с GmsCore и QVK.");
+                }
+                return new Result(ok, s.toString());
+            }
             return new Result(false, "microG не найден: за com.google.android.gms отвечают настоящие сервисы Google "
-                    + "или они не установлены. Этот путь — для сборок microG.");
+                    + "или они не установлены. Этот путь — для сборок microG и ReVanced GmsCore.");
         }
         // Force the vendor cache to re-evaluate, then request a native (FCM) token through microG.
         boolean ok;

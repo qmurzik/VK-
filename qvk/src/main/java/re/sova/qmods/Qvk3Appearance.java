@@ -239,6 +239,10 @@ public final class Qvk3Appearance {
         backup(p);
         SharedPreferences.Editor e = p.edit();
         for (String k : keys()) e.remove(k);
+        // BUG-0016: return day/night to «follow VK» and drop the per-theme overrides, so the reset really
+        // clears everything (text that stayed unreadable at night after a reset came from these leftovers).
+        e.putString(ThemeProfiles.MODE, "current");
+        Qvk3DayNight.clear(e);
         e.commit();
         try {
             IosAppearance.reset();
