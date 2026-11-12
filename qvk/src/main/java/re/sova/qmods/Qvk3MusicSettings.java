@@ -15,6 +15,8 @@ public final class Qvk3MusicSettings {
     /** Floating QVK mini-player on stock VK screens (off by default: it was too intrusive). */
     public static final String MINI_ON_VK = "qvk3_music_mini_on_vk";
     public static final String GAPLESS = "qvk3_music_gapless";
+    /** Short volume ramps on pause / resume / manual track change / seek. */
+    public static final String SMOOTH = "qvk3_music_smooth";
     public static final String CROSSFADE = "qvk3_music_crossfade";
     public static final String PAUSE_ON_UNPLUG = "qvk3_music_pause_unplug";
     public static final String RESUME_ON_PLUG = "qvk3_music_resume_plug";
@@ -45,6 +47,10 @@ public final class Qvk3MusicSettings {
     /** QVK Music replaces the VK music section unless the user turned it off (classic fallback). */
     public static boolean enabled(Context c) {
         return prefs(c).getBoolean(ENABLED, true);
+    }
+
+    public static boolean smooth(Context c) {
+        return prefs(c).getBoolean(SMOOTH, true);
     }
 
     public static boolean gapless(Context c) {

@@ -29,7 +29,7 @@ public final class Qvk3MusicSettingsScreen {
             "Кэш и загрузки", "Тексты песен", "Фоновая работа", "Bluetooth и гарнитуры", "CoverFlow", "История", "Диагностика"};
 
     static final String[][] RESET_KEYS = {
-            {Qvk3MusicSettings.GAPLESS, Qvk3MusicSettings.CROSSFADE, Qvk3MusicSettings.START_TAB},
+            {Qvk3MusicSettings.GAPLESS, Qvk3MusicSettings.SMOOTH, Qvk3MusicSettings.CROSSFADE, Qvk3MusicSettings.START_TAB},
             {},
             {Qvk3MusicSettings.LAYOUT, Qvk3MusicSettings.COVER_SIZE, Qvk3MusicSettings.COVER_RADIUS, Qvk3MusicSettings.PROGRESS_STYLE},
             {}, {},
@@ -153,6 +153,7 @@ public final class Qvk3MusicSettingsScreen {
             case 0:
                 return (a, p, c, r) -> {
                     c.addView(toggle(a, "Без пауз между треками (gapless)", Qvk3MusicSettings.GAPLESS, true, null));
+                    c.addView(toggle(a, "Плавные пауза и переключение", Qvk3MusicSettings.SMOOTH, true, null));
                     c.addView(link(a, p, "Кроссфейд: " + (Qvk3MusicSettings.crossfadeSeconds(a) == 0 ? "выкл" : Qvk3MusicSettings.crossfadeSeconds(a) + " с"), v -> {
                         String[] l = {"Выключен", "2 с", "4 с", "6 с", "8 с", "12 с"};
                         int[] val = {0, 2, 4, 6, 8, 12};

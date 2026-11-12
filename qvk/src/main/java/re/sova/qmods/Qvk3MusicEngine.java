@@ -183,20 +183,21 @@ public final class Qvk3MusicEngine {
 
     /** Plays a track that is already in the queue (tap in the queue screen). */
     public void playIndex(int index) {
-        worker.post(() -> {
+        worker.post(() -> smoothSwitch(() -> {
             if (queue.select(index) != null) startCurrent(true);
-        });
+        }));
     }
 
     public void toggle() {
         worker.post(() -> {
-            if (state == PLAYING || (state == BUFFERING && playWhenReady)) pauseInternal(false);
+            // a tap during the pause fade-out (still PLAYING, but no longer wanted) means «play on»
+            if ((state == PLAYING && playWhenReady) || (state == BUFFERING && playWhenReady)) pauseSmooth();
             else resumeInternal();
         });
     }
 
     public void pause() {
-        worker.post(() -> pauseInternal(false));
+        worker.post(this::pauseSmooth);
     }
 
     public void resume() {
@@ -204,24 +205,26 @@ public final class Qvk3MusicEngine {
     }
 
     public void next() {
-        worker.post(() -> advance(false));
+        worker.post(() -> smoothSwitch(() -> advance(false)));
     }
 
     /** Previous track, or restart of the current one when more than 3 s were played. */
     public void previous() {
         worker.post(() -> {
             if (player != null && prepared && safePosition() > 3000) {
-                player.seekTo(0);
+                seekSmooth(0);
                 return;
             }
-            if (queue.previous() != null) startCurrent(true);
+            smoothSwitch(() -> {
+                if (queue.previous() != null) startCurrent(true);
+            });
         });
     }
 
     public void seekTo(long ms) {
         worker.post(() -> {
             if (player != null && prepared) {
-                player.seekTo((int) Math.max(0, Math.min(ms, duration)));
+                seekSmooth(ms);
                 position = ms;
                 notifyState();
             }
@@ -527,6 +530,7 @@ public final class Qvk3MusicEngine {
 
     private void resumeInternal() {
         playWhenReady = true;
+        rampGen++; // cancels a pause fade-out still running
         if (player == null) {
             if (queue.current() != null) startCurrent(true);
             return;
@@ -539,14 +543,94 @@ public final class Qvk3MusicEngine {
             return;
         }
         registerNoisy();
-        player.setVolume(1f, 1f);
+        float target = ducked ? 0.2f : 1f;
+        boolean fade = Qvk3MusicSettings.smooth(app) && !player.isPlaying();
+        player.setVolume(fade ? 0f : target, fade ? 0f : target);
         player.start();
+        if (fade) ramp(player, 0f, target, 300, null);
         applySpeed();
         state = PLAYING;
         Qvk3MusicService.ensureRunning(app);
         worker.removeCallbacks(ticker);
         worker.post(ticker);
         notifyState();
+    }
+
+    // ---------------------------------------------------------------- smooth transitions
+
+    private int rampGen;
+
+    /** Volume ramp on the engine thread; a newer ramp cancels an older one. */
+    private void ramp(MediaPlayer mp, float from, float to, int ms, Runnable end) {
+        final int gen = ++rampGen;
+        final long start = SystemClock.elapsedRealtime();
+        worker.post(new Runnable() {
+            @Override
+            public void run() {
+                if (gen != rampGen || mp != player) return;
+                float f = Math.min(1f, (SystemClock.elapsedRealtime() - start) / (float) Math.max(1, ms));
+                float v = from + (to - from) * f * f * (3 - 2 * f); // smoothstep: no audible corners
+                try {
+                    mp.setVolume(v, v);
+                } catch (IllegalStateException e) {
+                    return;
+                }
+                if (f < 1f) worker.postDelayed(this, 16);
+                else if (end != null) end.run();
+            }
+        });
+    }
+
+    /** Pause with a short fade-out instead of cutting the sound. */
+    private void pauseSmooth() {
+        if (!Qvk3MusicSettings.smooth(app) || player == null || !prepared || !safeIsPlaying()) {
+            pauseInternal(false);
+            return;
+        }
+        playWhenReady = false;
+        final MediaPlayer mp = player;
+        ramp(mp, ducked ? 0.2f : 1f, 0f, 220, () -> {
+            if (mp == player && !playWhenReady) pauseInternal(false);
+        });
+    }
+
+    /** Manual track change: the current track fades out first, then the switch runs. */
+    private void smoothSwitch(Runnable change) {
+        if (!Qvk3MusicSettings.smooth(app) || player == null || !prepared || !safeIsPlaying()) {
+            change.run();
+            return;
+        }
+        final MediaPlayer mp = player;
+        ramp(mp, ducked ? 0.2f : 1f, 0f, 180, () -> {
+            if (mp != player) return;
+            change.run();
+            // nothing to switch to (start / end of the queue) and still playing: bring the sound back
+            if (mp == player && safeIsPlaying()) ramp(mp, 0f, ducked ? 0.2f : 1f, 260, null);
+        });
+    }
+
+    /** Seek without the click: silence, jump, fade back in. */
+    private void seekSmooth(long ms) {
+        int to = (int) Math.max(0, Math.min(ms, duration));
+        if (!Qvk3MusicSettings.smooth(app) || !safeIsPlaying()) {
+            player.seekTo(to);
+            return;
+        }
+        final MediaPlayer mp = player;
+        try {
+            mp.setVolume(0f, 0f);
+        } catch (IllegalStateException ignored) {
+        }
+        mp.seekTo(to);
+        ramp(mp, 0f, ducked ? 0.2f : 1f, 260, null);
+    }
+
+    private boolean safeIsPlaying() {
+        try {
+            return player != null && player.isPlaying();
+        } catch (IllegalStateException e) {
+            return false;
+        }
     }
 
     private void pauseInternal(boolean transientLoss) {
