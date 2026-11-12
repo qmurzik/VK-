@@ -586,7 +586,10 @@ public final class Qvk3SettingsActivity extends Activity {
         look.addView(top);
         LinearLayout chips = new LinearLayout(this);
         chips.setPadding(0, dp(16), 0, 0);
-        chips.addView(heroChip("Светлая и тёмная тема", true, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
+        // BUG-0064: surface «Быстрые настройки» at the top, next to the theme shortcut.
+        chips.addView(heroChip("Быстрые настройки", true, this::quick), Qvk3Ui.weight(1));
+        chips.addView(gap());
+        chips.addView(heroChip("Светлая и тёмная тема", false, () -> Qvk3InfoScreens.dayNight(this)), Qvk3Ui.weight(1));
         look.addView(chips);
         Qvk3Motion.press(look);
         look.setOnClickListener(v -> Qvk3InfoScreens.dayNight(this));
@@ -971,10 +974,11 @@ public final class Qvk3SettingsActivity extends Activity {
     // ------------------------------------------------------------------ IDEA-0023: «Быстрые настройки»
 
     private TextView quickTile(String title, String sub, int color, Runnable click) {
-        TextView t = Qvk3Ui.text(this, title + (sub == null ? "" : "\n" + sub), 15, Color.WHITE, true);
+        // BUG-0064 (2.1): the pill around the text was too chunky — tighter padding and radius, smaller text.
+        TextView t = Qvk3Ui.text(this, title + (sub == null ? "" : "\n" + sub), 14, Color.WHITE, true);
         t.setGravity(android.view.Gravity.CENTER);
-        t.setPadding(dp(10), dp(14), dp(10), dp(14));
-        t.setBackground(Qvk3Ui.ripple(this, color, 0x33FFFFFF, dp(18)));
+        t.setPadding(dp(8), dp(9), dp(8), dp(9));
+        t.setBackground(Qvk3Ui.ripple(this, color, 0x33FFFFFF, dp(13)));
         t.setOnClickListener(v -> click.run());
         return t;
     }
@@ -1052,7 +1056,15 @@ public final class Qvk3SettingsActivity extends Activity {
         }));
         col.addView(g);
         LinearLayout nav = Qvk3Sheet.group(this, p);
-        nav.addView(Qvk3Sheet.navRow(this, p, "Уведомления QVK", v -> go(dlg[0], "push")));
+        // BUG-0064 (2.2): «Уведомления QVK» should open the delivery-method chooser, not the diagnostics screen.
+        // (2.3): opening it as its own dialog over the quick sheet means closing it returns here, not to search.
+        nav.addView(Qvk3Sheet.navRow(this, p, "Доставка уведомлений", v -> {
+            try {
+                Qvk3NativeEditors.push(this);
+            } catch (Throwable e) {
+                Qvk3Ui.toast(this, "Не удалось открыть: " + Qvk3Jobs.message(e));
+            }
+        }));
         nav.addView(Qvk3Sheet.divider(this, p));
         nav.addView(Qvk3Sheet.navRow(this, p, "Стикеры из Telegram", v -> {
             dlg[0].dismiss();
@@ -1061,12 +1073,6 @@ public final class Qvk3SettingsActivity extends Activity {
             } catch (Throwable e) {
                 Qvk3Ui.toast(this, "Не удалось открыть: " + Qvk3Jobs.message(e));
             }
-        }));
-        nav.addView(Qvk3Sheet.divider(this, p));
-        nav.addView(Qvk3Sheet.navRow(this, p, "Найти настройку…", v -> {
-            dlg[0].dismiss();
-            search.requestFocus();
-            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(search, 0);
         }));
         LinearLayout.LayoutParams nl = Qvk3Ui.match();
         nl.topMargin = dp(10);
