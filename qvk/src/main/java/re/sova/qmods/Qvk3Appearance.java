@@ -16,10 +16,10 @@ public final class Qvk3Appearance {
     public static final String STYLE = "qvk3_style";
     public static final String TOKENS = "qvk3_tokens";
     /**
-     * QVK's existing "system" slot mode: ThemeProfiles picks the day or night palette by Android's night mode,
-     * as in QVK 2.x. (alpha2–alpha15 resolved it by VK's internal theme flag instead — patch 0006. That flag changes
-     * later than Android's and is flipped by the theme catalog, which mixed the two palettes: BUG-0014/0016.)
-     * apply() switches VK's own light/dark theme to follow the system too, so both always agree.
+     * QVK's "system" slot mode: ThemeProfiles picks the day or night palette by VK's actual theme (patch 0024), the
+     * same answer as every other QVK part (Qvk3Ui.night). Before, the palette went by Android's night mode while VK
+     * could be in the other theme — light text and buttons on dark VK with any day/night style (BUG-0039…0047).
+     * apply() also switches VK's own light/dark theme to follow the system, so normally both agree anyway.
      */
     public static final String MODE_VK = "system";
 
@@ -27,7 +27,7 @@ public final class Qvk3Appearance {
         try {
             return NativeTheme.dark(c);
         } catch (Throwable t) {
-            return Qvk3Ui.night(c);
+            return Qvk3Ui.systemNight(c);
         }
     }
     static final String BACKUP = "qvk3_appearance_backup";

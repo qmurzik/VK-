@@ -45,7 +45,21 @@ public final class Qvk3Ui {
         }
     }
 
+    /**
+     * Day or night for everything QVK draws: VK's actual theme (BUG-0039…0047). VK can be dark while the phone is light
+     * (and back); deciding some parts by Android's night mode and others by VK's theme put light-theme text and
+     * buttons on dark VK, with any style that has day and night variants. Falls back to Android's night mode.
+     */
     public static boolean night(Context c) {
+        try {
+            return NativeTheme.dark(c);
+        } catch (Throwable t) {
+            return systemNight(c);
+        }
+    }
+
+    /** Android's own night mode (only where the phone's setting itself is meant). */
+    public static boolean systemNight(Context c) {
         return (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
