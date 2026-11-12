@@ -1,0 +1,227 @@
+diff -ru a/smali_classes10/com/vk/im/ui/dialogs_list/ImDialogsFragment.smali b/smali_classes10/com/vk/im/ui/dialogs_list/ImDialogsFragment.smali
+--- a/smali_classes10/com/vk/im/ui/dialogs_list/ImDialogsFragment.smali	2026-11-12 09:51:02.240991647 +0000
++++ b/smali_classes10/com/vk/im/ui/dialogs_list/ImDialogsFragment.smali	2026-11-12 09:51:21.893353954 +0000
+@@ -1019,6 +1019,20 @@
+ .method public Fl()Z
+     .locals 3
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_Fl
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_im_ext_Fl
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/dialogs_list/ImDialogsFragment;->q:Lxsna/kwq;
+ 
+@@ -2538,6 +2552,20 @@
+ .method public l()Z
+     .locals 5
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_l
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_im_ext_l
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/dialogs_list/ImDialogsFragment;->G:Lxsna/npy;
+ 
+@@ -2602,6 +2630,18 @@
+ .method public o(Lcom/vk/core/ui/tracking/UiTrackingScreen;)V
+     .locals 2
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_o
++
++    return-void
++
++    :qvk3_im_ext_o
++
+     .line 1
+     invoke-super {p0, p1}, Lcom/vk/core/fragments/FragmentImpl;->o(Lcom/vk/core/ui/tracking/UiTrackingScreen;)V
+ 
+@@ -3642,6 +3682,18 @@
+ .method public w6()V
+     .locals 4
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_w6
++
++    return-void
++
++    :qvk3_im_ext_w6
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/dialogs_list/ImDialogsFragment;->y:Lcom/google/android/material/floatingactionbutton/FloatingActionButton;
+ 
+diff -ru a/smali_classes10/com/vk/im/ui/fragments/DialogsFragment.smali b/smali_classes10/com/vk/im/ui/fragments/DialogsFragment.smali
+--- a/smali_classes10/com/vk/im/ui/fragments/DialogsFragment.smali	2026-11-12 09:51:02.240555498 +0000
++++ b/smali_classes10/com/vk/im/ui/fragments/DialogsFragment.smali	2026-11-12 09:51:21.891601232 +0000
+@@ -1001,6 +1001,20 @@
+ .method public Fl()Z
+     .locals 3
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_Fl
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_im_ext_Fl
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->x:Lcom/vk/im/engine/models/ImExperiments;
+ 
+@@ -1147,6 +1161,18 @@
+ .method public Ud(Lxsna/iqj;)V
+     .locals 3
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_Ud
++
++    return-void
++
++    :qvk3_im_ext_Ud
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->U:Lcom/vk/imageloader/view/VKImageView;
+ 
+@@ -1525,6 +1551,18 @@
+ .method public Xh(Landroid/content/Intent;)V
+     .locals 3
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_Xh
++
++    return-void
++
++    :qvk3_im_ext_Xh
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->u:Lxsna/otq;
+ 
+@@ -2034,7 +2072,19 @@
+ .end method
+ 
+ .method public Z2()V
+-    .locals 0
++    .locals 1
++
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_Z2
++
++    return-void
++
++    :qvk3_im_ext_Z2
+ 
+     .line 1
+     invoke-virtual {p0}, Lcom/vk/im/ui/fragments/DialogsFragment;->bI()V
+@@ -3331,6 +3381,20 @@
+ .method public l()Z
+     .locals 5
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_l
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_im_ext_l
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->J:Lcom/google/android/material/appbar/AppBarLayout;
+ 
+@@ -3515,6 +3579,20 @@
+ .method public mI()Z
+     .locals 3
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_mI
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_im_ext_mI
++
+     .line 1
+     invoke-virtual {p0}, Lcom/vk/im/ui/fragments/DialogsFragment;->VH()Lxsna/npy;
+ 
+@@ -5106,6 +5184,18 @@
+ .method public w6()V
+     .locals 4
+ 
++    # QVK 3.0 (BUG-0056/0058/0059): VK calls this from outside (theme change, profile/bottom bar updates, tab
++    # reselect) — with QVK's list on screen this fragment's own views do not exist.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3ImEntry;->ours(Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_ext_w6
++
++    return-void
++
++    :qvk3_im_ext_w6
++
+     .line 1
+     iget-object v0, p0, Lcom/vk/im/ui/fragments/DialogsFragment;->R:Lcom/google/android/material/floatingactionbutton/FloatingActionButton;
+ 
