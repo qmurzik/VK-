@@ -63,7 +63,7 @@ public final class Qvk3StylesActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(8), dp(6), dp(12), dp(4));
         head.addView(Qvk3Ui.icon(this, Qvk3Icons.BACK, p.text, 48, 24, "Назад", v -> finish()));
-        TextView title = Qvk3Ui.line(this, "Оформление", 26, p.text, true);
+        TextView title = Qvk3Ui.line(this, "Оформление", 22, p.text, true);
         title.setAccessibilityHeading(true);
         title.setPadding(dp(8), 0, 0, 0);
         head.addView(title, Qvk3Ui.weight(1));

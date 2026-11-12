@@ -84,20 +84,34 @@ public final class Qvk3Runtime extends ContentProvider {
         ShortcutManager sm = c.getSystemService(ShortcutManager.class);
         if (sm == null) return;
         List<ShortcutInfo> list = new ArrayList<>();
-        list.add(new ShortcutInfo.Builder(c, "qvk3_settings").setShortLabel("Настройки QVK").setLongLabel("Центр настроек QVK")
-                .setIcon(Icon.createWithResource(c, android.R.drawable.ic_menu_preferences))
-                .setIntent(new Intent(c, Qvk3SettingsActivity.class).setAction(Intent.ACTION_VIEW)).build());
-        list.add(new ShortcutInfo.Builder(c, "qvk3_shell").setShortLabel("QVK").setLongLabel("Оболочка QVK: чаты и музыка")
-                .setIcon(Icon.createWithResource(c, android.R.drawable.sym_action_chat))
-                .setIntent(new Intent(c, Qvk3ShellActivity.class).setAction(Intent.ACTION_VIEW)).build());
-        list.add(new ShortcutInfo.Builder(c, "qvk3_music").setShortLabel("QVK Music").setLongLabel("Открыть QVK Music")
-                .setIcon(Icon.createWithResource(c, android.R.drawable.ic_media_play))
-                .setIntent(new Intent(c, Qvk3MusicActivity.class).setAction(Intent.ACTION_VIEW)).build());
+        list.add(shortcut(c, "qvk3_music", "QVK Music", "Открыть QVK Music", Qvk3Icons.MUSIC, 0xFFFF3B5C,
+                new Intent(c, Qvk3MusicActivity.class)));
+        list.add(shortcut(c, "qvk3_settings", "Настройки QVK", "Центр настроек QVK", Qvk3Icons.SLIDERS, 0xFF2688EB,
+                new Intent(c, Qvk3SettingsActivity.class)));
+        list.add(shortcut(c, "qvk3_report", "Сообщить о проблеме", "Баг или идея команде QVK", Qvk3Icons.SEND, 0xFFFF9500,
+                new Intent(c, Qvk3SettingsActivity.class).putExtra(Qvk3SettingsActivity.EXTRA_ROUTE, "report")));
+        if (Qvk3Shell.enabledByUser(c)) list.add(shortcut(c, "qvk3_shell", "Чаты QVK", "Оболочка QVK: чаты и музыка", Qvk3Icons.CHAT, 0xFF34C759,
+                new Intent(c, Qvk3ShellActivity.class)));
         try {
-            sm.setDynamicShortcuts(list);
+            sm.setDynamicShortcuts(list.subList(0, Math.min(list.size(), Math.max(1, sm.getMaxShortcutCountPerActivity()))));
         } catch (Exception e) {
             RuntimeFaults.record("qvk3.runtime.shortcuts", e);
         }
+    }
+
+    /** Launcher shortcut with a QVK icon on a coloured adaptive background (instead of grey system icons). */
+    private static ShortcutInfo shortcut(Context c, String id, String shortLabel, String longLabel, String icon, int color, Intent intent) {
+        int size = Math.round(108 * c.getResources().getDisplayMetrics().density);
+        android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(b);
+        cv.drawColor(color);
+        Qvk3Icons ic = Qvk3Icons.of(icon, 0xFFFFFFFF);
+        int glyph = size * 30 / 108, off = (size - glyph) / 2; // inside the adaptive-icon safe zone
+        ic.setBounds(off, off, off + glyph, off + glyph);
+        ic.draw(cv);
+        return new ShortcutInfo.Builder(c, id).setShortLabel(shortLabel).setLongLabel(longLabel)
+                .setIcon(Icon.createWithAdaptiveBitmap(b))
+                .setIntent(intent.setAction(Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)).build();
     }
 
     @Override

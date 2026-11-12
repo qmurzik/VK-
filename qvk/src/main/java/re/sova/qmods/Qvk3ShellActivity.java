@@ -187,7 +187,7 @@ public final class Qvk3ShellActivity extends Activity {
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(dp(16), 0, dp(16), dp(24));
         sv.addView(col);
-        TextView title = Qvk3Ui.text(this, "Ещё", 34, s.text, true);
+        TextView title = Qvk3Ui.text(this, "Ещё", 24, s.text, true);
         title.setAccessibilityHeading(true);
         title.setPadding(dp(0), dp(10), 0, dp(10));
         col.addView(title);
@@ -247,7 +247,7 @@ public final class Qvk3ShellActivity extends Activity {
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.BOTTOM);
         head.setPadding(dp(16), dp(10), dp(8), dp(4));
-        TextView title = Qvk3Ui.text(this, "Чаты", 34, s.text, false);
+        TextView title = Qvk3Ui.text(this, "Чаты", 24, s.text, true);
         title.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
         title.setAccessibilityHeading(true);
         head.addView(title, Qvk3Ui.weight(1));

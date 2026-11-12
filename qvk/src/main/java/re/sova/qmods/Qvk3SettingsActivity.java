@@ -101,7 +101,8 @@ public final class Qvk3SettingsActivity extends Activity {
         LinearLayout tt = new LinearLayout(this);
         tt.setOrientation(LinearLayout.VERTICAL);
         tt.setPadding(dp(8), 0, 0, 0);
-        title = Qvk3Ui.line(this, "Настройки", 30, p.text, true);
+        title = Qvk3Ui.line(this, "Настройки", 24, p.text, true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setAccessibilityHeading(true);
         subtitle = Qvk3Ui.line(this, version(), 13, p.text2, false);
         tt.addView(title);
@@ -157,10 +158,6 @@ public final class Qvk3SettingsActivity extends Activity {
         root.addView(hairline, root.indexOfChild(scroll), new LinearLayout.LayoutParams(-1, Math.max(1, dp(0.6f))));
         scroll.setOnScrollChangeListener((v, x, y, ox, oy) -> {
             float f = Math.max(0f, Math.min(1f, y / (float) dp(70)));
-            title.setPivotX(0f);
-            title.setPivotY(title.getHeight());
-            title.setScaleX(1f - 0.28f * f);
-            title.setScaleY(1f - 0.28f * f);
             subtitle.setAlpha(1f - f);
             hairline.setAlpha(f);
         });
@@ -184,6 +181,19 @@ public final class Qvk3SettingsActivity extends Activity {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
             backCallback = cb;
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        String route = intent == null ? null : intent.getStringExtra(EXTRA_ROUTE);
+        if (route != null) content.post(() -> {
+            try {
+                qvk3(route);
+            } catch (Exception e) {
+                Qvk3Ui.toast(this, Qvk3Jobs.message(e));
+            }
+        });
     }
 
     private String version() {
@@ -491,6 +501,8 @@ public final class Qvk3SettingsActivity extends Activity {
         content.removeAllViews();
         boolean changed = !heading.contentEquals(title.getText());
         title.setText(heading);
+        // a compact, readable header: 24sp on the home screen, 20sp inside — never a giant truncated title
+        title.setTextSize(home ? 24 : 20);
         subtitle.setText(sub);
         back.setVisibility(home ? View.GONE : View.VISIBLE);
         scroll.scrollTo(0, 0);
@@ -747,17 +759,16 @@ public final class Qvk3SettingsActivity extends Activity {
         }
         LinearLayout hero = new LinearLayout(this);
         hero.setGravity(Gravity.CENTER_VERTICAL);
-        hero.setPadding(dp(16), dp(14), dp(16), dp(14));
+        hero.setPadding(dp(12), dp(10), dp(14), dp(10));
         android.graphics.drawable.GradientDrawable wash = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, new int[]{(col & 0x00FFFFFF) | 0x40000000, (col & 0x00FFFFFF) | 0x0A000000});
-        wash.setCornerRadius(dp(20));
+        wash.setCornerRadius(dp(16));
         hero.setBackground(wash);
-        hero.addView(Qvk3Ui.tile(this, Qvk3SettingsIndex.SECTION_ICONS[s], col, 48));
+        hero.addView(Qvk3Ui.tile(this, Qvk3SettingsIndex.SECTION_ICONS[s], col, 32));
         LinearLayout ht = new LinearLayout(this);
         ht.setOrientation(LinearLayout.VERTICAL);
-        ht.setPadding(dp(14), 0, 0, 0);
-        ht.addView(Qvk3Ui.text(this, plural(index.groups(s).size(), "группа", "группы", "групп") + " · " + plural(nScreens, "экран", "экрана", "экранов") + " · " + plural(nToggles, "переключатель", "переключателя", "переключателей"), 13, p.text2, false));
-        ht.addView(Qvk3Ui.text(this, "Удерживайте пункт, чтобы добавить в избранное", 12, p.text2, false));
+        ht.setPadding(dp(12), 0, 0, 0);
+        ht.addView(Qvk3Ui.line(this, plural(nScreens, "экран", "экрана", "экранов") + " · " + plural(nToggles, "переключатель", "переключателя", "переключателей"), 13, p.text2, false));
         hero.addView(ht, Qvk3Ui.weight(1));
         LinearLayout.LayoutParams hl = Qvk3Ui.match();
         hl.topMargin = dp(6);

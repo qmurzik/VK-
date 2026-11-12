@@ -20,6 +20,10 @@ final class Qvk3Shell implements Application.ActivityLifecycleCallbacks {
         app.registerActivityLifecycleCallbacks(new Qvk3Shell());
     }
 
+    static boolean enabledByUser(android.content.Context c) {
+        return Qvk3MusicSettings.prefs(c).getBoolean(Qvk3ShellActivity.ENABLED, false);
+    }
+
     static boolean enabled(Activity a) {
         return Qvk3MusicSettings.prefs(a).getBoolean(Qvk3ShellActivity.ENABLED, false);
     }

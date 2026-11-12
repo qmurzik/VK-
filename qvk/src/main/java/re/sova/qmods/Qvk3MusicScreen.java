@@ -490,7 +490,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4), 0);
         header.addView(Qvk3Ui.icon(a, Qvk3Icons.BACK, p.text, 48, 24, "Назад", v -> backOrFinish()));
-        screenTitle = Qvk3Ui.line(a, "Музыка", 28, p.text, true);
+        screenTitle = Qvk3Ui.line(a, "Музыка", 22, p.text, true);
         screenTitle.setAccessibilityHeading(true);
         screenTitle.setPadding(Qvk3Ui.dp(a, 6), 0, 0, 0);
         header.addView(screenTitle, Qvk3Ui.weight(1));
