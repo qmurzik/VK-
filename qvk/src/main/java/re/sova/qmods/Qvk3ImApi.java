@@ -58,6 +58,11 @@ final class Qvk3ImApi {
         return r.optLong("message_id", r.optLong("id"));
     }
 
+    static long sendSticker(long peer, long randomId, long stickerId, long replyTo) throws Exception {
+        return number(call("messages.send", "peer_id", Long.toString(peer), "random_id", Long.toString(randomId),
+                "sticker_id", Long.toString(stickerId), "reply_to", replyTo > 0 ? Long.toString(replyTo) : null));
+    }
+
     /** Forwards messages from another chat (forward JSON keeps the source peer). */
     static long forward(long toPeer, long fromPeer, List<Long> ids, String comment) throws Exception {
         JSONObject f = new JSONObject().put("peer_id", fromPeer);

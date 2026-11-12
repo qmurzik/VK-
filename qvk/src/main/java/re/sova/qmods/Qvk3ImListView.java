@@ -49,6 +49,7 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
         TextView title = Qvk3Ui.line(a, "Сообщения", 22, p.text, true);
         title.setAccessibilityHeading(true);
         head.addView(title, Qvk3Ui.weight(1));
+        head.addView(Qvk3Ui.icon(a, Qvk3Icons.PLUS, p.text, 44, 22, "Новое сообщение", v -> compose()));
         head.addView(Qvk3Ui.icon(a, Qvk3Icons.MORE, p.text, 44, 22, "Ещё", v -> menu()));
         addView(head, Qvk3Ui.match());
 
@@ -147,6 +148,35 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
         if (c == null) return;
         Qvk3ImUi.hideKeyboard(search);
         Qvk3ImChatActivity.open(a, c.peer);
+    }
+
+    /** «Новое сообщение»: friends in VK's «important first» order. */
+    private void compose() {
+        Qvk3Ui.toast(a, "Загружаем друзей…");
+        Qvk3Jobs.io(() -> {
+            try {
+                org.json.JSONObject r = Qvk3ImApi.call("friends.get", "order", "hints", "count", "300", "fields", "photo_100,online");
+                org.json.JSONArray items = r.optJSONArray("items");
+                List<Long> ids = new ArrayList<>();
+                List<String> labels = new ArrayList<>();
+                if (items != null) for (int i = 0; i < items.length(); i++) {
+                    org.json.JSONObject o = items.optJSONObject(i);
+                    if (o == null || o.has("deactivated")) continue;
+                    ids.add(o.optLong("id"));
+                    labels.add((o.optString("first_name") + " " + o.optString("last_name")).trim() + "\n" + (o.optInt("online") == 1 ? "в сети" : "друг"));
+                }
+                Qvk3Jobs.main(() -> {
+                    if (ids.isEmpty()) {
+                        Qvk3Ui.toast(a, "Список друзей пуст");
+                        return;
+                    }
+                    Qvk3Ui.dialog(a).setTitle("Новое сообщение").setItems(labels.toArray(new String[0]), (d, w) -> Qvk3ImChatActivity.open(a, ids.get(w)))
+                            .setNegativeButton("Отмена", null).show();
+                });
+            } catch (Exception e) {
+                Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Не удалось загрузить друзей: " + Qvk3Jobs.message(e)));
+            }
+        });
     }
 
     private void menu() {

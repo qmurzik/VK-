@@ -224,6 +224,7 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
         LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(0, -2, 1f);
         il.setMargins(dp(2), 0, dp(4), 0);
         composer.addView(input, il);
+        composer.addView(Qvk3Ui.icon(a, Qvk3Icons.GRID, p.text2, 44, 22, "Стикеры", v -> Qvk3ImStickers.open(this)));
         send = Qvk3Ui.icon(a, Qvk3Icons.SEND, p.accent, 44, 24, "Отправить", v -> send());
         composer.addView(send);
         addView(composer, Qvk3Ui.match());
@@ -767,6 +768,49 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
         adapter.notifyDataSetChanged();
         list.post(() -> list.setSelection(adapter.getCount() - 1));
         deliver(local, reply, fwd, atts);
+    }
+
+    /** A sticker goes out at once (like in VK), as a local copy until the server confirms it. */
+    void sendSticker(long id, String url) {
+        Qvk3ImModel.Message local = new Qvk3ImModel.Message();
+        local.peer = peer;
+        local.out = true;
+        local.local = 1;
+        local.date = System.currentTimeMillis() / 1000;
+        local.randomId = (System.nanoTime() & 0x3fffffffL) + 1;
+        try {
+            local.attachments.add(Qvk3ImModel.attachment(new JSONObject().put("type", "sticker").put("sticker",
+                    new JSONObject().put("sticker_id", id).put("images", new JSONArray().put(new JSONObject().put("width", 256).put("url", url))))));
+        } catch (Exception ignored) {
+        }
+        long reply = replyTo;
+        store.messages(peer).add(local);
+        clearContext();
+        adapter.notifyDataSetChanged();
+        list.post(() -> list.setSelection(adapter.getCount() - 1));
+        Qvk3Jobs.io(() -> {
+            try {
+                long mid = Qvk3ImApi.sendSticker(peer, local.randomId, id, reply);
+                JSONObject r = Qvk3ImApi.byIds(Collections.singletonList(mid));
+                List<Qvk3ImModel.Message> got = Qvk3ImModel.history(r);
+                Qvk3Jobs.main(() -> {
+                    if (got.isEmpty()) {
+                        local.id = mid;
+                        local.local = 0;
+                        store.notifyChanged(peer);
+                    } else {
+                        got.get(0).randomId = local.randomId;
+                        store.put(got, false);
+                    }
+                });
+            } catch (Exception e) {
+                Qvk3Jobs.main(() -> {
+                    store.messages(peer).remove(local);
+                    adapter.notifyDataSetChanged();
+                    Qvk3Ui.toast(a, "Стикер не отправлен: " + Qvk3Jobs.message(e));
+                });
+            }
+        });
     }
 
     private void deliver(Qvk3ImModel.Message local, long reply, List<Long> fwd, List<String> atts) {
