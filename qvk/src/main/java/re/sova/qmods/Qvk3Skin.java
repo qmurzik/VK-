@@ -87,7 +87,6 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         Qvk3Look.settingsOnTop = !stock(a);
         if (!stock(a)) return;
         lastVk = new WeakReference<>(a);
-        Qvk3ElementPicker.maybeStart(a);
         if (!active(a)) {
             // nothing to restyle: no layout listener, no tree walks (they cost battery on every VK redraw)
             ViewTreeObserver.OnGlobalLayoutListener old = listeners.remove(a);

@@ -23,6 +23,8 @@ public final class Qvk3Look {
         } catch (Throwable ignored) {
             // fall through to the original check
         }
-        return IosAppearance.part(name);
+        // BUG-0016: the QVK 2.x appearance ("style") layer no longer touches VK screens — only QVK's own
+        // settings screens keep the unified card look. On a stock VK screen no part is ever forced on.
+        return settingsOnTop && IosAppearance.part(name);
     }
 }

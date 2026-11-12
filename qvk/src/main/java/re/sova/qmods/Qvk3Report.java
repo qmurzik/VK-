@@ -148,7 +148,6 @@ final class Qvk3Report {
             row.addView(thumb, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 54), Qvk3Ui.dp(a, 96)));
             col.addView(row);
         }
-        CheckBox look = check(a, p, col, "Настройки оформления (код QVKLOOK)", true);
         TextView auto = Qvk3Ui.text(a, "Подставится само: " + safeDevice(a), 12, p.text2, false);
         auto.setPadding(0, Qvk3Ui.dp(a, 8), 0, 0);
         col.addView(auto);
@@ -186,7 +185,7 @@ final class Qvk3Report {
                     putIf(t, "how_it_works", how);
                     putIf(t, "purpose", purpose);
                 }
-                Attach att = new Attach(log.isChecked(), shotBox != null && shotBox.isChecked() ? screenshot : null, look.isChecked());
+                Attach att = new Attach(log.isChecked(), shotBox != null && shotBox.isChecked() ? screenshot : null, false);
                 d.dismiss();
                 submit(a, t, att);
             } catch (Exception e) {
@@ -261,15 +260,6 @@ final class Qvk3Report {
                     out.add(new Qvk3Portal.Part("qvk-screen-" + stamp + ".jpg", "image/jpeg", o.toByteArray()));
                     break;
                 }
-            }
-        }
-        if (att.look) {
-            try {
-                String text = "Оформление QVK (вставить: Правила интерфейса → «Вставить оформление из буфера»)\n"
-                        + "Стиль: " + Qvk3MusicSettings.prefs(a).getString(Qvk3Appearance.STYLE, "classic") + "\n\n" + Qvk3LookShare.export(a) + "\n";
-                out.add(new Qvk3Portal.Part("qvk-look-" + stamp + ".txt", "text/plain", text.getBytes(StandardCharsets.UTF_8)));
-            } catch (Exception e) {
-                RuntimeFaults.record("qvk3.report.look", e);
             }
         }
         return out;
