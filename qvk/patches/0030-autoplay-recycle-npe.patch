@@ -1,0 +1,17 @@
+diff -ru a/smali_classes11/xsna/ub3.smali b/smali_classes11/xsna/ub3.smali
+--- a/smali_classes11/xsna/ub3.smali	2026-11-12 14:21:23.841845365 +0000
++++ b/smali_classes11/xsna/ub3.smali	2026-11-12 14:21:38.116441128 +0000
+@@ -14823,9 +14823,13 @@
+     .line 12
+     move-result-object v0
+ 
++    # QVK 3.0 (BUG-0015): RecyclerView recycles a GIF/sticker view after the autoplay manager was released; skip registration to avoid NPE in a.X().
++    if-eqz v0, :qvk3_q5_nomgr
++
+     .line 13
+     invoke-interface {v0, p0}, Lcom/vk/libvideo/autoplay/a;->X(Lxsna/t7q0;)V
+ 
++    :qvk3_q5_nomgr
+     .line 14
+     .line 15
+     .line 16
