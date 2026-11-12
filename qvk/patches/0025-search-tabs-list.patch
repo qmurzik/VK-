@@ -1,0 +1,27 @@
+diff -ru a/smali_classes15/com/vk/search/fragment/DiscoverSearchTabs.smali b/smali_classes15/com/vk/search/fragment/DiscoverSearchTabs.smali
+--- a/smali_classes15/com/vk/search/fragment/DiscoverSearchTabs.smali	2026-11-12 08:20:29.931562922 +0000
++++ b/smali_classes15/com/vk/search/fragment/DiscoverSearchTabs.smali	2026-11-12 08:20:29.951228240 +0000
+@@ -1198,6 +1198,11 @@
+ 
+     .line 60
+     .line 61
++    # QVK 3.0 (BUG-0048): drop the search tabs switched off in QVK settings.
++    invoke-static {v0}, Lre/sova/qmods/Qvk3SearchTabs;->tabs(Ljava/util/List;)Ljava/util/List;
++
++    move-result-object v0
++
+     return-object v0
+ 
+     .line 62
+@@ -1230,6 +1235,11 @@
+     move-result-object v0
+ 
+     .line 76
++    # QVK 3.0 (BUG-0048): drop the search tabs switched off in QVK settings.
++    invoke-static {v0}, Lre/sova/qmods/Qvk3SearchTabs;->tabs(Ljava/util/List;)Ljava/util/List;
++
++    move-result-object v0
++
+     return-object v0
+ .end method
+ 

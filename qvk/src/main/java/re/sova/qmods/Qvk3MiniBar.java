@@ -33,6 +33,33 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
         if (instance != null) return;
         instance = new Qvk3MiniBar();
         app.registerActivityLifecycleCallbacks(instance);
+        // BUG-0034: QVK starts one main-loop turn after VK, so VK's first screen is usually resumed already and its
+        // onActivityResumed never reaches the bar — it stayed hidden until another screen was opened and closed.
+        Activity top = resumedNow();
+        log("installed; resumed now: " + (top == null ? "none" : top.getClass().getSimpleName()));
+        if (top != null) instance.onActivityResumed(top);
+    }
+
+    /** The activity resumed right now (ActivityThread's records); null when it cannot be read. */
+    static Activity resumedNow() {
+        try {
+            Class<?> at = Class.forName("android.app.ActivityThread");
+            Object thread = at.getMethod("currentActivityThread").invoke(null);
+            java.lang.reflect.Field f = at.getDeclaredField("mActivities");
+            f.setAccessible(true);
+            Object map = f.get(thread);
+            if (!(map instanceof java.util.Map)) return null;
+            for (Object r : ((java.util.Map<?, ?>) map).values()) {
+                java.lang.reflect.Field pf = r.getClass().getDeclaredField("paused"), af = r.getClass().getDeclaredField("activity");
+                pf.setAccessible(true);
+                af.setAccessible(true);
+                Object act = af.get(r);
+                if (!pf.getBoolean(r) && act instanceof Activity && !((Activity) act).isFinishing()) return (Activity) act;
+            }
+        } catch (Throwable t) {
+            log("resumed activity unknown: " + t.getClass().getSimpleName());
+        }
+        return null;
     }
 
     static boolean vkScreen(Activity a) {

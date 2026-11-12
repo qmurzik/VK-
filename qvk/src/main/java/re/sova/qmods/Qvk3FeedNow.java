@@ -30,6 +30,8 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
         if (instance != null || Qvk3Kill.off(app, "feed_now")) return; // remote switch-off applies from the next start
         instance = new Qvk3FeedNow();
         app.registerActivityLifecycleCallbacks(instance);
+        Activity top = Qvk3MiniBar.resumedNow(); // VK's first screen resumed before QVK started (BUG-0034)
+        if (top != null) instance.onActivityResumed(top);
     }
 
     /** The engine may be created while a VK screen is already open (first play). */

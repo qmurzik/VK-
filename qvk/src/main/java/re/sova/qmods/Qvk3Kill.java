@@ -38,6 +38,7 @@ final class Qvk3Kill {
             {"shell", "Оболочка «Чаты» QVK"},
             {"update_prompt", "Окно «Доступно обновление»"},
             {"messenger", "Мессенджер QVK"},
+            {"classic_chats", "Классический список чатов (скрытые чаты, мессенджер QVK)"},
     };
 
     private static volatile Map<String, String> cache;

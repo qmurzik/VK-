@@ -1,0 +1,20 @@
+diff -ru a/smali_classes11/xsna/h2x.smali b/smali_classes11/xsna/h2x.smali
+--- a/smali_classes11/xsna/h2x.smali	2026-11-12 08:23:14.305811444 +0000
++++ b/smali_classes11/xsna/h2x.smali	2026-11-12 08:23:14.319537570 +0000
+@@ -1690,6 +1690,16 @@
+ 
+     .line 20
+     :goto_0
++    # QVK 3.0 (BUG-0034): with QVK Music on, the menu / «Сервисы» item opens the music container, which hosts QVK Music.
++    invoke-static {}, Lre/sova/qmods/Qvk3MusicEntry;->menuToQvk()Z
++
++    move-result p2
++
++    if-eqz p2, :qvk3_music_menu_vk
++
++    const-class v5, Lcom/vk/music/fragment/impl/MusicContainerFragment;
++
++    :qvk3_music_menu_vk
+     sget-object p2, Lxsna/h2x;->a:Lxsna/h2x;
+ 
+     sget-object p4, Lcom/vk/menu/presentation/entity/MenuItemUiData;->AUDIOS:Lcom/vk/menu/presentation/entity/MenuItemUiData;

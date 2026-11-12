@@ -1,0 +1,56 @@
+diff -ru a/smali_classes18/xsna/nrq0.smali b/smali_classes18/xsna/nrq0.smali
+--- a/smali_classes18/xsna/nrq0.smali	2026-11-12 08:17:01.670483267 +0000
++++ b/smali_classes18/xsna/nrq0.smali	2026-11-12 08:17:01.708085314 +0000
+@@ -375,6 +375,18 @@
+ .method public final h()Z
+     .locals 3
+ 
++    # QVK 3.0: QVK's chat-list features (hidden chats, dialog actions, messenger) live in the classic DialogsFragment.
++    invoke-static {}, Lre/sova/qmods/Qvk3ImEntry;->classicTab()Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_im_new_screen
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_im_new_screen
+     .line 1
+     sget-object v0, Lxsna/nrq0;->d:Lxsna/pdt;
+ 
+diff -ru a/smali_classes21/re/sova/qmods/ThemeProfiles.smali b/smali_classes21/re/sova/qmods/ThemeProfiles.smali
+--- a/smali_classes21/re/sova/qmods/ThemeProfiles.smali	2026-11-12 08:17:01.679427578 +0000
++++ b/smali_classes21/re/sova/qmods/ThemeProfiles.smali	2026-11-12 08:17:01.709974127 +0000
+@@ -845,25 +845,13 @@
+     if-eqz p0, :cond_2
+ 
+     .line 41
+-    invoke-virtual {p0}, Landroid/content/Context;->getResources()Landroid/content/res/Resources;
++    # QVK 3.0 (BUG-0039..0047): "system" follows VK's actual theme, not Android's night mode — VK can be dark
++    # while the phone is light (and back), which put the day palette on dark VK: white cards, invisible text.
++    invoke-static {p0}, Lre/sova/qmods/NativeTheme;->dark(Landroid/content/Context;)Z
+ 
+-    move-result-object p0
++    move-result p0
+ 
+-    invoke-virtual {p0}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;
+-
+-    move-result-object p0
+-
+-    iget p0, p0, Landroid/content/res/Configuration;->uiMode:I
+-
+-    and-int/lit8 p0, p0, 0x30
+-
+-    .line 42
+-    nop
+-
+-    .line 41
+-    const/16 p1, 0x20
+-
+-    if-ne p0, p1, :cond_2
++    if-eqz p0, :cond_2
+ 
+     .line 43
+     move-object v0, v2

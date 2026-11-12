@@ -1,0 +1,37 @@
+diff -ru a/smali_classes11/xsna/ub3.smali b/smali_classes11/xsna/ub3.smali
+--- a/smali_classes11/xsna/ub3.smali	2026-11-12 08:25:41.833907455 +0000
++++ b/smali_classes11/xsna/ub3.smali	2026-11-12 08:25:49.073148021 +0000
+@@ -2799,6 +2799,15 @@
+     .line 4
+     move-result-object v0
+ 
++    # QVK 3.0 (BUG-0015): the autoplay manager is gone after the chat screen closed — nothing to autoplay.
++    if-nez v0, :qvk3_e0_ok
++
++    const/4 v0, 0x0
++
++    return v0
++
++    :qvk3_e0_ok
++
+     .line 5
+     invoke-interface {v0}, Lcom/vk/libvideo/autoplay/a;->p0()Z
+ 
+@@ -9394,6 +9403,17 @@
+ .method public final j2(Z)V
+     .locals 34
+ 
++    # QVK 3.0 (BUG-0015): VideoFocusDelegate can refresh a GIF/video after its autoplay manager was released.
++    invoke-virtual/range {p0 .. p0}, Lxsna/y3;->j()Lcom/vk/libvideo/autoplay/a;
++
++    move-result-object v1
++
++    if-nez v1, :qvk3_j2_ok
++
++    return-void
++
++    :qvk3_j2_ok
++
+     .line 1
+     move-object/from16 v0, p0
+ 

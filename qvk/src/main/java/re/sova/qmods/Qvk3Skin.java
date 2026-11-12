@@ -63,6 +63,8 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         if (instance != null || Qvk3Kill.off(app, "skin")) return; // remote switch-off applies from the next start
         instance = new Qvk3Skin();
         app.registerActivityLifecycleCallbacks(instance);
+        Activity top = Qvk3MiniBar.resumedNow(); // VK's first screen resumed before QVK started (BUG-0034)
+        if (top != null) instance.onActivityResumed(top);
     }
 
     public static Activity lastVkActivity() {
@@ -186,7 +188,9 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         View container = find(a, "bottom_navigation_container"), nav = find(a, "bottom_navigation"), shadow = find(a, "bottom_navigation_shadow");
         if (container == null || nav == null) return;
         Orig oc = orig(container), on_ = orig(nav);
+        View host = contentHost(container);
         if (!on) {
+            if (host != null) giveBackBottom(host);
             restore(container);
             restore(nav);
             if (shadow != null) restore(shadow);
@@ -251,6 +255,43 @@ public final class Qvk3Skin implements Application.ActivityLifecycleCallbacks {
         nav.setOutlineProvider(round);
         nav.setClipToOutline(true);            // icons and the active-tab indicator stay inside the corners
         if (container instanceof ViewGroup) ((ViewGroup) container).setClipChildren(false);
+        // BUG-0033: VK keeps the screen content above the bar (bottomMargin = bar height), so around a floating bar
+        // the page background showed instead of the feed. Content now runs under the bar, as a floating bar should.
+        if (host != null) freeBottom(host);
+    }
+
+    /** VK's screen host (bottom_nav_content's FitSystemWindowsFrameLayout next to the bar container). */
+    private static View contentHost(View container) {
+        if (!(container.getParent() instanceof ViewGroup)) return null;
+        ViewGroup parent = (ViewGroup) container.getParent();
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            View c = parent.getChildAt(i);
+            if (c == container || !c.getClass().getName().endsWith("FitSystemWindowsFrameLayout")) continue;
+            ViewGroup.LayoutParams lp = c.getLayoutParams();
+            if (lp instanceof ViewGroup.MarginLayoutParams && lp.height == ViewGroup.LayoutParams.MATCH_PARENT) return c;
+        }
+        return null;
+    }
+
+    private void freeBottom(View host) {
+        ViewGroup.MarginLayoutParams m = (ViewGroup.MarginLayoutParams) host.getLayoutParams();
+        if (m.bottomMargin <= 0) return;
+        Orig o = orig(host);
+        o.margins = new int[]{m.leftMargin, m.topMargin, m.rightMargin, m.bottomMargin};
+        m.bottomMargin = 0;
+        host.setLayoutParams(m);
+    }
+
+    /** Floating bar off: VK's own margin comes back (VK sets it again itself whenever the bar shows or hides). */
+    private void giveBackBottom(View host) {
+        Orig o = origs.get(host);
+        if (o == null || o.margins == null) return;
+        ViewGroup.MarginLayoutParams m = (ViewGroup.MarginLayoutParams) host.getLayoutParams();
+        if (m.bottomMargin == 0) {
+            m.bottomMargin = o.margins[3];
+            host.setLayoutParams(m);
+        }
+        o.margins = null;
     }
 
     /** setTag keys must be application ids (high byte >= 2); 0x7e.. never collides with aapt-assigned 0x7f.. ids. */

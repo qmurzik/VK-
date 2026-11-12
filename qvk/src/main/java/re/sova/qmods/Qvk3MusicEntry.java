@@ -65,6 +65,23 @@ public final class Qvk3MusicEntry {
         }
     }
 
+    /**
+     * Patch 0026, xsna/h2x#p: the «Музыка» item of VK's side menu and of «Сервисы» (MenuItemUiData.AUDIOS) opens
+     * MusicCatalogFragment directly, past MusicFragmentNavigator (BUG-0034). With QVK Music on it opens
+     * MusicContainerFragment instead, which shows QVK Music inline (patch 0008).
+     */
+    public static boolean menuToQvk() {
+        try {
+            Context c = RuntimeBridge.context;
+            boolean on = c != null && Qvk3MusicSettings.enabled(c) && !classicWanted();
+            if (on) android.util.Log.i("QVK3Music", "menu «Музыка» → QVK Music");
+            return on;
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.music.menu", t);
+            return false;
+        }
+    }
+
     private static final java.util.WeakHashMap<Object, Qvk3MusicScreen> tabs = new java.util.WeakHashMap<>();
 
     /**

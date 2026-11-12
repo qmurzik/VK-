@@ -26,6 +26,27 @@ public final class Qvk3ImEntry {
         return Qvk3MusicSettings.prefs(c).getBoolean(PREF, false) && !Qvk3Kill.off(c, "messenger");
     }
 
+    /**
+     * VK 8.100 picks the «Мессенджер» tab between the new DialogsScreenFragment (a server experiment) and the classic
+     * DialogsFragment (xsna/nrq0#h, patch 0024). Everything QVK adds to the chat list lives in the classic one —
+     * «Скрыть чат» and hidden chats, QVK's dialog actions and folders, and the QVK messenger — so QVK keeps the classic
+     * list unless it is switched off remotely ("classic_chats"). No Context there: QVK's preferences are loaded by then.
+     */
+    public static boolean classicTab() {
+        try {
+            boolean on = !Qvk3Kill.off("classic_chats");
+            if (on && !loggedTab) {
+                loggedTab = true;
+                android.util.Log.i("QVK3Im", "classic chats tab (QVK chat list features)");
+            }
+            return on;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static boolean loggedTab;
+
     private static boolean bypass(long peer) {
         if (System.currentTimeMillis() > bypassUntil) return false;
         if (bypassPeer == peer || bypassPeer == Long.MAX_VALUE) {
@@ -57,7 +78,12 @@ public final class Qvk3ImEntry {
     public static View listView(Object fragment, LayoutInflater inflater) {
         try {
             Activity a = activity(fragment);
-            if (a == null || !enabled(a) || bypass(0)) return null;
+            if (a == null) {
+                android.util.Log.w("QVK3Im", "list: no activity");
+                return null;
+            }
+            if (!enabled(a) || bypass(0)) return null;
+            android.util.Log.i("QVK3Im", "list: QVK view in " + fragment.getClass().getSimpleName());
             return new Qvk3ImListView(a);
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.im.list", t);
