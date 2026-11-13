@@ -812,54 +812,59 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
 
     private void showHome() {
         screenTitle.setText("Музыка");
+        // BUG-0010 (tester's review): no «Продолжить» (the mini-player already does that), no «Избранное QVK» and no
+        // «Мои плейлисты ВК» link — both live in «Моя музыка» / «Плейлисты»; more of VK's own blocks instead.
         List<Row> r = new ArrayList<>();
-        Qvk3Track cur = engine.current();
-        if (cur != null) {
-            r.add(header("Продолжить"));
-            List<Qvk3Track> one = new ArrayList<>();
-            one.add(cur);
-            r.add(new Row(Row.ITEM, cur.title, cur.artist + " · очередь: " + engine.queue().size(), "", cur.cover, cur, !cur.local.isEmpty(),
-                    () -> {
-                        engine.resume();
-                        openPlayer();
-                    }, null));
-        }
+        r.add(note("Загружаем главную…", null));
         rows.set(r);
+        r.clear();
         Qvk3Jobs.io(() -> {
             Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
-            List<Qvk3Track> recent = lib.recent(8), favs = lib.favorites(0, 8), latest = lib.page("my", 0, 10);
+            List<Qvk3Track> recent = lib.recent(10), latest = lib.page("my", 0, 10);
             List<Qvk3MusicLibrary.LocalList> locals = lib.localPlaylists();
-            // suggestions come from VK; when the account has none (or offline) the sections are simply absent
-            List<Qvk3Track> reco = new ArrayList<>(), popular = new ArrayList<>();
+            // suggestions come from VK; when the account has none (or offline) the sections are simply absent.
+            // BUG-0010 «долго открывается»: the three VK requests now run in parallel instead of one after another.
+            final List<Qvk3Track> reco = java.util.Collections.synchronizedList(new ArrayList<>());
+            final List<Qvk3Track> popular = java.util.Collections.synchronizedList(new ArrayList<>());
+            final List<Qvk3MusicSource.Block> vkBlocks = java.util.Collections.synchronizedList(new ArrayList<>());
+            Thread tReco = new Thread(() -> {
+                try {
+                    reco.addAll(Qvk3MusicSource.recommendations(15));
+                } catch (Exception ignored) {
+                }
+            }, "qvk3-home-reco");
+            Thread tPop = new Thread(() -> {
+                try {
+                    popular.addAll(Qvk3MusicSource.popular(15));
+                } catch (Exception ignored) {
+                }
+            }, "qvk3-home-popular");
+            Thread tVk = new Thread(() -> {
+                // BUG-0010: VK's own music home (джемы, подборки, плейлисты дня) right on «Главная»
+                try {
+                    List<Qvk3MusicSource.Block> all = Qvk3MusicSource.vkHome();
+                    for (int i = 0; i < all.size() && vkBlocks.size() < 8; i++) vkBlocks.add(all.get(i));
+                } catch (Exception e) {
+                    android.util.Log.i("QVK3Music", "home: VK blocks unavailable: " + Qvk3Jobs.message(e) + " · " + Qvk3MusicSource.lastHomeTrace);
+                }
+            }, "qvk3-home-vk");
+            tReco.start();
+            tPop.start();
+            tVk.start();
             try {
-                reco = Qvk3MusicSource.recommendations(15);
-            } catch (Exception ignored) {
+                tVk.join(20_000);
+                tReco.join(20_000);
+                tPop.join(20_000);
+            } catch (InterruptedException ignored) {
             }
-            try {
-                popular = Qvk3MusicSource.popular(15);
-            } catch (Exception ignored) {
-            }
-            // BUG-0010: VK's own music home (джемы, подборки, плейлисты дня) right on «Главная», not only on «Музыка ВК»
-            List<Qvk3MusicSource.Block> vkBlocks = new ArrayList<>();
-            try {
-                List<Qvk3MusicSource.Block> all = Qvk3MusicSource.vkHome();
-                for (int i = 0; i < all.size() && vkBlocks.size() < 5; i++) vkBlocks.add(all.get(i));
-            } catch (Exception e) {
-                android.util.Log.i("QVK3Music", "home: VK blocks unavailable: " + Qvk3Jobs.message(e) + " · " + Qvk3MusicSource.lastHomeTrace);
-            }
-            final List<Qvk3MusicSource.Block> fBlocks = vkBlocks;
-            final List<Qvk3Track> fReco = reco, fPopular = popular;
+            final List<Qvk3MusicSource.Block> fBlocks = new ArrayList<>(vkBlocks);
+            final List<Qvk3Track> fReco = new ArrayList<>(reco), fPopular = new ArrayList<>(popular);
             Qvk3Jobs.main(() -> {
                 List<Qvk3Track> reco2 = fReco, popular2 = fPopular;
                 if (tab != 0 || !back.isEmpty()) return;
                 if (!recent.isEmpty()) {
                     r.add(header("Недавно прослушанное"));
                     for (int i = 0; i < recent.size(); i++) r.add(trackRow(recent, i));
-                }
-                if (!favs.isEmpty()) {
-                    r.add(header("Избранное QVK"));
-                    for (int i = 0; i < favs.size(); i++) r.add(trackRow(favs, i));
-                    r.add(note("Всё избранное →", () -> push(this::showFavorites)));
                 }
                 for (Qvk3MusicSource.Block b : fBlocks) {
                     r.add(header(b.title));
@@ -881,8 +886,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 r.add(header("Последние добавленные"));
                 if (latest.isEmpty()) r.add(note("Откройте «Моя музыка», чтобы загрузить медиатеку", () -> selectTab(1)));
                 for (int i = 0; i < latest.size(); i++) r.add(trackRow(latest, i));
-                r.add(header("Плейлисты"));
-                r.add(note("Мои плейлисты ВК →", () -> selectTab(2)));
+                if (!locals.isEmpty()) r.add(header("Плейлисты QVK"));
                 for (Qvk3MusicLibrary.LocalList l : locals) {
                     r.add(new Row(Row.ITEM, l.title == null ? "Плейлист QVK" : l.title, "Плейлист QVK · " + l.total + " треков", "", null, null, false,
                             () -> push(() -> showCachedList(l.list, l.title)), () -> confirmDeleteList(l)));
