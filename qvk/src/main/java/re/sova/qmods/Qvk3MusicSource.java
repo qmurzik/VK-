@@ -344,14 +344,30 @@ public final class Qvk3MusicSource {
         if (me > 0 && t.ownerId == me) return me + "_" + t.id; // already one of my own tracks
         JSONObject r = response("audio.add", args("owner_id", Long.toString(t.ownerId), "audio_id", Long.toString(t.id), "access_key", t.accessKey));
         long id = r.optLong("response", 0);
-        if (id <= 0) throw new IOException("ВК не вернул номер добавленного трека");
+        if (id <= 0) id = r.optLong("id", 0);
+        if (id <= 0 && me > 0) {
+            // BUG-0073: VK added the track but the answer carried no id in this API path — the new copy is the first
+            // track of «Моя музыка», so find it there instead of reporting an error (which led to adding it again).
+            try {
+                JSONArray items = response("audio.get", args("owner_id", Long.toString(me), "count", "5")).optJSONArray("items");
+                for (int i = 0; items != null && i < items.length(); i++) {
+                    JSONObject o = items.optJSONObject(i);
+                    if (o != null && o.optString("title").equals(t.title) && o.optString("artist").equals(t.artist)) {
+                        id = o.optLong("id");
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (id <= 0) return (me > 0 ? me : t.ownerId) + "_?";   // added, copy unknown — still shown as «в моей музыке»
         return (me > 0 ? me : t.ownerId) + "_" + id;
     }
 
     /** BUG-0067: remove a track from «Моя музыка» (copy = "ownerId_audioId" from {@link #addToMine}). */
     public static void removeFromMine(String copy) throws Exception {
         String[] p = copy.split("_");
-        if (p.length < 2) throw new IOException("Не знаю, какой трек удалить");
+        if (p.length < 2 || "?".equals(p[1])) throw new IOException("Не знаю номер копии: удалите трек в «Моей музыке» вручную");
         response("audio.delete", args("owner_id", p[0], "audio_id", p[1]));
     }
 

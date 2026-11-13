@@ -35,7 +35,7 @@ final class Qvk3ImVoice {
             try {
                 if (player.isPlaying()) {
                     player.pause();
-                    v.setProgress(v.progress, false);
+                    if (v != null) v.setProgress(v.progress, false);
                 } else {
                     player.start();
                     h.post(tick);
@@ -73,7 +73,7 @@ final class Qvk3ImVoice {
                 stop();
                 return true;
             });
-            v.setProgress(0, true);
+            if (v != null) v.setProgress(0, true);
             p.prepareAsync();
         } catch (Exception e) {
             Qvk3Ui.toast(c, "Не удалось воспроизвести голосовое");

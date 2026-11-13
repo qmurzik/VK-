@@ -92,6 +92,11 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
         tt.addView(title);
         tt.addView(status);
         head.addView(tt, new LinearLayout.LayoutParams(0, -2, 1f));
+        // the name and avatar open the chat info (members, attachments, invite link…)
+        View.OnClickListener info = v -> Qvk3ImInfo.show(a, peer, this::searchInChat);
+        tt.setOnClickListener(info);
+        avatar.setOnClickListener(info);
+        tt.setContentDescription("Информация о чате");
         head.addView(Qvk3Ui.icon(a, Qvk3Icons.SEARCH, p.text, 44, 22, "Поиск в чате", v -> searchInChat()));
         head.addView(Qvk3Ui.icon(a, Qvk3Icons.MORE, p.text, 44, 22, "Ещё", v -> menu()));
         addView(head, Qvk3Ui.match());
@@ -395,9 +400,72 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
             case "wall":
                 Qvk3ImUi.openLink(a, x.url);
                 break;
+            case "poll":
+                pollDialog(x);
+                break;
+            case "story":
+                if (x.ownerId != 0 || x.id != 0) Qvk3ImUi.openLink(a, "https://vk.com/story" + x.ownerId + "_" + x.id);
+                else Qvk3ImEntry.openStock(a, peer);
+                break;
+            case "market":
+                if (x.ownerId != 0 || x.id != 0) Qvk3ImUi.openLink(a, "https://vk.com/product" + x.ownerId + "_" + x.id);
+                else Qvk3ImEntry.openStock(a, peer);
+                break;
             default:
-                Qvk3ImEntry.openStock(a, peer); // poll, story, market…: VK's own screen shows them fully
+                Qvk3ImEntry.openStock(a, peer); // gifts, money transfers…: VK's own screen shows them fully
         }
+    }
+
+    /** Polls right in QVK: results with percentages, your vote marked; vote (one or several answers) or take it back. */
+    private void pollDialog(Qvk3ImModel.Attachment x) {
+        JSONObject poll = x.raw == null ? null : x.raw.optJSONObject("poll");
+        if (poll == null) {
+            Qvk3ImEntry.openStock(a, peer);
+            return;
+        }
+        org.json.JSONArray answers = poll.optJSONArray("answers");
+        org.json.JSONArray mine = poll.optJSONArray("answer_ids");
+        java.util.Set<Long> voted = new java.util.HashSet<>();
+        for (int i = 0; mine != null && i < mine.length(); i++) voted.add(mine.optLong(i));
+        boolean closed = poll.optBoolean("closed") || (poll.optLong("end_date") > 0 && poll.optLong("end_date") * 1000 < System.currentTimeMillis());
+        boolean multiple = poll.optBoolean("multiple");
+        int n = answers == null ? 0 : answers.length();
+        String[] labels = new String[n];
+        long[] ids = new long[n];
+        for (int i = 0; i < n; i++) {
+            JSONObject o = answers.optJSONObject(i);
+            ids[i] = o.optLong("id");
+            labels[i] = (voted.contains(ids[i]) ? "✓ " : "") + o.optString("text")
+                    + (voted.isEmpty() && !closed ? "" : "  ·  " + Math.round(o.optDouble("rate", 0)) + "% (" + o.optInt("votes") + ")");
+        }
+        long owner = poll.optLong("owner_id"), id = poll.optLong("id");
+        String title = poll.optString("question") + (poll.optBoolean("anonymous") ? "\nАнонимный опрос" : "")
+                + " · голосов: " + poll.optInt("votes") + (closed ? " · завершён" : "");
+        android.app.AlertDialog.Builder b = Qvk3Ui.dialog(a).setTitle(title);
+        if (!voted.isEmpty() || closed) {
+            b.setItems(labels, null);
+            if (!closed && poll.optBoolean("can_vote", true)) b.setNeutralButton("Отменить голос", (d, w) -> simple(() ->
+                    Qvk3ImApi.call("polls.deleteVote", "owner_id", Long.toString(owner), "poll_id", Long.toString(id)), "Голос отменён", null));
+            b.setPositiveButton("Закрыть", null).show();
+            return;
+        }
+        if (multiple) {
+            boolean[] checked = new boolean[n];
+            b.setMultiChoiceItems(labels, checked, (d, w, on) -> checked[w] = on)
+                    .setPositiveButton("Голосовать", (d, w) -> {
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < n; i++) if (checked[i]) sb.append(sb.length() == 0 ? "" : ",").append(ids[i]);
+                        if (sb.length() == 0) return;
+                        vote(owner, id, sb.toString());
+                    }).setNegativeButton("Отмена", null).show();
+        } else {
+            b.setItems(labels, (d, w) -> vote(owner, id, Long.toString(ids[w]))).setNegativeButton("Отмена", null).show();
+        }
+    }
+
+    private void vote(long owner, long pollId, String answers) {
+        simple(() -> Qvk3ImApi.call("polls.addVote", "owner_id", Long.toString(owner), "poll_id", Long.toString(pollId), "answer_ids", answers),
+                "Голос учтён", () -> store.loadHistory(peer, false, err -> { }));
     }
 
     @Override
@@ -874,8 +942,10 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
                 }));
             }
         }
-        items.add("Вложения чата\nФото, видео, файлы — в ВК");
-        acts.add(() -> Qvk3ImEntry.openStock(a, peer));
+        items.add("Информация о чате\nУчастники, вложения, ссылка-приглашение");
+        acts.add(() -> Qvk3ImInfo.show(a, peer, this::searchInChat));
+        items.add("Вложения чата\nФото, видео, файлы, ссылки, голосовые");
+        acts.add(() -> Qvk3ImInfo.Attachments.open(a, peer, "photo"));
         items.add("Звонок\nЧерез ВКонтакте");
         acts.add(() -> Qvk3ImEntry.openStock(a, peer));
         items.add("Открыть в ВК\nШтатный экран этого чата");

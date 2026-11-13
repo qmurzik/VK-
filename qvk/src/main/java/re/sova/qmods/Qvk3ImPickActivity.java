@@ -19,6 +19,9 @@ public final class Qvk3ImPickActivity extends Activity {
 
     static Result pending;
     static final String MIME = "mime";
+    /** Special "mime": take a photo with the camera app (saved to Pictures/QVK, then sent like a gallery photo). */
+    static final String CAMERA = "qvk3/camera";
+    private Uri shot;
 
     static void pick(Activity from, String mime, Result r) {
         pending = r;
@@ -30,6 +33,15 @@ public final class Qvk3ImPickActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         if (state != null) return;
+        if (CAMERA.equals(getIntent().getStringExtra(MIME))) {
+            // VK declares CAMERA: then ACTION_IMAGE_CAPTURE needs it granted, so ask first
+            if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 2);
+            } else {
+                camera();
+            }
+            return;
+        }
         Intent i = new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType(getIntent().getStringExtra(MIME)).putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         try {
@@ -40,8 +52,50 @@ public final class Qvk3ImPickActivity extends Activity {
         }
     }
 
+    private void camera() {
+        try {
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "QVK_" + System.currentTimeMillis() + ".jpg");
+            v.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            if (android.os.Build.VERSION.SDK_INT >= 29) v.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/QVK");
+            shot = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE).putExtra(android.provider.MediaStore.EXTRA_OUTPUT, shot)
+                    .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(i, 3);
+        } catch (Exception e) {
+            Qvk3Ui.toast(this, "Камера недоступна: " + Qvk3Jobs.message(e));
+            finish();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] res) {
+        if (res.length > 0 && res[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) camera();
+        else {
+            Qvk3Ui.toast(this, "Без доступа к камере снять фото нельзя");
+            finish();
+        }
+    }
+
     @Override
     protected void onActivityResult(int req, int code, Intent data) {
+        if (req == 3) {
+            Result r = pending;
+            pending = null;
+            if (code == RESULT_OK && shot != null && r != null) {
+                List<Uri> one = new ArrayList<>();
+                one.add(shot);
+                r.picked(one);
+            } else if (shot != null) {
+                try {
+                    getContentResolver().delete(shot, null, null);   // cancelled: no empty file left in the gallery
+                } catch (Exception ignored) {
+                }
+            }
+            finish();
+            overridePendingTransition(0, 0);
+            return;
+        }
         List<Uri> out = new ArrayList<>();
         if (code == RESULT_OK && data != null) {
             if (data.getClipData() != null) for (int k = 0; k < data.getClipData().getItemCount() && k < 10; k++) out.add(data.getClipData().getItemAt(k).getUri());

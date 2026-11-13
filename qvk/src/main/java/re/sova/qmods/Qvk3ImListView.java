@@ -71,11 +71,34 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
             public void afterTextChanged(Editable e) {
                 query = Qvk3Lyrics.normal(e.toString());
                 adapter.notifyDataSetChanged();
+                String q = e.toString().trim();
+                if (msgSearch != null) {
+                    msgSearch.setVisibility(q.length() >= 2 ? VISIBLE : GONE);
+                    msgSearch.setText("Искать «" + q + "» в сообщениях всех чатов");
+                }
             }
         });
         LinearLayout.LayoutParams sl = Qvk3Ui.match();
         sl.setMargins(dp(16), dp(4), dp(16), dp(8));
         addView(search, sl);
+
+        // folders: Все · Непрочитанные · Беседы · Важные · Архив
+        android.widget.HorizontalScrollView fs = new android.widget.HorizontalScrollView(a);
+        fs.setHorizontalScrollBarEnabled(false);
+        fs.setClipToPadding(false);
+        fs.setPadding(dp(12), 0, dp(12), dp(6));
+        folderRow = new LinearLayout(a);
+        fs.addView(folderRow);
+        addView(fs, Qvk3Ui.match());
+        buildFolders();
+
+        // search in the text of messages of every chat (the field above filters chat names)
+        msgSearch = Qvk3Ui.line(a, "", 15, p.accent, true);
+        msgSearch.setPadding(dp(20), dp(10), dp(20), dp(10));
+        msgSearch.setBackground(Qvk3Ui.ripple(a, 0, p.dark ? 0x22FFFFFF : 0x14000000, 0));
+        msgSearch.setVisibility(GONE);
+        msgSearch.setOnClickListener(v -> searchMessages(search.getText().toString().trim()));
+        addView(msgSearch, Qvk3Ui.match());
 
         FrameLayout box = new FrameLayout(a);
         list = new ListView(a);
@@ -129,10 +152,8 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
     @Override
     public void changed(long peer) {
         adapter.notifyDataSetChanged();
-        boolean none = store.conversations.isEmpty();
-        empty.setVisibility(none ? VISIBLE : GONE);
-        if (none) empty.setText(store.listLoading || !store.listLoaded ? "Загружаем чаты…"
-                : !store.listError.isEmpty() ? "Не удалось загрузить чаты: " + store.listError + "\n\nНажмите, чтобы повторить" : "Чатов пока нет");
+        if (folderRow != null) buildFolders();
+        updateEmpty();
     }
 
     /** Back: clears the search first. */
@@ -142,6 +163,103 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
             return true;
         }
         return false;
+    }
+
+    // ------------------------------------------------------------------ folders
+
+    private static final String[][] FOLDERS = {{"all", "Все"}, {"unread", "Непрочитанные"}, {"chats", "Беседы"},
+            {"important", "Важные"}, {"archive", "Архив"}};
+    private String folder = "all";
+    private LinearLayout folderRow;
+
+    private void buildFolders() {
+        folderRow.removeAllViews();
+        Qvk3Ui.Palette p = look.p;
+        int unread = 0;
+        for (Qvk3ImModel.Conversation c : store.conversations) if (c.unread > 0 && !c.archived && !c.muted) unread++;
+        for (String[] f : FOLDERS) {
+            boolean on = f[0].equals(folder);
+            String label = f[1] + ("unread".equals(f[0]) && unread > 0 ? "  " + unread : "");
+            TextView chip = Qvk3Ui.line(a, label, 14, on ? p.onAccent : p.text, on);
+            chip.setPadding(dp(14), dp(7), dp(14), dp(7));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(dp(100));
+            bg.setColor(on ? p.accent : p.surface2);
+            chip.setBackground(bg);
+            chip.setOnClickListener(v -> {
+                folder = f[0];
+                if ("archive".equals(folder) && !store.archiveLoaded) store.loadArchive();
+                buildFolders();
+                adapter.notifyDataSetChanged();
+                list.setSelection(0);
+                updateEmpty();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.rightMargin = dp(8);
+            folderRow.addView(chip, lp);
+        }
+    }
+
+    private boolean inFolder(Qvk3ImModel.Conversation c) {
+        switch (folder) {
+            case "unread":
+                return !c.archived && c.unread > 0;
+            case "chats":
+                return !c.archived && c.chat();
+            case "important":
+                return c.important || c.pinned;
+            case "archive":
+                return c.archived;
+            default:
+                return !c.archived;
+        }
+    }
+
+    private void updateEmpty() {
+        boolean none = adapter.getCount() == 0;
+        empty.setVisibility(none ? VISIBLE : GONE);
+        if (!none) return;
+        if (!"all".equals(folder)) {
+            empty.setText("archive".equals(folder) && store.archiveLoading ? "Загружаем архив…" : "В этой папке пока пусто");
+            return;
+        }
+        empty.setText(store.listLoading || !store.listLoaded ? "Загружаем чаты…"
+                : !store.listError.isEmpty() ? "Не удалось загрузить чаты: " + store.listError + "\n\nНажмите, чтобы повторить" : "Чатов пока нет");
+    }
+
+    private TextView msgSearch;
+
+    private void searchMessages(String q) {
+        if (q.length() < 2) return;
+        Qvk3ImUi.hideKeyboard(search);
+        Qvk3Ui.toast(a, "Ищем «" + q + "»…");
+        Qvk3Jobs.io(() -> {
+            try {
+                org.json.JSONObject r = Qvk3ImApi.search(q, 0, 100);
+                List<Qvk3ImModel.Message> found = Qvk3ImModel.history(r);
+                java.util.Map<Long, Qvk3ImModel.Person> people = Qvk3ImModel.people(r);
+                Qvk3Jobs.main(() -> {
+                    store.people.putAll(people);
+                    if (found.isEmpty()) {
+                        Qvk3Ui.toast(a, "Ничего не найдено");
+                        return;
+                    }
+                    String[] labels = new String[found.size()];
+                    for (int i = 0; i < found.size(); i++) {
+                        Qvk3ImModel.Message m = found.get(i);
+                        Qvk3ImModel.Conversation c = store.conversation(m.peer);
+                        Qvk3ImModel.Person who = store.people.get(m.from);
+                        String chat = c != null ? c.title : who != null ? who.name : "Чат";
+                        labels[i] = chat + " · " + Qvk3ImUi.listTime(m.date) + "\n"
+                                + (m.out ? "Вы: " : (c != null && c.chat() && who != null ? who.first + ": " : "")) + Qvk3ImModel.preview(m, store.people);
+                    }
+                    Qvk3Ui.dialog(a).setTitle("«" + q + "» · " + found.size()).setItems(labels, (d, w) -> Qvk3ImChatActivity.open(a, found.get(w).peer))
+                            .setNegativeButton("Закрыть", null).show();
+                });
+            } catch (Exception e) {
+                Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Поиск не удался: " + Qvk3Jobs.message(e)));
+            }
+        });
     }
 
     void open(Qvk3ImModel.Conversation c) {
@@ -170,13 +288,60 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
                         Qvk3Ui.toast(a, "Список друзей пуст");
                         return;
                     }
-                    Qvk3Ui.dialog(a).setTitle("Новое сообщение").setItems(labels.toArray(new String[0]), (d, w) -> Qvk3ImChatActivity.open(a, ids.get(w)))
-                            .setNegativeButton("Отмена", null).show();
+                    List<String> rows = new ArrayList<>();
+                    rows.add("➕ Создать беседу\nВыберите участников и название");
+                    rows.addAll(labels);
+                    Qvk3Ui.dialog(a).setTitle("Новое сообщение").setItems(rows.toArray(new String[0]), (d, w) -> {
+                        if (w == 0) createChat(ids, labels);
+                        else Qvk3ImChatActivity.open(a, ids.get(w - 1));
+                    }).setNegativeButton("Отмена", null).show();
                 });
             } catch (Exception e) {
                 Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Не удалось загрузить друзей: " + Qvk3Jobs.message(e)));
             }
         });
+    }
+
+    /** New group chat: pick friends, give it a name, messages.createChat, open it. */
+    private void createChat(List<Long> ids, List<String> labels) {
+        String[] names = new String[labels.size()];
+        for (int i = 0; i < names.length; i++) names[i] = labels.get(i).split("\n")[0];
+        boolean[] on = new boolean[names.length];
+        Qvk3Ui.dialog(a).setTitle("Участники беседы").setMultiChoiceItems(names, on, (d, w, c) -> on[w] = c)
+                .setPositiveButton("Дальше", (d, w) -> {
+                    List<String> chosen = new ArrayList<>();
+                    StringBuilder who = new StringBuilder();
+                    for (int i = 0; i < on.length; i++) if (on[i]) {
+                        chosen.add(Long.toString(ids.get(i)));
+                        if (who.length() < 40) who.append(who.length() == 0 ? "" : ", ").append(names[i].split(" ")[0]);
+                    }
+                    if (chosen.isEmpty()) {
+                        Qvk3Ui.toast(a, "Выберите хотя бы одного участника");
+                        return;
+                    }
+                    EditText t = new EditText(a);
+                    t.setSingleLine(true);
+                    t.setHint(who.toString());
+                    FrameLayout box = new FrameLayout(a);
+                    box.setPadding(dp(20), dp(8), dp(20), 0);
+                    box.addView(t);
+                    Qvk3Ui.dialog(a).setTitle("Название беседы").setView(box).setPositiveButton("Создать", (d2, w2) -> {
+                        String title = t.getText().toString().trim().isEmpty() ? who.toString() : t.getText().toString().trim();
+                        Qvk3Jobs.io(() -> {
+                            try {
+                                org.json.JSONObject r = Qvk3ImApi.call("messages.createChat", "user_ids", String.join(",", chosen), "title", title);
+                                long chatId = r.optLong("chat_id", Qvk3ImApi.number(r));
+                                if (chatId <= 0) throw new java.io.IOException("ВК не вернул номер беседы");
+                                Qvk3Jobs.main(() -> {
+                                    store.loadConversations(false);
+                                    Qvk3ImChatActivity.open(a, 2_000_000_000L + chatId);
+                                });
+                            } catch (Exception e) {
+                                Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Беседа не создана: " + Qvk3Jobs.message(e)));
+                            }
+                        });
+                    }).setNegativeButton("Отмена", null).show();
+                }).setNegativeButton("Отмена", null).show();
     }
 
     /** Hidden by QVK's «Скрыть диалог» and not revealed right now. */
@@ -264,10 +429,7 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
             else Qvk3ImApi.markUnread(c.peer);
         }, () -> c.unread = c.unread > 0 ? 0 : 1));
         items.add(c.archived ? "Вернуть из архива" : "Архивировать");
-        acts.add(() -> act(() -> Qvk3ImApi.archive(c.peer, !c.archived), () -> {
-            store.conversations.remove(c);
-            store.byPeer.remove(c.peer);
-        }));
+        acts.add(() -> act(() -> Qvk3ImApi.archive(c.peer, !c.archived), () -> c.archived = !c.archived));
         boolean isHidden = hiddenSaved(c.peer);
         items.add(isHidden ? "Показать диалог\nВернуть в общий список" : "Скрыть диалог\nСкрытые видны по «Показать скрытые» в меню");
         acts.add(() -> {
@@ -321,6 +483,7 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
             for (Qvk3ImModel.Conversation c : store.conversations) {
                 if (!query.isEmpty() && !Qvk3Lyrics.normal(c.title).contains(query)) continue;
                 if (hidden(c.peer)) continue; // BUG-0036: QVK's hidden chats stay hidden here too
+                if (query.isEmpty() && !inFolder(c)) continue;
                 shown.add(c);
             }
             super.notifyDataSetChanged();

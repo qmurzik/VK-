@@ -103,6 +103,35 @@ final class Qvk3ImStore {
         });
     }
 
+    boolean archiveLoaded, archiveLoading;
+
+    /** «Архив» folder: archived chats are not in the "all" list; loaded on demand and merged into the store. */
+    void loadArchive() {
+        if (archiveLoading) return;
+        archiveLoading = true;
+        Qvk3Jobs.io(() -> {
+            try {
+                JSONObject r = Qvk3ImApi.conversations(0, 200, "archive");
+                Qvk3Jobs.main(() -> {
+                    archiveLoading = false;
+                    archiveLoaded = true;
+                    applyConversations(r, false);
+                    for (Qvk3ImModel.Conversation c : Qvk3ImModel.conversations(r)) {
+                        Qvk3ImModel.Conversation k = byPeer.get(c.peer);
+                        if (k != null) k.archived = true;
+                    }
+                    notifyChanged(0);
+                });
+            } catch (Exception e) {
+                Qvk3Jobs.main(() -> {
+                    archiveLoading = false;
+                    listError = Qvk3Jobs.message(e);
+                    notifyChanged(0);
+                });
+            }
+        });
+    }
+
     private void applyConversations(JSONObject r, boolean replace) {
         people.putAll(Qvk3ImModel.people(r));
         List<Qvk3ImModel.Conversation> page = Qvk3ImModel.conversations(r);

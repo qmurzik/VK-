@@ -143,6 +143,42 @@ final class Qvk3ImApi {
                 "extended", "1", "fields", FIELDS);
     }
 
+    // ------------------------------------------------------------------ chat info (messenger completion)
+
+    /** Members of a group chat with their profiles (items: member_id, is_admin, is_owner, invited_by). */
+    static JSONObject members(long peer) throws Exception {
+        return call("messages.getConversationMembers", "peer_id", Long.toString(peer), "fields", FIELDS);
+    }
+
+    /** All attachments of one kind in a chat: photo, video, audio, doc, link, audio_message. */
+    static JSONObject historyAttachments(long peer, String mediaType, String startFrom, int count) throws Exception {
+        return call("messages.getHistoryAttachments", "peer_id", Long.toString(peer), "media_type", mediaType,
+                "start_from", startFrom, "count", Integer.toString(count), "photo_sizes", "1", "extended", "1", "fields", FIELDS);
+    }
+
+    static String inviteLink(long peer, boolean reset) throws Exception {
+        return call("messages.getInviteLink", "peer_id", Long.toString(peer), "reset", reset ? "1" : "0").optString("link");
+    }
+
+    static void renameChat(long peer, String title) throws Exception {
+        call("messages.editChat", "chat_id", Long.toString(peer - 2_000_000_000L), "title", title);
+    }
+
+    /** Leaves a group chat (removes the current user from it). */
+    static void leaveChat(long peer) throws Exception {
+        long me = Qvk3MusicSource.account();
+        call("messages.removeChatUser", "chat_id", Long.toString(peer - 2_000_000_000L), "member_id", Long.toString(me));
+    }
+
+    static void kick(long peer, long member) throws Exception {
+        call("messages.removeChatUser", "chat_id", Long.toString(peer - 2_000_000_000L), "member_id", Long.toString(member));
+    }
+
+    /** Video for a message: video.save (private) → upload → "video{owner}_{id}". */
+    static JSONObject videoSave(String name) throws Exception {
+        return call("video.save", "name", name, "is_private", "1", "wallpost", "0");
+    }
+
     static JSONObject longPollServer() throws Exception {
         return call("messages.getLongPollServer", "need_pts", "1", "lp_version", "19");
     }

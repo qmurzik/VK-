@@ -29,11 +29,15 @@ final class Qvk3ImAttach {
     static void pick(Qvk3ImChatView chat) {
         Activity a = chat.a;
         Qvk3Ui.dialog(a).setTitle("Прикрепить").setItems(new String[]{
+                "Камера\nСнять фото и отправить",
                 "Фотографии\nДо 10 из галереи",
+                "Видео\nИз галереи, до 100 МБ",
                 "Файл\nЛюбой документ до 200 МБ",
                 "Голосовое сообщение\nУдерживайте кнопку записи"}, (d, w) -> {
-            if (w == 0) Qvk3ImPickActivity.pick(a, "image/*", uris -> upload(chat, uris, true));
-            else if (w == 1) Qvk3ImPickActivity.pick(a, "*/*", uris -> upload(chat, uris, false));
+            if (w == 0) Qvk3ImPickActivity.pick(a, Qvk3ImPickActivity.CAMERA, uris -> upload(chat, uris, true));
+            else if (w == 1) Qvk3ImPickActivity.pick(a, "image/*", uris -> upload(chat, uris, true));
+            else if (w == 2) Qvk3ImPickActivity.pick(a, "video/*", uris -> uploadVideo(chat, uris));
+            else if (w == 3) Qvk3ImPickActivity.pick(a, "*/*", uris -> upload(chat, uris, false));
             else Qvk3ImRecorder.open(chat);
         }).show();
     }
@@ -49,6 +53,30 @@ final class Qvk3ImAttach {
                 Qvk3Jobs.main(() -> chat.attachUploaded(preview.ref(), preview));
             } catch (Exception e) {
                 Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Не загрузилось: " + Qvk3Jobs.message(e)));
+            }
+        });
+    }
+
+    /** Video for a message: video.save (private, not on the wall) → upload the file → "video{owner}_{id}". */
+    static void uploadVideo(Qvk3ImChatView chat, List<Uri> uris) {
+        Activity a = chat.a;
+        Qvk3Ui.toast(a, "Загружаем видео: " + uris.size() + " — это может занять время");
+        for (Uri u : uris) Qvk3Jobs.io(() -> {
+            try {
+                String name = name(a, u);
+                byte[] data = read(a, u);
+                if (data.length > (100L << 20)) throw new java.io.IOException("Видео больше 100 МБ — отправьте его файлом");
+                JSONObject srv = Qvk3ImApi.videoSave(name);
+                JSONObject up = new JSONObject(post(srv.getString("upload_url"), "video_file", name, data));
+                Qvk3ImModel.Attachment v = new Qvk3ImModel.Attachment("video");
+                v.ownerId = up.optLong("owner_id", srv.optLong("owner_id"));
+                v.id = up.optLong("video_id", srv.optLong("video_id"));
+                v.accessKey = srv.optString("access_key", "");
+                v.title = name;
+                if (v.id == 0) throw new java.io.IOException("ВК не сохранил видео");
+                Qvk3Jobs.main(() -> chat.attachUploaded(v.ref(), v));
+            } catch (Throwable e) {
+                Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Видео не загрузилось: " + Qvk3Jobs.message(e)));
             }
         });
     }
