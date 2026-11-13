@@ -1,0 +1,26 @@
+diff -ru a/smali_classes21/re/sova/qmods/TelegramPanel$State.smali b/smali_classes21/re/sova/qmods/TelegramPanel$State.smali
+--- a/smali_classes21/re/sova/qmods/TelegramPanel$State.smali	2026-11-13 10:04:34.160063896 +0000
++++ b/smali_classes21/re/sova/qmods/TelegramPanel$State.smali	2026-11-13 10:04:34.180568343 +0000
+@@ -443,7 +443,7 @@
+     :cond_1
+     iget-object v1, p0, Lre/sova/qmods/TelegramPanel$State;->ui:Lre/sova/qmods/MenuUi;
+ 
+-    const-string v2, "\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043d\u0430\u0431\u043e\u0440 \u043a\u043d\u043e\u043f\u043a\u043e\u0439 +"
++    const-string v2, "\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u0437\u0434\u0435\u0441\u044c, \u0447\u0442\u043e\u0431\u044b \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043d\u0430\u0431\u043e\u0440 \u0441\u0442\u0438\u043a\u0435\u0440\u043e\u0432 \u0438\u0437 Telegram"
+ 
+     invoke-static {v2}, Lre/sova/qmods/LanguagePacks;->ui(Ljava/lang/String;)Ljava/lang/String;
+ 
+@@ -459,6 +459,13 @@
+ 
+     move-result-object v1
+ 
++    # QVK 3.0 (BUG-0050): the empty-state hint itself opens «add a Telegram set» — testers did not find the «+».
++    new-instance v2, Lre/sova/qmods/TelegramPanel$State$2;
++
++    invoke-direct {v2, p0}, Lre/sova/qmods/TelegramPanel$State$2;-><init>(Lre/sova/qmods/TelegramPanel$State;)V
++
++    invoke-virtual {v1, v2}, Landroid/widget/TextView;->setOnClickListener(Landroid/view/View$OnClickListener;)V
++
+     .line 218
+     iget-object v2, p0, Lre/sova/qmods/TelegramPanel$State;->ui:Lre/sova/qmods/MenuUi;
+ 
