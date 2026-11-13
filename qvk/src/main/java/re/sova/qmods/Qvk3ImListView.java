@@ -191,7 +191,7 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
                 if ("archive".equals(folder) && !store.archiveLoaded) store.loadArchive();
                 buildFolders();
                 adapter.notifyDataSetChanged();
-                list.setSelection(0);
+                if (adapter.getCount() > 0) list.setSelection(0);   // BUG-0075: an empty folder has no row 0
                 updateEmpty();
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
@@ -500,12 +500,12 @@ final class Qvk3ImListView extends LinearLayout implements Qvk3ImStore.Listener 
 
         @Override
         public Object getItem(int i) {
-            return shown.get(i);
+            return i >= 0 && i < shown.size() ? shown.get(i) : null;
         }
 
         @Override
         public long getItemId(int i) {
-            return shown.get(i).peer;
+            return i >= 0 && i < shown.size() ? shown.get(i).peer : -1;
         }
 
         @Override

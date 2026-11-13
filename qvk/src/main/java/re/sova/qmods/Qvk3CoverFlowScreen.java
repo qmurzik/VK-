@@ -84,12 +84,9 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         flow.setCaptionOnTop(true);
         flow.setListener((index, settled) -> {
             Qvk3MusicSettings.prefs(a).edit().putInt(SELECTED, index).apply();
-            if (!settled) {
-                flipOpen(index);
-            } else if (flow.settledByUser() && !flow.settledByFling()) {
-                // BUG-0013: a calm swipe that stops on another album starts it (a fast fling only browses).
-                playCover(index);
-            }
+            // BUG-0074: browsing albums only browses, like the iPod — stopping on a cover never starts it.
+            // A tap opens the album; ▶ in the corner plays. (BUG-0013 was about the player, fixed there.)
+            if (!settled) flipOpen(index);
         });
         LayoutParams fl = new LayoutParams(-1, -1);
         fl.topMargin = byRotation ? dp(4) : dp(52);
