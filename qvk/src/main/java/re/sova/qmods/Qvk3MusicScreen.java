@@ -79,12 +79,19 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     // ------------------------------------------------------------------ rows
 
     static final class Row {
-        static final int HEADER = 0, ITEM = 1, NOTE = 2;
+        static final int HEADER = 0, ITEM = 1, NOTE = 2, SHELF = 3;
         final int type;
         final String title, subtitle, right, cover;
         final Qvk3Track track;
         final Runnable click, longClick;
         final boolean saved;
+        /** IDEA-0027 / BUG-0010: a horizontally scrolling grid of tracks ({@link #lines} rows). */
+        List<Qvk3Track> shelf;
+        int lines;
+        /** BUG-0010: VK playlists/albums as a sideways row of big covers. */
+        List<Qvk3MusicSource.Playlist> cards;
+        /** IDEA-0022: the «Моя музыка» section tiles. */
+        Qvk3TileGrid grid;
         /** IDEA-0022: section tiles get their own icon on a gradient instead of the grey note. */
         String icon;
         int c1, c2;
@@ -135,7 +142,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
 
         @Override
         public int getViewTypeCount() {
-            return 3;
+            return 4;
         }
 
         @Override
@@ -152,9 +159,17 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         public View getView(int i, View convert, ViewGroup parent) {
             Row r = items.get(i);
             if (feed != null && i >= items.size() - 15) feed.more();
+            if (r.type == Row.SHELF) return shelfView(r);
             if (r.type == Row.HEADER) {
                 TextView t = convert instanceof TextView ? (TextView) convert : Qvk3Ui.text(a, "", 21, p.text, true);
-                t.setText(r.title);
+                if (r.click != null) {
+                    // IDEA-0027: a clickable section title opens the whole list
+                    android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(r.title + "  ›");
+                    sb.setSpan(new android.text.style.ForegroundColorSpan(p.accent), r.title.length(), sb.length(), 0);
+                    t.setText(sb);
+                } else {
+                    t.setText(r.title);
+                }
                 t.setPadding(Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 22), Qvk3Ui.dp(t.getContext(), 16), Qvk3Ui.dp(t.getContext(), 8));
                 t.setAccessibilityHeading(true);
                 return t;
@@ -478,6 +493,10 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
 
     /** Returns true when the back press was consumed (player closed / inner screen popped). */
     public boolean handleBack() {
+        if (tileGrid != null && tileGrid.editing() && tileGrid.isAttachedToWindow()) {
+            tileGrid.stopEdit();   // IDEA-0022: «Назад» ends the rearranging first
+            return true;
+        }
         if (coverFlow != null) {
             if (!coverFlow.back()) hideCoverFlow();
             return true;
@@ -759,6 +778,115 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         return new Row(Row.HEADER, text, "", "", null, null, false, null, null);
     }
 
+    /** IDEA-0027: section title that opens the full list. */
+    Row header(String text, Runnable open) {
+        return new Row(Row.HEADER, text, "", "", null, null, false, open, null);
+    }
+
+    /** IDEA-0027 / BUG-0010: tracks as a grid of {@code lines} rows that scrolls sideways, like VK's music home. */
+    Row shelf(List<Qvk3Track> tracks, int lines) {
+        Row r = new Row(Row.SHELF, "", "", "", null, null, false, null, null);
+        r.shelf = new ArrayList<>(tracks);
+        r.lines = Math.max(1, lines);
+        return r;
+    }
+
+    Row cards(List<Qvk3MusicSource.Playlist> lists) {
+        Row r = new Row(Row.SHELF, "", "", "", null, null, false, null, null);
+        r.cards = new ArrayList<>(lists);
+        return r;
+    }
+
+    /** A plain list screen behind a clickable section title (BUG-0010 / IDEA-0027). */
+    private void showTrackList(String title, List<Qvk3Track> tracks) {
+        screenTitle.setText(title);
+        feed = null;
+        List<Row> r = new ArrayList<>();
+        for (int i = 0; i < tracks.size(); i++) r.add(trackRow(tracks, i));
+        rows.set(r);
+    }
+
+    private View cardsView(Row r) {
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(a);
+        hs.setHorizontalScrollBarEnabled(false);
+        hs.setClipToPadding(false);
+        int d16 = Qvk3Ui.dp(a, 16);
+        hs.setPadding(d16, 0, d16, Qvk3Ui.dp(a, 6));
+        LinearLayout line = new LinearLayout(a);
+        int size = Qvk3Ui.dp(a, 148);
+        for (Qvk3MusicSource.Playlist pl : r.cards) {
+            LinearLayout card = new LinearLayout(a);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(0, 0, Qvk3Ui.dp(a, 12), 0);
+            ImageView cv = Qvk3Ui.cover(a, p, 148, 14);
+            android.graphics.Bitmap hit = Qvk3Images.get(a).cached(pl.cover, 300);
+            setRounded(cv, hit, 14);
+            if (hit == null && pl.cover != null && !pl.cover.isEmpty()) Qvk3Images.get(a).load(pl.cover, 300, b -> setRounded(cv, b, 14));
+            card.addView(cv);
+            TextView t1 = Qvk3Ui.line(a, pl.title, 14, p.text, false);
+            t1.setPadding(0, Qvk3Ui.dp(a, 6), 0, 0);
+            card.addView(t1, new LinearLayout.LayoutParams(size, ViewGroup.LayoutParams.WRAP_CONTENT));
+            String sub = pl.subtitle.isEmpty() ? (pl.count > 0 ? pl.count + " треков" : "Плейлист") : pl.subtitle;
+            card.addView(Qvk3Ui.line(a, sub, 12, p.text2, false), new LinearLayout.LayoutParams(size, ViewGroup.LayoutParams.WRAP_CONTENT));
+            card.setOnClickListener(v -> push(() -> showPlaylist(pl)));
+            card.setContentDescription(pl.title + ", " + sub);
+            line.addView(card);
+        }
+        hs.addView(line);
+        return hs;
+    }
+
+    private View shelfView(Row r) {
+        if (r.grid != null) {
+            if (r.grid.getParent() instanceof ViewGroup) ((ViewGroup) r.grid.getParent()).removeView(r.grid);
+            return r.grid;
+        }
+        if (r.cards != null) return cardsView(r);
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(a);
+        hs.setHorizontalScrollBarEnabled(false);
+        hs.setClipToPadding(false);
+        int d16 = Qvk3Ui.dp(a, 16);
+        hs.setPadding(d16 - Qvk3Ui.dp(a, 4), 0, d16, Qvk3Ui.dp(a, 4));
+        android.widget.GridLayout g = new android.widget.GridLayout(a);
+        g.setOrientation(android.widget.GridLayout.VERTICAL);
+        int lines = Math.min(r.lines, Math.max(1, r.shelf.size()));
+        g.setRowCount(lines);
+        int cellW = Math.round(a.getResources().getDisplayMetrics().widthPixels * 0.78f);
+        for (int i = 0; i < r.shelf.size(); i++) {
+            final int idx = i;
+            Qvk3Track t = r.shelf.get(i);
+            LinearLayout cell = new LinearLayout(a);
+            cell.setGravity(Gravity.CENTER_VERTICAL);
+            cell.setPadding(Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 5), Qvk3Ui.dp(a, 8), Qvk3Ui.dp(a, 5));
+            cell.setBackground(Qvk3Ui.ripple(a, 0, p.dark ? 0x22FFFFFF : 0x14000000, Qvk3Ui.dp(a, 10)));
+            ImageView cv = Qvk3Ui.cover(a, p, 48, 8);
+            android.graphics.Bitmap hit = Qvk3Images.get(a).cached(t.cover, 144);
+            setRounded(cv, hit, 8);
+            if (hit == null && t.cover != null && !t.cover.isEmpty()) {
+                Qvk3Images.get(a).load(t.cover, 144, b -> setRounded(cv, b, 8));
+            }
+            cell.addView(cv);
+            LinearLayout tx = new LinearLayout(a);
+            tx.setOrientation(LinearLayout.VERTICAL);
+            tx.setPadding(Qvk3Ui.dp(a, 12), 0, 0, 0);
+            tx.addView(Qvk3Ui.line(a, t.title, 15, p.text, false));
+            tx.addView(Qvk3Ui.line(a, t.playable() || !t.local.isEmpty() ? t.artist : t.unplayableReason(), 13, p.text2, false));
+            cell.addView(tx, Qvk3Ui.weight(1));
+            cell.setOnClickListener(v -> play(r.shelf, idx));
+            cell.setOnLongClickListener(v -> {
+                trackMenu(r.shelf, idx);
+                return true;
+            });
+            cell.setContentDescription(t.title + ", " + t.artist);
+            android.widget.GridLayout.LayoutParams lp = new android.widget.GridLayout.LayoutParams();
+            lp.width = cellW;
+            lp.height = Qvk3Ui.dp(a, 60);
+            g.addView(cell, lp);
+        }
+        hs.addView(g);
+        return hs;
+    }
+
     Row trackRow(List<Qvk3Track> context, int index) {
         Qvk3Track t = context.get(index);
         String sub = t.artist + (t.album.isEmpty() ? "" : " · " + t.album);
@@ -862,30 +990,34 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             Qvk3Jobs.main(() -> {
                 List<Qvk3Track> reco2 = fReco, popular2 = fPopular;
                 if (tab != 0 || !back.isEmpty()) return;
+                // BUG-0010: like VK's music home — tracks as sideways grids (2 rows, «Популярное» 4), playlists as big
+                // covers in a row; a section title opens the whole list.
                 if (!recent.isEmpty()) {
-                    r.add(header("Недавно прослушанное"));
-                    for (int i = 0; i < recent.size(); i++) r.add(trackRow(recent, i));
+                    r.add(header("Недавно прослушанное", () -> push(() -> showTrackList("Недавно прослушанное", recent))));
+                    r.add(shelf(recent, 2));
                 }
                 for (Qvk3MusicSource.Block b : fBlocks) {
-                    r.add(header(b.title));
-                    for (Qvk3MusicSource.Playlist pl : b.playlists) {
-                        r.add(new Row(Row.ITEM, pl.title, (pl.subtitle.isEmpty() ? "Плейлист" : pl.subtitle) + (pl.count > 0 ? " · " + pl.count + " треков" : ""),
-                                "", pl.cover, null, false, () -> push(() -> showPlaylist(pl)), null));
-                    }
-                    for (int i = 0; i < Math.min(5, b.tracks.size()); i++) r.add(trackRow(b.tracks, i));
+                    List<Qvk3Track> bt = b.tracks;
+                    r.add(bt.isEmpty() ? header(b.title) : header(b.title, () -> push(() -> showTrackList(b.title, bt))));
+                    if (!b.playlists.isEmpty()) r.add(cards(b.playlists));
+                    if (!bt.isEmpty()) r.add(shelf(bt.subList(0, Math.min(10, bt.size())), 2));
                 }
                 if (!fBlocks.isEmpty()) r.add(note("Вся главная музыки ВК →", () -> selectTab(5)));
                 if (!reco2.isEmpty()) {
-                    r.add(header("Для вас"));
-                    for (int i = 0; i < reco2.size(); i++) r.add(trackRow(reco2, i));
+                    r.add(header("Для вас", () -> push(() -> showTrackList("Для вас", reco2))));
+                    r.add(shelf(reco2, 2));
                 }
                 if (!popular2.isEmpty()) {
-                    r.add(header("Популярное"));
-                    for (int i = 0; i < popular2.size(); i++) r.add(trackRow(popular2, i));
+                    r.add(header("Популярное", () -> push(() -> showTrackList("Популярное", popular2))));
+                    r.add(shelf(popular2, 4));
                 }
-                r.add(header("Последние добавленные"));
-                if (latest.isEmpty()) r.add(note("Откройте «Моя музыка», чтобы загрузить медиатеку", () -> selectTab(1)));
-                for (int i = 0; i < latest.size(); i++) r.add(trackRow(latest, i));
+                if (latest.isEmpty()) {
+                    r.add(header("Последние добавленные"));
+                    r.add(note("Откройте «Моя музыка», чтобы загрузить медиатеку", () -> selectTab(1)));
+                } else {
+                    r.add(header("Последние добавленные", () -> selectTab(1)));
+                    r.add(shelf(latest, 2));
+                }
                 if (!locals.isEmpty()) r.add(header("Плейлисты QVK"));
                 for (Qvk3MusicLibrary.LocalList l : locals) {
                     r.add(new Row(Row.ITEM, l.title == null ? "Плейлист QVK" : l.title, "Плейлист QVK · " + l.total + " треков", "", null, null, false,
@@ -949,17 +1081,26 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         });
     }
 
+    /** IDEA-0022: the section tiles of «Моя музыка» (kept so «Назад» can end their edit mode first). */
+    private Qvk3TileGrid tileGrid;
+
     private void showMyMusic() {
         screenTitle.setText("Моя музыка");
         List<Row> head = new ArrayList<>();
-        head.add(note("Альбомы · Исполнители · Избранное · История · Файлы", null));
-        head.add(new Row(Row.ITEM, "Альбомы", Qvk3MusicSettings.layout(a).equals("coverflow") ? "CoverFlow" : "Сгруппировано по альбомам", "", null, null, false, () -> push(this::showAlbums), null).tile(Qvk3Icons.GRID, 0xFF5B6CFF, 0xFF8E54E9));
-        head.add(new Row(Row.ITEM, "Cover Flow", "Альбомы на чёрном фоне, как на iPhone. Открывается и поворотом телефона", "", null, null, false, () -> showCoverFlow(false), null).tile(Qvk3Icons.LAYERS, 0xFF232526, 0xFF5A5F66));
-        head.add(new Row(Row.ITEM, "Исполнители", "Сгруппировано по исполнителям", "", null, null, false, () -> push(this::showArtists), null).tile(Qvk3Icons.USER, 0xFFFF7A59, 0xFFFF4E8A));
-        head.add(new Row(Row.ITEM, "Избранное QVK", "Локальный список, не меняет медиатеку ВК", "", null, null, false, () -> push(this::showFavorites), null).tile(Qvk3Icons.HEART_FILL, 0xFFFF416C, 0xFFFF4B2B));
-        head.add(new Row(Row.ITEM, "История", "Недавно прослушанные", "", null, null, false, () -> Qvk3QueueDialog.history(a, p), null).tile(Qvk3Icons.UNDO, 0xFF11998E, 0xFF38EF7D));
-        head.add(new Row(Row.ITEM, "Файлы на устройстве", "Импортированные и ранее сохранённые QVK", "", null, null, false, () -> push(() -> showCachedList("local", "Файлы на устройстве")), null).tile(Qvk3Icons.FOLDER, 0xFFF7971E, 0xFFFFC837));
-        head.add(new Row(Row.ITEM, "Перемешать всё", "Случайный порядок по всей медиатеке", "", null, null, false, this::shuffleAll, null).tile(Qvk3Icons.SHUFFLE, 0xFF2193B0, 0xFF6DD5ED));
+        // IDEA-0022: two rows of gradient tiles instead of grey list rows; hold a tile to rearrange them (iOS-style)
+        List<Qvk3TileGrid.Tile> t = new ArrayList<>();
+        t.add(new Qvk3TileGrid.Tile("albums", "Альбомы", Qvk3Icons.GRID, 0xFF5B6CFF, 0xFF8E54E9, () -> push(this::showAlbums)));
+        t.add(new Qvk3TileGrid.Tile("coverflow", "Cover Flow", Qvk3Icons.LAYERS, 0xFF232526, 0xFF5A5F66, () -> showCoverFlow(false)));
+        t.add(new Qvk3TileGrid.Tile("artists", "Исполнители", Qvk3Icons.USER, 0xFFFF7A59, 0xFFFF4E8A, () -> push(this::showArtists)));
+        t.add(new Qvk3TileGrid.Tile("favorites", "Избранное QVK", Qvk3Icons.HEART_FILL, 0xFFFF416C, 0xFFFF4B2B, () -> push(this::showFavorites)));
+        t.add(new Qvk3TileGrid.Tile("history", "История", Qvk3Icons.UNDO, 0xFF11998E, 0xFF38EF7D, () -> Qvk3QueueDialog.history(a, p)));
+        t.add(new Qvk3TileGrid.Tile("files", "Файлы", Qvk3Icons.FOLDER, 0xFFF7971E, 0xFFFFC837, () -> push(() -> showCachedList("local", "Файлы на устройстве"))));
+        t.add(new Qvk3TileGrid.Tile("shuffle", "Перемешать всё", Qvk3Icons.SHUFFLE, 0xFF2193B0, 0xFF6DD5ED, this::shuffleAll));
+        t.add(new Qvk3TileGrid.Tile("downloads", "Загрузки", Qvk3Icons.DOWNLOAD, 0xFF4776E6, 0xFF8E54E9, () -> selectTab(4)));
+        tileGrid = new Qvk3TileGrid(a, t);
+        Row g = new Row(Row.SHELF, "", "", "", null, null, false, null, null);
+        g.grid = tileGrid;
+        head.add(g);
         head.add(header("Все композиции"));
         feed = new Feed("my", head, Qvk3MusicSource::myTracks);
         feed.render();
@@ -1099,7 +1240,10 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 do {
                     page = Qvk3MusicSource.playlists(offset);
                     for (Qvk3MusicSource.Playlist pl : page.items) {
-                        out.add(new Row(Row.ITEM, pl.title, (pl.subtitle.isEmpty() ? "" : pl.subtitle + " · ") + pl.count + " треков", "", pl.cover, null, false,
+                        // IDEA-0026: download mark when every track of the playlist is saved on the device
+                        boolean saved = playlistSaved(pl);
+                        out.add(new Row(Row.ITEM, pl.title, (pl.subtitle.isEmpty() ? "" : pl.subtitle + " · ") + pl.count + " треков"
+                                + (saved ? " · скачан" : ""), "", pl.cover, null, saved,
                                 () -> push(() -> showPlaylist(pl)), () -> playlistMenu(pl)));
                     }
                     offset += page.items.size();
@@ -1138,6 +1282,8 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                         all.addAll(page.items);
                         offset += page.items.size();
                     } while (!page.items.isEmpty() && offset < page.total && offset < 5000);
+                    // IDEA-0026: keep the track list so the «скачан» mark can be worked out without loading it again
+                    Qvk3MusicLibrary.get(a).storePage("pl:" + pl.key(), 0, all, all.size());
                     if (w == 0) engine.play(all, 0);
                     else Qvk3Ui.toast(a, Qvk3MusicDownloads.enqueue(a, all));
                 } catch (Exception e) {
@@ -1145,6 +1291,24 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 }
             });
         }).show();
+    }
+
+    /** IDEA-0026: true when the cached track list of this playlist is complete and every track is downloaded. */
+    private boolean playlistSaved(Qvk3MusicSource.Playlist pl) {
+        try {
+            Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
+            String key = "pl:" + pl.key();
+            int total = lib.cachedTotal(key);
+            if (total <= 0 || (pl.count > 0 && total < pl.count)) return false;
+            List<Qvk3Track> cached = lib.page(key, 0, total);
+            if (cached.size() < total) return false;
+            for (Qvk3Track t : cached) {
+                if (lib.withDownload(t).local.isEmpty()) return false;
+            }
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     private void showPlaylist(Qvk3MusicSource.Playlist pl) {
@@ -1167,9 +1331,11 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         screenTitle.setText("Поиск: " + query);
         List<Qvk3Track> local = Qvk3MusicLibrary.get(a).searchLocal(query, 30);
         List<Row> head = new ArrayList<>();
+        // IDEA-0027: sections instead of one long list — «Мои треки» and «Глобальный поиск» as grids of three rows that
+        // scroll sideways; tapping a section title opens the whole list.
         if (!local.isEmpty()) {
-            head.add(header("В медиатеке и загрузках"));
-            for (int i = 0; i < local.size(); i++) head.add(trackRow(local, i));
+            head.add(header("Мои треки", () -> push(() -> showSearchList(query, true))));
+            head.add(shelf(local, Math.min(3, local.size())));
         }
         if (localOnly) {
             feed = null;
@@ -1178,7 +1344,49 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             rows.set(head);
             return;
         }
-        head.add(header("Каталог ВК"));
+        feed = null;
+        head.add(header("Глобальный поиск", () -> push(() -> showSearchList(query, false))));
+        head.add(note("Ищем во всём ВК…", null));
+        rows.set(head);
+        final Runnable owner = current;
+        Qvk3Jobs.io(() -> {
+            List<Qvk3Track> found = new ArrayList<>();
+            String err = null;
+            try {
+                for (Qvk3Track t : Qvk3MusicSource.search(query, false, 0).items) found.add(Qvk3MusicLibrary.get(a).withDownload(t));
+            } catch (Exception e) {
+                err = Qvk3Jobs.message(e);
+            }
+            final String fErr = err;
+            Qvk3Jobs.main(() -> {
+                if (current != owner) return;
+                head.remove(head.size() - 1);
+                if (fErr != null) head.add(note("Поиск ВК недоступен: " + fErr, () -> runSearch(query, false)));
+                else if (found.isEmpty()) head.add(note("Во всём ВК ничего не нашлось", null));
+                else {
+                    List<Qvk3Track> first = found.subList(0, Math.min(15, found.size()));
+                    head.add(shelf(first, Math.min(3, first.size())));
+                    head.add(note("Все результаты →", () -> push(() -> showSearchList(query, false))));
+                }
+                head.add(note("Только исполнитель «" + query + "» →", () -> openArtist(query)));
+                rows.set(head);
+            });
+        });
+    }
+
+    /** IDEA-0027: the full list behind a search section title. */
+    private void showSearchList(String query, boolean mine) {
+        screenTitle.setText((mine ? "Мои треки: " : "Поиск: ") + query);
+        if (mine) {
+            feed = null;
+            List<Qvk3Track> local = Qvk3MusicLibrary.get(a).searchLocal(query, 300);
+            List<Row> r = new ArrayList<>();
+            if (local.isEmpty()) r.add(note("В медиатеке ничего не нашлось", null));
+            for (int i = 0; i < local.size(); i++) r.add(trackRow(local, i));
+            rows.set(r);
+            return;
+        }
+        List<Row> head = new ArrayList<>();
         feed = new Feed(null, head, offset -> Qvk3MusicSource.search(query, false, offset));
         feed.render();
         feed.more();

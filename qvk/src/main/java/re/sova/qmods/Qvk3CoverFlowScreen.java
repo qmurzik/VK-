@@ -34,6 +34,12 @@ import java.util.Set;
  */
 final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.Listener {
     static final String SELECTED = "qvk3_music_coverflow_selected";
+    /** IDEA-0028: which set of covers Cover Flow shows — "my" (my albums and playlists) or "home" (VK's music home). */
+    static final String MODE = "qvk3_music_coverflow_mode";
+    /** IDEA-0028: covers that stand for a ready track list (a «Для вас» block), not for a VK playlist. */
+    private final Map<Qvk3MusicLibrary.Group, List<Qvk3Track>> fixed = new HashMap<>();
+    private TextView titleView;
+    private LinearLayout modeMenu;
     private static final int WHITE = Color.WHITE, GREY = 0xFF9A9A9F, ACCENT = 0xFF4DA3FF;
 
     final Activity a;
@@ -101,7 +107,8 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
             bar.setGravity(Gravity.CENTER_VERTICAL);
             bar.setPadding(dp(4), dp(4), dp(4), 0);
             bar.addView(Qvk3Ui.icon(a, Qvk3Icons.BACK, WHITE, 48, 24, "Назад", v -> close()));
-            TextView t = Qvk3Ui.line(a, "Альбомы", 20, WHITE, true);
+            TextView t = Qvk3Ui.line(a, home() ? "Главная" : "Альбомы", 20, WHITE, true);
+            titleView = t;
             t.setPadding(dp(6), 0, 0, 0);
             bar.addView(t, Qvk3Ui.weight(1));
             addView(bar, new LayoutParams(-1, dp(52), Gravity.TOP));
@@ -121,10 +128,8 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         pl.leftMargin = dp(10);
         pl.bottomMargin = dp(8);
         addView(play, pl);
-        ImageView list = Qvk3Ui.icon(a, Qvk3Icons.LIST, WHITE, 52, 24, "Треки альбома", v -> {
-            int c = flow.selected();
-            if (c >= 0) flipOpen(c);
-        });
+        // IDEA-0028: the album tracks open by tapping the cover anyway — this button now switches the set of covers
+        ImageView list = Qvk3Ui.icon(a, Qvk3Icons.LIST, WHITE, 52, 24, "Наборы обложек: мои альбомы или главная", v -> toggleModeMenu());
         list.setBackground(circle());
         LayoutParams ll = new LayoutParams(dp(52), dp(52), Gravity.BOTTOM | Gravity.END);
         ll.rightMargin = dp(10);
@@ -178,7 +183,125 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
      * device, so it appears instantly and works offline; it is refreshed from VK in the background. Only without VK
      * (offline, never loaded) does it fall back to the local index, and then only to albums with 2+ tracks.
      */
+    private boolean home() {
+        return "home".equals(Qvk3MusicSettings.prefs(a).getString(MODE, "my"));
+    }
+
+    private void toggleModeMenu() {
+        if (modeMenu != null) {
+            closeModeMenu();
+            return;
+        }
+        LinearLayout m = new LinearLayout(a);
+        m.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xF0202024);
+        bg.setCornerRadius(dp(16));
+        bg.setStroke(Math.max(1, dp(0.7f)), 0x22FFFFFF);
+        m.setBackground(bg);
+        m.setPadding(dp(6), dp(6), dp(6), dp(6));
+        m.setClickable(true);
+        String cur = home() ? "home" : "my";
+        String[][] items = {{"my", "Мои альбомы"}, {"home", "Главная"}};
+        for (String[] it : items) {
+            TextView row = Qvk3Ui.line(a, it[1], 16, WHITE, cur.equals(it[0]));
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(14), dp(12), dp(14), dp(12));
+            row.setBackground(Qvk3Ui.ripple(a, 0, 0x22FFFFFF, dp(12)));
+            if (cur.equals(it[0])) {
+                android.graphics.drawable.Drawable ck = Qvk3Icons.of(Qvk3Icons.CHECK, WHITE);
+                ck.setBounds(0, 0, dp(18), dp(18));
+                row.setCompoundDrawablesRelative(null, null, ck, null);
+            }
+            final String id = it[0];
+            row.setOnClickListener(v -> {
+                closeModeMenu();
+                if (id.equals(home() ? "home" : "my")) return;
+                Qvk3MusicSettings.prefs(a).edit().putString(MODE, id).apply();
+                if (titleView != null) titleView.setText("home".equals(id) ? "Главная" : "Альбомы");
+                load();
+            });
+            m.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        }
+        LayoutParams lp = new LayoutParams(dp(230), -2, Gravity.BOTTOM | Gravity.END);
+        lp.rightMargin = dp(10);
+        lp.bottomMargin = dp(68);
+        addView(m, lp);
+        modeMenu = m;
+        // slides up out of the button, like the track-list card
+        m.setAlpha(0f);
+        m.setTranslationY(dp(48));
+        m.animate().alpha(1f).translationY(0).setDuration(220).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+    }
+
+    private void closeModeMenu() {
+        LinearLayout m = modeMenu;
+        modeMenu = null;
+        if (m == null) return;
+        m.animate().alpha(0f).translationY(dp(48)).setDuration(160).withEndAction(() -> removeView(m)).start();
+    }
+
+    /**
+     * IDEA-0028: «Главная» — VK's music home as covers: every playlist of every block (плейлисты дня, новинки,
+     * открытия, собрано редакцией…), and blocks that are only tracks («Для вас», «Похожее на прослушанное») as one
+     * cover each.
+     */
+    private void loadHome() {
+        flow.setVisibility(GONE);
+        empty.setVisibility(VISIBLE);
+        empty.setOnClickListener(null);
+        empty.setText("Загружаем главную музыки ВК…");
+        Qvk3Jobs.io(() -> {
+            List<Qvk3MusicLibrary.Group> groups = new ArrayList<>();
+            Map<Qvk3MusicLibrary.Group, Qvk3MusicSource.Playlist> map = new HashMap<>();
+            Map<Qvk3MusicLibrary.Group, List<Qvk3Track>> fx = new HashMap<>();
+            String err = null;
+            try {
+                for (Qvk3MusicSource.Block b : Qvk3MusicSource.vkHome()) {
+                    for (Qvk3MusicSource.Playlist pl : b.playlists) {
+                        Qvk3MusicLibrary.Group g = new Qvk3MusicLibrary.Group(pl.title, pl.subtitle.isEmpty() ? b.title : pl.subtitle, pl.cover, Math.max(1, pl.count));
+                        groups.add(g);
+                        map.put(g, pl);
+                    }
+                    if (b.playlists.isEmpty() && b.tracks.size() >= 2) {
+                        String cover = "";
+                        for (Qvk3Track t : b.tracks) if (t.cover != null && !t.cover.isEmpty()) {
+                            cover = t.cover;
+                            break;
+                        }
+                        Qvk3MusicLibrary.Group g = new Qvk3MusicLibrary.Group(b.title, "Подборка ВК · " + b.tracks.size() + " треков", cover, b.tracks.size());
+                        groups.add(g);
+                        fx.put(g, new ArrayList<>(b.tracks));
+                    }
+                }
+            } catch (Exception e) {
+                err = Qvk3Jobs.message(e);
+            }
+            final String fErr = err;
+            Qvk3Jobs.main(() -> {
+                if (!home()) return;
+                sources.clear();
+                sources.putAll(map);
+                fixed.clear();
+                fixed.putAll(fx);
+                if (groups.isEmpty()) {
+                    flow.setVisibility(GONE);
+                    empty.setVisibility(VISIBLE);
+                    empty.setText(fErr != null ? "Главная музыки ВК недоступна: " + fErr + "\n\nНажмите, чтобы повторить." : "На главной музыки ВК сейчас пусто.");
+                    empty.setOnClickListener(v -> loadHome());
+                    return;
+                }
+                show(groups, new java.util.HashSet<>());
+            });
+        });
+    }
+
     void load() {
+        if (home()) {
+            loadHome();
+            return;
+        }
+        fixed.clear();
         Qvk3Jobs.io(() -> {
             Qvk3MusicLibrary lib = Qvk3MusicLibrary.get(a);
             Set<String> done = lib.albumsSaved("my");
@@ -232,6 +355,7 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
             }
         }
         Qvk3Jobs.main(() -> {
+            if (home()) return;   // IDEA-0028: the user switched to «Главная» meanwhile
             sources.clear();
             sources.putAll(map);
             show(groups, done);
@@ -335,9 +459,12 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         open = albums.get(index);
         flipping = true;
         final Qvk3MusicSource.Playlist pl = sources.get(open);
+        final List<Qvk3Track> fx = fixed.get(open);
         Qvk3Jobs.io(() -> {
             List<Qvk3Track> tracks = new ArrayList<>();
-            if (pl != null) {
+            if (fx != null) {
+                for (Qvk3Track t : fx) tracks.add(Qvk3MusicLibrary.get(a).withDownload(t));
+            } else if (pl != null) {
                 try {
                     for (int off = 0; off < 2000; ) {
                         Qvk3MusicSource.Page<Qvk3Track> pg = Qvk3MusicSource.playlistTracks(pl, off);
@@ -557,10 +684,13 @@ final class Qvk3CoverFlowScreen extends FrameLayout implements Qvk3MusicEngine.L
         if (index < 0 || index >= albums.size()) return;
         if (index == playingAlbum()) return; // already playing this album
         final Qvk3MusicSource.Playlist pl = sources.get(albums.get(index));
+        final List<Qvk3Track> fx = fixed.get(albums.get(index));
         final String localName = albums.get(index).name;
         Qvk3Jobs.io(() -> {
             List<Qvk3Track> tracks = new ArrayList<>();
-            if (pl != null) {
+            if (fx != null) {
+                for (Qvk3Track t : fx) tracks.add(Qvk3MusicLibrary.get(a).withDownload(t));
+            } else if (pl != null) {
                 try {
                     for (int off = 0; off < 2000; ) {
                         Qvk3MusicSource.Page<Qvk3Track> pg = Qvk3MusicSource.playlistTracks(pl, off);
