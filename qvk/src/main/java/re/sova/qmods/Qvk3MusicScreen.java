@@ -85,6 +85,16 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         final Qvk3Track track;
         final Runnable click, longClick;
         final boolean saved;
+        /** IDEA-0022: section tiles get their own icon on a gradient instead of the grey note. */
+        String icon;
+        int c1, c2;
+
+        Row tile(String icon, int c1, int c2) {
+            this.icon = icon;
+            this.c1 = c1;
+            this.c2 = c2;
+            return this;
+        }
 
         Row(int type, String title, String subtitle, String right, String cover, Qvk3Track track, boolean saved, Runnable click, Runnable longClick) {
             this.type = type;
@@ -228,7 +238,20 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             }
             row.setContentDescription(r.title + ", " + r.subtitle + (r.saved ? ", сохранён на устройстве" : "")
                     + (r.right == null || r.right.isEmpty() ? "" : ", " + r.right) + (now ? ", сейчас играет" : ""));
-            if (r.cover == null || !r.cover.equals(boundCover)) {
+            if (r.icon != null) {
+                String want = "tile:" + r.icon;
+                if (!want.equals(boundCover)) {
+                    boundCover = want;
+                    android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[]{r.c1, r.c2});
+                    g.setCornerRadius(Qvk3Ui.dp(a, 10));
+                    cover.setBackground(g);
+                    cover.setImageDrawable(Qvk3Icons.of(r.icon, 0xFFFFFFFF));
+                    int pad = Qvk3Ui.dp(a, 13);
+                    cover.setPadding(pad, pad, pad, pad);
+                }
+            } else if (r.cover == null || !r.cover.equals(boundCover)) {
+                if (boundCover != null && boundCover.startsWith("tile:")) cover.setBackground(Qvk3Ui.rounded(p.surface2, Qvk3Ui.dp(a, 10)));
                 boundCover = r.cover;
                 android.graphics.Bitmap hit = Qvk3Images.get(row.getContext()).cached(r.cover, 144);
                 setRounded(cover, hit, 10);
@@ -926,13 +949,13 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         screenTitle.setText("Моя музыка");
         List<Row> head = new ArrayList<>();
         head.add(note("Альбомы · Исполнители · Избранное · История · Файлы", null));
-        head.add(new Row(Row.ITEM, "Альбомы", Qvk3MusicSettings.layout(a).equals("coverflow") ? "CoverFlow" : "Сгруппировано по альбомам", "", null, null, false, () -> push(this::showAlbums), null));
-        head.add(new Row(Row.ITEM, "Cover Flow", "Альбомы на чёрном фоне, как на iPhone. Открывается и поворотом телефона", "", null, null, false, () -> showCoverFlow(false), null));
-        head.add(new Row(Row.ITEM, "Исполнители", "Сгруппировано по исполнителям", "", null, null, false, () -> push(this::showArtists), null));
-        head.add(new Row(Row.ITEM, "Избранное QVK", "Локальный список, не меняет медиатеку ВК", "", null, null, false, () -> push(this::showFavorites), null));
-        head.add(new Row(Row.ITEM, "История", "Недавно прослушанные", "", null, null, false, () -> Qvk3QueueDialog.history(a, p), null));
-        head.add(new Row(Row.ITEM, "Файлы на устройстве", "Импортированные и ранее сохранённые QVK", "", null, null, false, () -> push(() -> showCachedList("local", "Файлы на устройстве")), null));
-        head.add(new Row(Row.ITEM, "Перемешать всё", "Случайный порядок по всей медиатеке", "", null, null, false, this::shuffleAll, null));
+        head.add(new Row(Row.ITEM, "Альбомы", Qvk3MusicSettings.layout(a).equals("coverflow") ? "CoverFlow" : "Сгруппировано по альбомам", "", null, null, false, () -> push(this::showAlbums), null).tile(Qvk3Icons.GRID, 0xFF5B6CFF, 0xFF8E54E9));
+        head.add(new Row(Row.ITEM, "Cover Flow", "Альбомы на чёрном фоне, как на iPhone. Открывается и поворотом телефона", "", null, null, false, () -> showCoverFlow(false), null).tile(Qvk3Icons.LAYERS, 0xFF232526, 0xFF5A5F66));
+        head.add(new Row(Row.ITEM, "Исполнители", "Сгруппировано по исполнителям", "", null, null, false, () -> push(this::showArtists), null).tile(Qvk3Icons.USER, 0xFFFF7A59, 0xFFFF4E8A));
+        head.add(new Row(Row.ITEM, "Избранное QVK", "Локальный список, не меняет медиатеку ВК", "", null, null, false, () -> push(this::showFavorites), null).tile(Qvk3Icons.HEART_FILL, 0xFFFF416C, 0xFFFF4B2B));
+        head.add(new Row(Row.ITEM, "История", "Недавно прослушанные", "", null, null, false, () -> Qvk3QueueDialog.history(a, p), null).tile(Qvk3Icons.UNDO, 0xFF11998E, 0xFF38EF7D));
+        head.add(new Row(Row.ITEM, "Файлы на устройстве", "Импортированные и ранее сохранённые QVK", "", null, null, false, () -> push(() -> showCachedList("local", "Файлы на устройстве")), null).tile(Qvk3Icons.FOLDER, 0xFFF7971E, 0xFFFFC837));
+        head.add(new Row(Row.ITEM, "Перемешать всё", "Случайный порядок по всей медиатеке", "", null, null, false, this::shuffleAll, null).tile(Qvk3Icons.SHUFFLE, 0xFF2193B0, 0xFF6DD5ED));
         head.add(header("Все композиции"));
         feed = new Feed("my", head, Qvk3MusicSource::myTracks);
         feed.render();

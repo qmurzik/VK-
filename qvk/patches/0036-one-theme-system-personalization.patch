@@ -1,0 +1,46 @@
+diff -ru a/smali_classes21/re/sova/qmods/PersonalThemes.smali b/smali_classes21/re/sova/qmods/PersonalThemes.smali
+--- a/smali_classes21/re/sova/qmods/PersonalThemes.smali	2026-11-13 09:59:47.362362129 +0000
++++ b/smali_classes21/re/sova/qmods/PersonalThemes.smali	2026-11-13 09:59:47.380677522 +0000
+@@ -478,6 +478,10 @@
+ 
+     move-result p0
+ 
++    # QVK 3.0 (BUG-0016): one theme system. Personalization keeps chat backgrounds/bubbles/effects, but its own
++    # "theme" no longer overwrites the app palette (qmods_theme_palette) on every resume — that mixed the themes.
++    const/4 p0, 0x0
++
+     if-nez p0, :cond_1
+ 
+     return-void
+@@ -1741,11 +1745,7 @@
+ 
+     move-result-object v2
+ 
+-    const-string v3, "qmods_theme_palette"
+-
+-    invoke-interface {v1, v3, v2}, Landroid/content/SharedPreferences$Editor;->putString(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;
+-
+-    move-result-object v1
++    # QVK 3.0 (BUG-0016): the snapshot is only discarded — restoring it would undo the theme picked since then.
+ 
+     .line 199
+     invoke-interface {v1, v0}, Landroid/content/SharedPreferences$Editor;->remove(Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;
+diff -ru a/smali_classes21/re/sova/qmods/PersonalizationActivity.smali b/smali_classes21/re/sova/qmods/PersonalizationActivity.smali
+--- a/smali_classes21/re/sova/qmods/PersonalizationActivity.smali	2026-11-13 09:59:47.365606199 +0000
++++ b/smali_classes21/re/sova/qmods/PersonalizationActivity.smali	2026-11-13 09:59:47.381814879 +0000
+@@ -4082,13 +4082,8 @@
+     invoke-virtual {p0, v0, p1}, Lre/sova/qmods/PersonalizationActivity;->put(Ljava/lang/String;Ljava/lang/Object;)V
+ 
+     .line 376
+-    new-instance p1, Landroid/content/Intent;
+-
+-    const-class v0, Lre/sova/qmods/ThemeEditorActivity;
+-
+-    invoke-direct {p1, p0, v0}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
+-
+-    invoke-virtual {p0, p1}, Lre/sova/qmods/PersonalizationActivity;->startActivity(Landroid/content/Intent;)V
++    # QVK 3.0 (BUG-0016): one place for themes — the QVK 3 «Светлая и тёмная тема» screen, not the QVK 2 editor.
++    invoke-static {p0}, Lre/sova/qmods/Qvk3InfoScreens;->dayNight(Landroid/app/Activity;)V
+ 
+     .line 377
+     return-void

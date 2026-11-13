@@ -304,10 +304,19 @@ public final class Qvk3SettingsIndex {
         add(new Item(key, key, title, summary, section, group, SWITCH, null, def));
     }
 
+    /**
+     * SettingsHub screens that only repeat catalog entries the centre already lists (BUG-0016 feedback: two ways into
+     * the same personalization screen, two ways into the badge catalog).
+     */
+    static final java.util.Set<String> HIDE_HUB = new java.util.HashSet<>(java.util.Arrays.asList(
+            "personal",          // «Фоны, пузыри и эффекты» = «Персонализация» (qvk_personalization)
+            "original:badges")); // «Значки и украшения» = «Значки в профиле» + «Каталог украшений» + «Заявка на значок»
+
     public void addHubScreen(String group, String title, String summary, String target) {
         // "all:"/"basic:" routes only re-list catalog switches that the centre already shows; a screen whose
         // target or title duplicates a catalog entry would appear twice.
         if (target.startsWith("all:") || target.startsWith("basic:")) return;
+        if (HIDE_HUB.contains(target)) return;
         String nt = normal(title);
         for (Item i : items) {
             if (target.equals(i.target) || normal(i.title).equals(nt)) return;

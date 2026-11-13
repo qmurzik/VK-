@@ -260,6 +260,23 @@ public final class Qvk3Appearance {
         } catch (Throwable t) {
             RuntimeFaults.record("qvk3.appearance.reset.studio", t);
         }
+        try {
+            // BUG-0016: «Фон и пузыри чатов» (QVK 2 personalization) kept its chat background, bubble and text colours
+            // — globally and per chat — so after «Сбросить тему» fonts and backgrounds stayed. Clear them too, and the
+            // old palette snapshot that personalization would otherwise write back over the theme later.
+            SharedPreferences rp = RuntimeBridge.prefs;
+            if (rp != null) {
+                SharedPreferences.Editor pe = rp.edit();
+                for (String k : new java.util.ArrayList<>(rp.getAll().keySet())) {
+                    if (k.startsWith("qvk_personalization_") || k.startsWith("qvk_personal_previous_palette_")) pe.remove(k);
+                }
+                pe.commit();
+            }
+            Personalization.cache.clear();
+            Personalization.sources.clear();
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.appearance.reset.personal", t);
+        }
         Qvk3SettingsHistory.record(a, STYLE, "Оформление сброшено");
         ThemePalette.refresh(a);
     }

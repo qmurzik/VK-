@@ -1,0 +1,17 @@
+diff -ru a/smali_classes11/xsna/y3.smali b/smali_classes11/xsna/y3.smali
+--- a/smali_classes11/xsna/y3.smali	2026-11-13 09:59:29.528780765 +0000
++++ b/smali_classes11/xsna/y3.smali	2026-11-13 09:59:29.532004834 +0000
+@@ -1613,7 +1613,12 @@
+ 
+     .line 6
+     :cond_0
+-    const/4 v0, 0x0
++    # QVK 3.0 (BUG-0015): released autoplay manager -> inert proxy instead of null (all ~90 call sites dereference it).
++    invoke-static {}, Lre/sova/qmods/Qvk3NullAutoplay;->get()Ljava/lang/Object;
++
++    move-result-object v0
++
++    check-cast v0, Lcom/vk/libvideo/autoplay/a;
+ 
+     .line 7
+     return-object v0

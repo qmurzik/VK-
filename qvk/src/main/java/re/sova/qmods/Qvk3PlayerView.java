@@ -712,7 +712,6 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         }).show();
     }
 
-    private static final String MINE = "qvk3_mine_copy_";
     private android.widget.ImageView addButton;
 
     private void updateAdd(Qvk3Track t) {
@@ -721,46 +720,28 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
 
     /** "ownerId_audioId" of this track's copy in «Моя музыка», or "" when it is not there (as far as QVK knows). */
     private String mineCopy(Qvk3Track t) {
-        if (t == null || t.id == 0) return "";
-        long me = Qvk3MusicSource.account();
-        if (me > 0 && t.ownerId == me) return me + "_" + t.id;
-        return Qvk3MusicSettings.prefs(a).getString(MINE + t.key(), "");
+        return Qvk3Mine.copy(a, t);
     }
 
-    /** BUG-0030 / BUG-0067: «+» adds the playing track to «Моя музыка»; tapping the check again removes it. */
+    /**
+     * BUG-0030 / BUG-0067: «+» adds the playing track to «Моя музыка»; tapping the check again removes it.
+     * BUG-0072: while the request runs, further taps (here or on the lock screen) are ignored — no double adds.
+     */
     private void addToMine(View button) {
         Qvk3Track t = engine.current();
         if (t == null) return;
-        button.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM);
-        final String copy = mineCopy(t);
-        Qvk3Jobs.io(() -> {
-            String m;
-            boolean nowMine = !copy.isEmpty();
-            try {
-                if (copy.isEmpty()) {
-                    String c = Qvk3MusicSource.addToMine(t);
-                    Qvk3MusicSettings.prefs(a).edit().putString(MINE + t.key(), c).apply();
-                    m = "Добавлено в «Мою музыку»: " + t.title;
-                    nowMine = true;
-                } else {
-                    Qvk3MusicSource.removeFromMine(copy);
-                    Qvk3MusicSettings.prefs(a).edit().remove(MINE + t.key()).apply();
-                    m = "Удалено из «Моей музыки»: " + t.title;
-                    nowMine = false;
-                }
-            } catch (Exception e) {
-                m = Qvk3Jobs.message(e);
+        boolean started = Qvk3Mine.toggle(a, t, (mine, msg) -> {
+            button.setAlpha(1f);
+            Qvk3Ui.toast(a, msg);
+            if (button instanceof android.widget.ImageView) {
+                Qvk3Ui.setIcon((android.widget.ImageView) button, mine ? Qvk3Icons.CHECK : Qvk3Icons.PLUS, fg2);
+                Qvk3Motion.pop(button);
             }
-            final boolean mine = nowMine;
-            final String msg = m;
-            Qvk3Jobs.main(() -> {
-                Qvk3Ui.toast(a, msg);
-                if (button instanceof android.widget.ImageView) {
-                    Qvk3Ui.setIcon((android.widget.ImageView) button, mine ? Qvk3Icons.CHECK : Qvk3Icons.PLUS, fg2);
-                    Qvk3Motion.pop(button);
-                }
-            });
+            Qvk3MusicService.refresh();   // lock-screen «+»/«✓» follows
         });
+        if (!started) return;
+        button.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM);
+        button.setAlpha(0.5f);
     }
 
     private void toggleFavorite() {
@@ -861,7 +842,8 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
             });
             Qvk3Track n = e.queue().peekNext();
             if (n != null) Qvk3Images.get(a).prefetch(n.cover, 900);
-        } else if (flow != null && e.queue().currentIndex() >= 0 && flow.selected() != e.queue().currentIndex()) {
+        } else if (flow != null && !flow.busy() && e.queue().currentIndex() >= 0 && flow.selected() != e.queue().currentIndex()) {
+            // BUG-0013: never pull the covers back while the user is swiping them / they settle from the swipe
             flow.smoothScrollTo(e.queue().currentIndex());
         }
         if (lyricsMode && lyrics != null && lyrics.synced) {

@@ -56,6 +56,28 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
         onState(e);
         // BUG-0053: right after resume the header is not laid out yet — look again shortly instead of on the next tick
         View root = a.getWindow() != null ? a.getWindow().getDecorView() : null;
+        // BUG-0071: on pause the engine does not tick, so after switching tabs nobody moved the button to the new
+        // header. React to the screen's layout changes instead (throttled; cheap when the button is in place).
+        if (root != null) {
+            if (layoutHook != null && layoutRoot.get() != null) {
+                layoutRoot.get().getViewTreeObserver().removeOnGlobalLayoutListener(layoutHook);
+            }
+            layoutRoot = new WeakReference<>(root);
+            layoutHook = () -> {
+                if (resumed.get() != a) return;
+                Qvk3MusicEngine en = Qvk3MusicEngine.peek();
+                if (en == null || en.current() == null || en.isPlaying()) return; // playing: the ticks handle it
+                long now = SystemClock.uptimeMillis();
+                if (now - lastLayoutCheck < 300) return;
+                lastLayoutCheck = now;
+                Qvk3NowButton b = button.get();
+                View an = anchor.get();
+                if (b != null && b.isAttachedToWindow() && an != null && an.isShown()) return;
+                lastLook = 0;   // the hook has its own 300 ms throttle; don't let the attach throttle swallow it
+                onState(en);
+            };
+            root.getViewTreeObserver().addOnGlobalLayoutListener(layoutHook);
+        }
         if (root != null) for (long d : new long[]{150, 600}) root.postDelayed(() -> {
             if (resumed.get() != a || button.get() != null) return;
             lastLook = 0;
@@ -63,10 +85,18 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
         }, d);
     }
 
+    private android.view.ViewTreeObserver.OnGlobalLayoutListener layoutHook;
+    private WeakReference<View> layoutRoot = new WeakReference<>(null);
+    private long lastLayoutCheck;
+
     @Override
     public void onActivityPaused(Activity a) {
         if (resumed.get() != a) return;
         resumed = new WeakReference<>(null);
+        View lr = layoutRoot.get();
+        if (lr != null && layoutHook != null) lr.getViewTreeObserver().removeOnGlobalLayoutListener(layoutHook);
+        layoutHook = null;
+        layoutRoot = new WeakReference<>(null);
         Qvk3MusicEngine e = Qvk3MusicEngine.peek();
         if (e != null && listening) {
             e.removeListener(this);

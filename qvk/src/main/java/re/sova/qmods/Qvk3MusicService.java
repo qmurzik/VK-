@@ -35,6 +35,10 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
     private static final long IDLE_STOP_MS = 10 * 60_000L;
 
     private static volatile boolean running;
+    /** IDEA-0029: lock-screen / notification custom actions. */
+    static final String CA_CLOSE = "ru.qmods.qvk.music.CLOSE";
+    static final String CA_MINE = "ru.qmods.qvk.music.MINE";
+    private static volatile Qvk3MusicService self;
     private MediaSession session;
     private Qvk3MusicEngine engine;
     private boolean foreground;
@@ -61,10 +65,28 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
         return running;
     }
 
+    /** Re-publishes the media session (e.g. after «+» in the player changed the «Моя музыка» state). */
+    static void refresh() {
+        Qvk3MusicService s = self;
+        if (s == null) return;
+        s.main.post(() -> {
+            if (self != s) return;
+            s.lastSig = "";
+            s.onState(s.engine);
+        });
+    }
+
+    /** A VK drawable by name (plain vectors, tinted by the system), else a framework fallback. */
+    private int icon(String vkName, int fallback) {
+        int id = getResources().getIdentifier(vkName, "drawable", getPackageName());
+        return id != 0 ? id : fallback;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
         running = true;
+        self = this;
         engine = Qvk3MusicEngine.get(this);
         session = new MediaSession(this, "QVK Music");
         session.setCallback(new MediaSession.Callback() {
@@ -96,6 +118,22 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
             @Override
             public void onSeekTo(long pos) {
                 engine.seekTo(pos);
+            }
+
+            @Override
+            public void onCustomAction(String action, android.os.Bundle extras) {
+                if (CA_CLOSE.equals(action)) {
+                    // IDEA-0029: «×» on the lock screen — stop the music and remove the player widget
+                    engine.stop();
+                    stopForegroundCompat(true);
+                    stopSelf();
+                } else if (CA_MINE.equals(action)) {
+                    Qvk3Track t = engine.current();
+                    Qvk3Mine.toggle(Qvk3MusicService.this, t, (mine, msg) -> {
+                        android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_SHORT).show();
+                        refresh();
+                    });
+                }
             }
 
             @Override
@@ -153,6 +191,7 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
     @Override
     public void onDestroy() {
         running = false;
+        if (self == this) self = null;
         main.removeCallbacks(idleStop);
         engine.removeListener(this);
         session.setActive(false);
@@ -169,7 +208,8 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
         // (track, state, speed, cover, error) or the position jumped (seek / A-B loop). Re-posting the notification
         // and the 512 px cover four times a second was the main battery cost of QVK Music.
         long now = android.os.SystemClock.elapsedRealtime();
-        String sig = (t == null ? "" : t.key()) + "|" + e.state() + "|" + e.speed() + "|" + e.duration() + "|" + (cover != null) + "|" + coverFor + "|" + e.error();
+        String sig = (t == null ? "" : t.key()) + "|" + e.state() + "|" + e.speed() + "|" + e.duration() + "|" + (cover != null) + "|" + coverFor + "|" + e.error()
+                + "|" + (t != null && Qvk3Mine.mine(this, t));
         long expected = lastPos + (e.state() == Qvk3MusicEngine.PLAYING ? (long) ((now - lastPosAt) * e.speed()) : 0);
         boolean jumped = Math.abs(e.position() - expected) > 2000;
         if (sig.equals(lastSig) && !jumped) return;
@@ -198,6 +238,17 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
                         | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS
                         | PlaybackState.ACTION_SEEK_TO | PlaybackState.ACTION_STOP)
                 .setState(st, e.position(), st == PlaybackState.STATE_PLAYING ? e.speed() : 0f);
+        // IDEA-0029: «×» closes the player, «+»/«✓» adds to / removes from «Моя музыка» — shown by the lock-screen
+        // and notification media controls next to the transport buttons.
+        ps.addCustomAction(new PlaybackState.CustomAction.Builder(CA_CLOSE, "Закрыть плеер",
+                icon("vk_icon_cancel_outline_28", android.R.drawable.ic_menu_close_clear_cancel)).build());
+        if (t != null && t.id != 0) {
+            boolean mine = Qvk3Mine.mine(this, t);
+            ps.addCustomAction(new PlaybackState.CustomAction.Builder(CA_MINE,
+                    mine ? "Убрать из «Моей музыки»" : "Добавить в «Мою музыку»",
+                    mine ? icon("vk_icon_done_outline_28", android.R.drawable.checkbox_on_background)
+                            : icon("vk_icon_add_outline_28", android.R.drawable.ic_input_add)).build());
+        }
         if (st == PlaybackState.STATE_ERROR) ps.setErrorMessage(e.error());
         session.setPlaybackState(ps.build());
         if (t != null) {

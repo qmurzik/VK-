@@ -148,6 +148,20 @@ public final class Qvk3CoverFlowView extends View {
         return items.isEmpty() ? -1 : Math.round(pos);
     }
 
+    /** Finger down, or covers still gliding after the user let go (BUG-0013). */
+    private boolean touching;
+    private long userUntil;
+
+    /**
+     * True while the user is moving the covers or they are still settling from that gesture. Owners that keep the
+     * flow in sync with something else (the player's current track) must not scroll it back during this time —
+     * that was BUG-0013: every player tick pulled the cover back to the playing track mid-swipe.
+     */
+    public boolean busy() {
+        return touching || byUser || fling || !scroller.isFinished()
+                || android.os.SystemClock.uptimeMillis() < userUntil;
+    }
+
     /** Animated jump ("к текущему альбому"). */
     public void smoothScrollTo(int index) {
         scrollTo(index, false);
@@ -403,12 +417,13 @@ public final class Qvk3CoverFlowView extends View {
         for (int i = Math.max(0, c - side); i <= Math.min(items.size() - 1, c + side); i++) {
             img.prefetch(items.get(i).cover, coverBucket());
         }
+        boolean wasUser = byUser, wasFling = fling;
+        byUser = false;   // always cleared, also when the swipe ended on the same cover (else busy() would stick)
+        fling = false;
         if (c != lastSettled) {
             lastSettled = c;
-            settledByUser = byUser;
-            settledByFling = fling;
-            byUser = false;
-            fling = false;
+            settledByUser = wasUser;
+            settledByFling = wasFling;
             setContentDescription(items.get(c).title + ", " + items.get(c).subtitle + ". Альбом " + (c + 1) + " из " + items.size());
             sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
             if (listener != null) listener.onItem(c, true);
@@ -423,6 +438,7 @@ public final class Qvk3CoverFlowView extends View {
         velocity.addMovement(e);
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                touching = true;
                 byUser = true;
                 fling = false;
                 scroller.forceFinished(true);
@@ -441,6 +457,8 @@ public final class Qvk3CoverFlowView extends View {
                 return true;
             }
             case MotionEvent.ACTION_UP: {
+                touching = false;
+                userUntil = android.os.SystemClock.uptimeMillis() + 1200;
                 velocity.computeCurrentVelocity(1000, maxFling);
                 float vx = velocity.getXVelocity();
                 if (!dragging) {
@@ -467,6 +485,7 @@ public final class Qvk3CoverFlowView extends View {
                 return true;
             }
             case MotionEvent.ACTION_CANCEL:
+                touching = false;
                 scrollTo(Math.round(pos), false);
                 recycle();
                 return true;
