@@ -278,6 +278,12 @@ final class Qvk3UpdateScreen {
     }
 
     private void open() {
+        // Nothing runs right now: a finished, failed or half-shown state from earlier must not hide «Обновить».
+        // A paused download keeps its state so «Продолжить» resumes from the same byte.
+        if (!Qvk3Updates.busy() && Qvk3Updates.stage != Qvk3Updates.PAUSED) {
+            Qvk3Updates.stage = Qvk3Updates.IDLE;
+            Qvk3Updates.status = "";
+        }
         previous = Qvk3Updates.listener;
         Qvk3Updates.listener = listener;
         dialog.show();

@@ -616,8 +616,12 @@ public final class Qvk3Updates {
                     break;
                 }
                 case PackageInstaller.STATUS_SUCCESS:
-                    stage = DONE;
-                    set("Обновление установлено", -1);
+                    // This broadcast is delivered to the NEW, just-installed process: nothing is being updated in it,
+                    // so it must not look like a finished update (alpha43 then showed «Готово» instead of «Обновить»
+                    // for the next version). Start clean.
+                    stage = IDLE;
+                    bytes = 0;
+                    set("", -1);
                     break;
                 default:
                     stage = ERROR;
