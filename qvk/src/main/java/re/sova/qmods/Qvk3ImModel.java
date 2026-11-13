@@ -148,6 +148,23 @@ public final class Qvk3ImModel {
                 x.url = "https://vk.com/video" + x.ownerId + "_" + x.id;
                 break;
             }
+            case "video_message": {
+                // «кружок»: round video message — preview, a playable mp4 and VK's speech transcript
+                x.duration = o.optInt("duration");
+                JSONObject p = bestSize(o.optJSONArray("image"), 600);
+                if (p == null) p = bestSize(o.optJSONArray("first_frame"), 600);
+                x.preview = sizeUrl(p);
+                JSONObject files = o.optJSONObject("files");
+                if (files != null) for (String k : new String[]{"mp4_480", "mp4_360", "mp4_720", "mp4_240", "mp4_144"}) {
+                    if (!files.optString(k).isEmpty()) {
+                        x.url = files.optString(k);
+                        break;
+                    }
+                }
+                x.transcript = o.optString("transcript");
+                x.title = "Видеосообщение";
+                break;
+            }
             case "audio":
                 x.title = o.optString("title");
                 x.subtitle = o.optString("artist");
@@ -254,6 +271,7 @@ public final class Qvk3ImModel {
             case "video": return "Видео";
             case "audio": return "Аудиозапись";
             case "audio_message": return "Голосовое сообщение";
+            case "video_message": return "Видеосообщение";
             case "doc": return "Файл";
             case "sticker": return "Стикер";
             case "wall": return "Запись со стены";

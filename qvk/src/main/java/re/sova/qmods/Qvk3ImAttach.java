@@ -33,12 +33,14 @@ final class Qvk3ImAttach {
                 "Фотографии\nДо 10 из галереи",
                 "Видео\nИз галереи, до 100 МБ",
                 "Файл\nЛюбой документ до 200 МБ",
-                "Голосовое сообщение\nУдерживайте кнопку записи"}, (d, w) -> {
+                "Голосовое сообщение\nУдерживайте кнопку записи",
+                "Кружок\nВидеосообщение с фронтальной камеры, до 60 секунд"}, (d, w) -> {
             if (w == 0) Qvk3ImPickActivity.pick(a, Qvk3ImPickActivity.CAMERA, uris -> upload(chat, uris, true));
             else if (w == 1) Qvk3ImPickActivity.pick(a, "image/*", uris -> upload(chat, uris, true));
             else if (w == 2) Qvk3ImPickActivity.pick(a, "video/*", uris -> uploadVideo(chat, uris));
             else if (w == 3) Qvk3ImPickActivity.pick(a, "*/*", uris -> upload(chat, uris, false));
-            else Qvk3ImRecorder.open(chat);
+            else if (w == 4) Qvk3ImRecorder.open(chat);
+            else Qvk3ImPickActivity.pick(a, Qvk3ImPickActivity.CIRCLE, uris -> uploadCircle(chat, uris.get(0)));
         }).show();
     }
 
@@ -53,6 +55,48 @@ final class Qvk3ImAttach {
                 Qvk3Jobs.main(() -> chat.attachUploaded(preview.ref(), preview));
             } catch (Exception e) {
                 Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Не загрузилось: " + Qvk3Jobs.message(e)));
+            }
+        });
+    }
+
+    /**
+     * «Кружок»: the same route VK's app uses — video.getVideoMessageUploadInfo(shape_id) gives the upload address and
+     * the video id, the file is posted there, and the message carries "video_message{owner}_{id}_{key}".
+     */
+    static void uploadCircle(Qvk3ImChatView chat, Uri u) {
+        Activity a = chat.a;
+        Qvk3Ui.toast(a, "Загружаем кружок…");
+        Qvk3Jobs.io(() -> {
+            try {
+                byte[] data = read(a, u);
+                if (data.length > (60L << 20)) throw new java.io.IOException("Кружок больше 60 МБ — снимите покороче");
+                int shape = 0;
+                try {
+                    JSONObject sh = Qvk3ImApi.call("messages.getVideoMessageShapes");
+                    JSONArray shapes = sh.optJSONArray("shapes");
+                    if (shapes != null && shapes.length() > 0) shape = shapes.optJSONObject(0).optInt("id");
+                } catch (Exception ignored) {
+                    // no shapes: the plain circle
+                }
+                JSONObject info = Qvk3ImApi.call("video.getVideoMessageUploadInfo",
+                        "shape_id", Integer.toString(shape));
+                String url = info.optString("upload_url");
+                JSONObject upload = info.optJSONObject("upload");
+                if (url.isEmpty() && upload != null) url = upload.optString("upload_url");
+                if (url.isEmpty()) throw new java.io.IOException("ВК не дал адрес загрузки кружка");
+                post(url, "video_file", "circle.mp4", data);
+                Qvk3ImModel.Attachment v = new Qvk3ImModel.Attachment("video_message");
+                v.ownerId = info.optLong("owner_id");
+                v.id = info.optLong("video_id");
+                v.accessKey = info.optString("access_key", "");
+                v.title = "Видеосообщение";
+                if (v.id == 0) throw new java.io.IOException("ВК не вернул номер кружка");
+                Qvk3Jobs.main(() -> {
+                    chat.attachUploaded(v.ref(), v);
+                    chat.send();   // a circle goes right away, like in VK
+                });
+            } catch (Throwable e) {
+                Qvk3Jobs.main(() -> Qvk3Ui.toast(a, "Кружок не отправлен: " + Qvk3Jobs.message(e)));
             }
         });
     }

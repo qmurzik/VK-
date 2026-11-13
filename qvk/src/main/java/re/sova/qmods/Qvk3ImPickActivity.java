@@ -21,6 +21,8 @@ public final class Qvk3ImPickActivity extends Activity {
     static final String MIME = "mime";
     /** Special "mime": take a photo with the camera app (saved to Pictures/QVK, then sent like a gallery photo). */
     static final String CAMERA = "qvk3/camera";
+    /** «Кружок»: a short front-camera video from the camera app. */
+    static final String CIRCLE = "qvk3/circle";
     private Uri shot;
 
     static void pick(Activity from, String mime, Result r) {
@@ -33,7 +35,7 @@ public final class Qvk3ImPickActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         if (state != null) return;
-        if (CAMERA.equals(getIntent().getStringExtra(MIME))) {
+        if (CAMERA.equals(getIntent().getStringExtra(MIME)) || CIRCLE.equals(getIntent().getStringExtra(MIME))) {
             // VK declares CAMERA: then ACTION_IMAGE_CAPTURE needs it granted, so ask first
             if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 2);
@@ -53,6 +55,23 @@ public final class Qvk3ImPickActivity extends Activity {
     }
 
     private void camera() {
+        if (CIRCLE.equals(getIntent().getStringExtra(MIME))) {
+            try {
+                Intent i = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE)
+                        .putExtra(android.provider.MediaStore.EXTRA_DURATION_LIMIT, 60)
+                        .putExtra(android.provider.MediaStore.EXTRA_VIDEO_QUALITY, 1)
+                        .putExtra(android.provider.MediaStore.EXTRA_SIZE_LIMIT, 55L << 20)
+                        // front camera: a common hint understood by most camera apps
+                        .putExtra("android.intent.extras.CAMERA_FACING", 1)
+                        .putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
+                        .putExtra("android.intent.extra.USE_FRONT_CAMERA", true);
+                startActivityForResult(i, 4);
+            } catch (Exception e) {
+                Qvk3Ui.toast(this, "Камера недоступна: " + Qvk3Jobs.message(e));
+                finish();
+            }
+            return;
+        }
         try {
             android.content.ContentValues v = new android.content.ContentValues();
             v.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "QVK_" + System.currentTimeMillis() + ".jpg");
@@ -79,6 +98,18 @@ public final class Qvk3ImPickActivity extends Activity {
 
     @Override
     protected void onActivityResult(int req, int code, Intent data) {
+        if (req == 4) {
+            Result r = pending;
+            pending = null;
+            if (code == RESULT_OK && data != null && data.getData() != null && r != null) {
+                List<Uri> one = new ArrayList<>();
+                one.add(data.getData());
+                r.picked(one);
+            }
+            finish();
+            overridePendingTransition(0, 0);
+            return;
+        }
         if (req == 3) {
             Result r = pending;
             pending = null;

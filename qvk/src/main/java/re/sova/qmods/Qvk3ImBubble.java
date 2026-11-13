@@ -292,6 +292,44 @@ final class Qvk3ImBubble {
         return f;
     }
 
+    /** «Кружок»: the first frame in a circle with a play mark and the length; tap plays it round, in place. */
+    private View circle(Qvk3ImModel.Attachment x) {
+        int size = dp(200);
+        FrameLayout f = new FrameLayout(a);
+        f.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) {
+                o.setOval(0, 0, v.getWidth(), v.getHeight());
+            }
+        });
+        f.setClipToOutline(true);
+        ImageView img = image(x.preview, 400);
+        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        f.addView(img, new FrameLayout.LayoutParams(-1, -1));
+        ImageView play = new ImageView(a);
+        play.setImageDrawable(Qvk3Icons.of(Qvk3Icons.PLAY, 0xFFFFFFFF));
+        int pd = dp(14);
+        play.setPadding(pd, pd, pd, pd);
+        android.graphics.drawable.GradientDrawable pb = new android.graphics.drawable.GradientDrawable();
+        pb.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        pb.setColor(0x66000000);
+        play.setBackground(pb);
+        f.addView(play, new FrameLayout.LayoutParams(dp(52), dp(52), android.view.Gravity.CENTER));
+        TextView len = Qvk3Ui.line(a, Qvk3ImUi.duration(x.duration), 12, 0xFFFFFFFF, true);
+        len.setPadding(dp(8), dp(2), dp(8), dp(2));
+        android.graphics.drawable.GradientDrawable lb = new android.graphics.drawable.GradientDrawable();
+        lb.setColor(0x80000000);
+        lb.setCornerRadius(dp(10));
+        len.setBackground(lb);
+        FrameLayout.LayoutParams ll = new FrameLayout.LayoutParams(-2, -2, android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
+        ll.bottomMargin = dp(14);
+        f.addView(len, ll);
+        f.setContentDescription("Видеосообщение, " + Qvk3ImUi.duration(x.duration));
+        f.setOnClickListener(v -> host.openAttachment(x));
+        f.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+        return f;
+    }
+
     private View attachment(Qvk3ImModel.Message m, Qvk3ImModel.Attachment x, boolean out, int text, int text2) {
         switch (x.type) {
             case "sticker":
@@ -311,6 +349,8 @@ final class Qvk3ImBubble {
             }
             case "audio_message":
                 return voice(m, x, out, text, text2);
+            case "video_message":
+                return circle(x);
             case "audio":
                 return row(Qvk3Icons.MUSIC, x.title, x.subtitle + (x.duration > 0 ? " · " + Qvk3ImUi.duration(x.duration) : ""), out, text, text2, () -> host.openAttachment(x));
             case "doc":

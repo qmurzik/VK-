@@ -403,6 +403,9 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
             case "poll":
                 pollDialog(x);
                 break;
+            case "video_message":
+                Qvk3ImCircle.play(a, x);
+                break;
             case "story":
                 if (x.ownerId != 0 || x.id != 0) Qvk3ImUi.openLink(a, "https://vk.com/story" + x.ownerId + "_" + x.id);
                 else Qvk3ImEntry.openStock(a, peer);
