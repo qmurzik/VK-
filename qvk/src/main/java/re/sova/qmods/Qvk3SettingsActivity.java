@@ -284,6 +284,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:storage", "Место на устройстве", "Музыка, обложки, обновления", 7, "Загрузки и место");
         idx.addScreen("qvk3:perf", "Облегчённый режим", "Без размытия и прозрачности — для слабых устройств", 7, "Производительность и батарея");
         idx.addScreen("qvk3:battery", "Фоновая работа и батарея", "Оптимизация батареи и ограничения Android", 7, "Производительность и батарея");
+        idx.addScreen("qvk3:photoAlbum", "Скачать фотоальбом", "Весь альбом в галерею: оригинал или поменьше, своя папка, прогресс в уведомлении", 5, "Видео, клипы и фото");
         idx.addScreen("qvk3:weather", "Погода на экране запуска", "Температура под логотипом QVK; дождь и снег — подписью", 0, "Анимации и запуск");
         idx.addScreen("qvk3:dayNight", "Светлая и тёмная тема", "Режим (как в системе, по времени) и цвета каждой темы", 0, "Темы и цвета");
         idx.addScreen("qvk3:report", "Сообщить о проблеме", "Баг или идея на портал бета-теста — с журналом, снимком экрана и версией", 7, "Портал бета-теста");
@@ -874,6 +875,9 @@ public final class Qvk3SettingsActivity extends Activity {
                 break;
             case "weather":
                 Qvk3SplashWeather.settings(this);
+                break;
+            case "photoAlbum":
+                Qvk3PhotoAlbums.open(this);   // IDEA-0025
                 break;
             case "searchTabs":
                 Qvk3SearchTabs.settings(this);
