@@ -504,6 +504,11 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         });
         nowButton.setVisibility(View.GONE);
         header.addView(nowButton, new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 48), Qvk3Ui.dp(a, 48)));
+        // BUG-0068: downloads at the top right, like VK's own music section
+        header.addView(Qvk3Ui.icon(a, Qvk3Icons.DOWNLOAD, p.text, 48, 22, "Загрузки", v -> {
+            back.clear();
+            selectTab(4);
+        }));
         header.addView(Qvk3Ui.icon(a, Qvk3Icons.TUNE, p.text, 48, 22, "Настройки QVK Music", v -> Qvk3MusicSettingsScreen.show(a)));
         col.addView(header, Qvk3Ui.match());
 
@@ -1202,6 +1207,9 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                     }).show()));
         }
         if (dls.isEmpty()) r.add(note("Скачанных треков нет. Скачать можно из меню трека (долгое нажатие) или плейлиста.", null));
+        // BUG-0068: be honest about VK's own offline cache
+        r.add(note("Треки, скачанные в штатной музыке ВК, хранятся зашифрованными внутри плеера ВК, и QVK Music не может их "
+                + "проигрывать. Скачанное в QVK отмечено значком загрузки перед длительностью трека.", null));
         rows.set(r);
     }
 

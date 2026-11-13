@@ -262,6 +262,16 @@ public final class Qvk3SettingsIndex {
     // ------------------------------------------------------------------ build
 
     /** Adds the QVK feature catalog (array of {name, items[]}). Unavailable entries are skipped. */
+    /**
+     * QVK 2.x catalog entries that duplicate a QVK 3.0 feature and only lead back into the old QVK 2.x screens —
+     * hidden so the settings centre is not cluttered with two of everything. The QVK 3.0 equivalents:
+     * iOS/Material/Monet styles → the «Светлая и тёмная тема» theme system; «Оформление и темы»/«Каталог настроек» →
+     * this very centre; the classic «моя музыка» toggles → QVK Music.
+     */
+    static final java.util.Set<String> HIDE = new java.util.HashSet<>(java.util.Arrays.asList(
+            "qvk_ios_style", "qvk_material3_style", "qvk_monet_colors", "qvk_monet_options", "themes", "qvk_settings_catalog",
+            "classic_my_music", "show_my_music", "qmods_music_compat", "use_legacy_shuffle"));
+
     public void addCatalog(JSONArray catalog) {
         for (int g = 0; g < catalog.length(); g++) {
             JSONObject group = catalog.optJSONObject(g);
@@ -273,6 +283,7 @@ public final class Qvk3SettingsIndex {
                 JSONObject o = its.optJSONObject(i);
                 if (o == null || "unavailable".equals(o.optString("status"))) continue;
                 String key = o.optString("key");
+                if (HIDE.contains(key)) continue;
                 boolean sw = o.optBoolean("switch") || key.equals("enablePin");
                 String summary = o.optString("summary", o.optString("detail"));
                 if ("partial".equals(o.optString("status"))) summary = (summary.isEmpty() ? "" : summary + " ") + "(работает частично)";

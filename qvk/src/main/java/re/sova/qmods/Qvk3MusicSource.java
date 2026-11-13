@@ -337,11 +337,22 @@ public final class Qvk3MusicSource {
     }
 
     /** BUG-0030: «+» — the track goes to «Моя музыка» of the signed-in account (VK audio.add). */
-    public static void addToMine(Qvk3Track t) throws Exception {
+    /** Returns "ownerId_audioId" of the copy that now sits in «Моя музыка» (needed to remove it again, BUG-0067). */
+    public static String addToMine(Qvk3Track t) throws Exception {
         if (t.id == 0) throw new IOException("Этот трек — файл на устройстве, его нельзя добавить в ВК");
         long me = account();
-        if (me > 0 && t.ownerId == me) throw new IOException("Трек уже в вашей музыке");
-        response("audio.add", args("owner_id", Long.toString(t.ownerId), "audio_id", Long.toString(t.id), "access_key", t.accessKey));
+        if (me > 0 && t.ownerId == me) return me + "_" + t.id; // already one of my own tracks
+        JSONObject r = response("audio.add", args("owner_id", Long.toString(t.ownerId), "audio_id", Long.toString(t.id), "access_key", t.accessKey));
+        long id = r.optLong("response", 0);
+        if (id <= 0) throw new IOException("ВК не вернул номер добавленного трека");
+        return (me > 0 ? me : t.ownerId) + "_" + id;
+    }
+
+    /** BUG-0067: remove a track from «Моя музыка» (copy = "ownerId_audioId" from {@link #addToMine}). */
+    public static void removeFromMine(String copy) throws Exception {
+        String[] p = copy.split("_");
+        if (p.length < 2) throw new IOException("Не знаю, какой трек удалить");
+        response("audio.delete", args("owner_id", p[0], "audio_id", p[1]));
     }
 
     public static Qvk3Lyrics lyrics(Qvk3Track t) throws Exception {
