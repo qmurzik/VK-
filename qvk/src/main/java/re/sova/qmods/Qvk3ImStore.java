@@ -232,6 +232,7 @@ final class Qvk3ImStore {
                     List<Qvk3ImModel.Message> merged = Qvk3ImModel.merge(messages(peer), page);
                     history.put(peer, merged);
                     if (older && page.size() < 50) historyComplete.add(peer);
+                    resolveAuthors(peer, page);
                     JSONObject convs = r.optJSONArray("conversations") == null ? null : r.optJSONArray("conversations").optJSONObject(0);
                     if (convs != null) {
                         Qvk3ImModel.Conversation old = byPeer.get(peer);
@@ -248,6 +249,58 @@ final class Qvk3ImStore {
                 Qvk3Jobs.main(() -> done.done(Qvk3Jobs.message(e)));
             }
         });
+    }
+
+    /**
+     * BUG-0076: authors of forwarded/replied messages are not always in the answer's profiles (big chats), so the
+     * forward showed without a name. Fetch the missing ones once and redraw.
+     */
+    private final Set<Long> asked = new HashSet<>();
+
+    void resolveAuthors(long peer, List<Qvk3ImModel.Message> page) {
+        Set<Long> missing = new HashSet<>();
+        for (Qvk3ImModel.Message m : page) collectAuthors(m, missing, 0);
+        missing.removeAll(people.keySet());
+        missing.removeAll(asked);
+        missing.remove(0L);
+        if (missing.isEmpty()) return;
+        asked.addAll(missing);
+        StringBuilder users = new StringBuilder(), groups = new StringBuilder();
+        for (Long id : missing) {
+            StringBuilder b = id > 0 ? users : groups;
+            b.append(b.length() == 0 ? "" : ",").append(Math.abs(id));
+        }
+        Qvk3Jobs.io(() -> {
+            JSONObject all = new JSONObject();
+            try {
+                if (users.length() > 0) {
+                    JSONObject u = Qvk3ImApi.call("users.get", "user_ids", users.toString(), "fields", Qvk3ImApi.FIELDS);
+                    org.json.JSONArray items = u == null ? null : u.optJSONArray("items");
+                    if (items == null && u != null) items = u.optJSONArray("response");
+                    if (items != null) all.put("profiles", items);
+                }
+                if (groups.length() > 0) {
+                    JSONObject g = Qvk3ImApi.call("groups.getById", "group_ids", groups.toString());
+                    org.json.JSONArray items = g == null ? null : g.optJSONArray("groups");
+                    if (items == null && g != null) items = g.optJSONArray("items");
+                    if (items != null) all.put("groups", items);
+                }
+            } catch (Exception ignored) {
+            }
+            Qvk3Jobs.main(() -> {
+                java.util.Map<Long, Qvk3ImModel.Person> found = Qvk3ImModel.people(all);
+                if (found.isEmpty()) return;
+                people.putAll(found);
+                notifyChanged(peer);
+            });
+        });
+    }
+
+    private static void collectAuthors(Qvk3ImModel.Message m, Set<Long> out, int depth) {
+        if (m == null || depth > 4) return;
+        if (depth > 0) out.add(m.from);
+        for (Qvk3ImModel.Message f : m.forwards) collectAuthors(f, out, depth + 1);
+        if (m.reply != null) collectAuthors(m.reply, out, depth + 1);
     }
 
     /** New or edited messages (Long Poll history, send result): into the chat and the list. */

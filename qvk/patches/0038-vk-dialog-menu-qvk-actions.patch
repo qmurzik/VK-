@@ -1,0 +1,37 @@
+diff -ru a/smali_classes10/xsna/eni$o.smali b/smali_classes10/xsna/eni$o.smali
+--- a/smali_classes10/xsna/eni$o.smali	2026-11-13 15:48:10.668539852 +0000
++++ b/smali_classes10/xsna/eni$o.smali	2026-11-13 15:48:10.686077091 +0000
+@@ -63,6 +63,18 @@
+     .locals 2
+ 
+     .line 1
++    # QVK 3.0: our entries go to QVK's handler, never to VK's (Qvk3VkDialogMenu)
++    iget-object v0, p0, Lxsna/eni$o;->$dialog:Lcom/vk/im/engine/models/dialogs/DialogExt;
++
++    invoke-static {p1, v0}, Lre/sova/qmods/Qvk3VkDialogMenu;->click(Ljava/lang/Object;Ljava/lang/Object;)Z
++
++    move-result v0
++
++    if-eqz v0, :qvk3_vk_action
++
++    return-void
++
++    :qvk3_vk_action
+     sget-object v0, Lxsna/b3i;->a:Lxsna/b3i;
+ 
+     .line 2
+diff -ru a/smali_classes10/xsna/eni.smali b/smali_classes10/xsna/eni.smali
+--- a/smali_classes10/xsna/eni.smali	2026-11-13 15:48:10.665444515 +0000
++++ b/smali_classes10/xsna/eni.smali	2026-11-13 15:48:10.685793259 +0000
+@@ -3118,6 +3118,11 @@
+     .line 36
+     invoke-direct {v2, v0, v3}, Lcom/vk/im/ui/components/viewcontrollers/popup/Popup$b0;-><init>(Ljava/util/List;Ljava/lang/Integer;)V
+ 
++    # QVK 3.0: QVK actions (hide, local rename, archive, folders...) in VK 8.100's chat list menu (Qvk3VkDialogMenu)
++    iget-object v3, p0, Lxsna/eni;->a:Landroid/content/Context;
++
++    invoke-static {v2, v3, p1}, Lre/sova/qmods/Qvk3VkDialogMenu;->extend(Ljava/lang/Object;Landroid/content/Context;Ljava/lang/Object;)V
++
+     .line 37
+     .line 38
+     .line 39

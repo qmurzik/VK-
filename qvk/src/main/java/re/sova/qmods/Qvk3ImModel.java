@@ -344,6 +344,7 @@ public final class Qvk3ImModel {
 
     public static Message message(JSONObject o) {
         if (o == null) return null;
+        o = unwrap(o);
         Message m = new Message();
         m.id = o.optLong("id");
         m.cmid = o.optLong("conversation_message_id");
@@ -358,7 +359,14 @@ public final class Qvk3ImModel {
         m.geo = o.has("geo");
         JSONArray atts = o.optJSONArray("attachments");
         if (atts != null) for (int i = 0; i < atts.length(); i++) {
-            Attachment a = attachment(atts.optJSONObject(i));
+            JSONObject ao = atts.optJSONObject(i);
+            JSONObject nested = forwardedAttachment(ao);
+            if (nested != null) {   // BUG-0076: VK may send a forward as an attachment
+                Message f = message(nested);
+                if (f != null) m.forwards.add(f);
+                continue;
+            }
+            Attachment a = attachment(ao);
             if (a != null) m.attachments.add(a);
         }
         if (m.geo) {
@@ -371,6 +379,7 @@ public final class Qvk3ImModel {
             m.attachments.add(g);
         }
         JSONArray fwd = o.optJSONArray("fwd_messages");
+        if (fwd == null) fwd = o.optJSONArray("forwarded_messages");
         if (fwd != null) for (int i = 0; i < fwd.length(); i++) {
             Message f = message(fwd.optJSONObject(i));
             if (f != null) m.forwards.add(f);
@@ -391,6 +400,29 @@ public final class Qvk3ImModel {
             m.actionText = act.optString("text");
         }
         return m;
+    }
+
+    /**
+     * BUG-0076: besides the plain {@code fwd_messages} item VK also sends forwards wrapped as
+     * {@code {"message": {...}}} / {@code {"forwarded_message": {...}}} (QVK 2's ForwardMessages handled the same
+     * shapes). Without unwrapping, the forward showed as an empty «Пересланное сообщение».
+     */
+    static JSONObject unwrap(JSONObject o) {
+        if (o.has("from_id") || o.has("text") || o.has("attachments")) return o;
+        JSONObject in = o.optJSONObject("message");
+        if (in == null) in = o.optJSONObject("forwarded_message");
+        return in == null ? o : in;
+    }
+
+    /** The message inside an attachment of type "message" / "forwarded_message", else null. */
+    static JSONObject forwardedAttachment(JSONObject a) {
+        if (a == null) return null;
+        String type = a.optString("type");
+        if (!"message".equals(type) && !"forwarded_message".equals(type) && !"fwd_message".equals(type)) return null;
+        JSONObject in = a.optJSONObject(type);
+        if (in == null) in = a.optJSONObject("message");
+        if (in == null) in = a.optJSONObject("forwarded_message");
+        return in;
     }
 
     /** History answer → messages, oldest first. */

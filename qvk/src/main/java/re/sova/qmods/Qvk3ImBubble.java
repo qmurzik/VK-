@@ -130,6 +130,11 @@ final class Qvk3ImBubble {
         inner.setOrientation(LinearLayout.VERTICAL);
         inner.setPadding(-dp(12), 0, -dp(10), 0);
         content(inner, f, out, text, text2, depth);
+        if (f.text.isEmpty() && f.attachments.isEmpty() && f.forwards.isEmpty()) {
+            TextView none = Qvk3Ui.text(a, "Содержимое не пришло от ВК", 14, text2, false);
+            none.setPadding(dp(12), dp(2), dp(12), 0);
+            inner.addView(none, new LinearLayout.LayoutParams(-2, -2));
+        }
         box.addView(inner, new LinearLayout.LayoutParams(-2, -2));
         return box;
     }

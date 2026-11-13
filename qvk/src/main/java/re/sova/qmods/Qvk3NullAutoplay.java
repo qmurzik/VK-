@@ -73,6 +73,48 @@ public final class Qvk3NullAutoplay {
                 return null;
             }
         }
-        return null;
+        return value(r);
+    }
+
+    private static final java.util.Map<Class<?>, Object> VALUES = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Object NONE = new Object();
+
+    /**
+     * A harmless value for a concrete return type (alpha44 log: {@code getConfig()} returned null and VK called
+     * {@code AutoPlayConfig.l()} on it). Enums give their first constant; otherwise VK's own default instance
+     * (a {@code public static final} field of that type, e.g. {@code AutoPlayConfig.s}) or a no-arg instance.
+     */
+    private static Object value(Class<?> r) {
+        if (r.isPrimitive() || r.isArray() || r == Object.class) return null;
+        Object v = VALUES.get(r);
+        if (v == null) {
+            v = NONE;
+            try {
+                if (r.isEnum()) {
+                    Object[] all = r.getEnumConstants();
+                    if (all != null && all.length > 0) v = all[0];
+                } else {
+                    for (java.lang.reflect.Field f : r.getDeclaredFields()) {
+                        int mod = f.getModifiers();
+                        if (java.lang.reflect.Modifier.isStatic(mod) && java.lang.reflect.Modifier.isFinal(mod) && f.getType() == r) {
+                            f.setAccessible(true);
+                            Object o = f.get(null);
+                            if (o != null) {
+                                v = o;
+                                break;
+                            }
+                        }
+                    }
+                    if (v == NONE && !java.lang.reflect.Modifier.isAbstract(r.getModifiers())) {
+                        java.lang.reflect.Constructor<?> c = r.getDeclaredConstructor();
+                        c.setAccessible(true);
+                        v = c.newInstance();
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            VALUES.put(r, v);
+        }
+        return v == NONE ? null : v;
     }
 }

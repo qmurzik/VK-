@@ -300,8 +300,8 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 8, "О QVK");
         idx.addScreen("qvk3:shell", "Открыть оболочку QVK", "Чаты и музыка в стиле iOS", 1, "Оболочка QVK");
         idx.addScreen("qvk3:shellToggle", "Запускать оболочку QVK при старте", "Экспериментально: вместо главного экрана ВКонтакте. По умолчанию выключено", 1, "Оболочка QVK");
-        idx.addScreen("qvk3:classic", "Классические настройки QVK", "Прежний экран настроек QVK 2.x", 8, "О QVK");
-        idx.addScreen("qvk3:classicDefault", "Открывать классические настройки", "Вернуть прежний экран вместо этого центра", 8, "О QVK");
+        // IDEA-0033: «Классические настройки» and «Открывать классические» only confused testers — every QVK 2 setting
+        // is listed in this centre; the routes stay for old favourites/search history but are no longer shown.
         idx.addCatalog(catalog(a));
         for (SettingsHub.Entry e : SettingsHub.ENTRIES) idx.addHubScreen(e.group, e.title, e.detail, e.target);
         return idx;

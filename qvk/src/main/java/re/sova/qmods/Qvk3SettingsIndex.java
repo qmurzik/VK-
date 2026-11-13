@@ -310,7 +310,8 @@ public final class Qvk3SettingsIndex {
      */
     static final java.util.Set<String> HIDE_HUB = new java.util.HashSet<>(java.util.Arrays.asList(
             "personal",          // «Фоны, пузыри и эффекты» = «Персонализация» (qvk_personalization)
-            "original:badges")); // «Значки и украшения» = «Значки в профиле» + «Каталог украшений» + «Заявка на значок»
+            "original:badges",   // «Значки и украшения» = «Значки в профиле» + «Каталог украшений» + «Заявка на значок»
+            "qmodsInbox"));      // IDEA-0033: «Обновления и объявления» = the «Объявления и обновления» card below it
 
     public void addHubScreen(String group, String title, String summary, String target) {
         // "all:"/"basic:" routes only re-list catalog switches that the centre already shows; a screen whose

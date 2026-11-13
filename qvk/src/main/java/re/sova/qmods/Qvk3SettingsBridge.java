@@ -18,7 +18,8 @@ public final class Qvk3SettingsBridge {
 
     public static boolean openHub(Activity a) {
         try {
-            if (a == null || Qvk3MusicSettings.prefs(a).getBoolean(CLASSIC, false)) return false;
+            // IDEA-0033: the «open classic settings» switch is gone; an old «on» must not trap users in QVK 2's screen
+            if (a == null) return false;
             a.startActivity(new Intent(a, Qvk3SettingsActivity.class));
             return true;
         } catch (Throwable t) {

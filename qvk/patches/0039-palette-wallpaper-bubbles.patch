@@ -1,0 +1,13 @@
+diff -ru a/smali_classes21/re/sova/qmods/ThemePalette.smali b/smali_classes21/re/sova/qmods/ThemePalette.smali
+--- a/smali_classes21/re/sova/qmods/ThemePalette.smali	2026-11-13 15:51:21.595356030 +0000
++++ b/smali_classes21/re/sova/qmods/ThemePalette.smali	2026-11-13 15:51:21.610282235 +0000
+@@ -919,6 +919,9 @@
+     move-result-object v5
+ 
+     invoke-interface {v4, v0, v5}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
++
++    # QVK 3.0 (BUG-0016): chats with a wallpaper use im_bubble_wallpaper_* — give them the palette's bubble colour too
++    invoke-static {v4, v6, v11}, Lre/sova/qmods/Qvk3BubbleAttrs;->wallpaper(Ljava/util/Map;Ljava/lang/String;I)V
+     :try_end_2
+     .catch Ljava/lang/Exception; {:try_start_2 .. :try_end_2} :catch_1
+     .catchall {:try_start_2 .. :try_end_2} :catchall_0
