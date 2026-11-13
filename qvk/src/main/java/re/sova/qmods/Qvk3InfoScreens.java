@@ -278,6 +278,13 @@ final class Qvk3InfoScreens {
     }
 
     static void updates(Activity a) {
+        // «Орбита»: the new update screen; the old dialog stays as a fallback
+        try {
+            Qvk3UpdateScreen.check(a);
+            return;
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.updateScreen", t);
+        }
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         TextView status = body(a, "Установлено: " + Qvk3Updates.installedName(a) + "\nПроверка…");

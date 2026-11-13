@@ -54,6 +54,10 @@ public final class Qvk3Updates {
     private static final AtomicBoolean cancel = new AtomicBoolean();
     public static volatile String status = "";
     public static volatile int progress = -1;
+    /** Update screen: what is happening now and exact byte counters (speed and time left are drawn from these). */
+    public static final int IDLE = 0, DOWNLOAD = 1, VERIFY = 2, INSTALL = 3, DONE = 4, ERROR = 5, PAUSED = 6;
+    public static volatile int stage = IDLE;
+    public static volatile long bytes, total;
 
     public interface Listener {
         void changed();
@@ -331,14 +335,20 @@ public final class Qvk3Updates {
         Context app = c.getApplicationContext();
         Qvk3Jobs.download(() -> {
             try {
+                stage = DOWNLOAD;
+                total = r.size;
                 File apk = download(app, r);
+                stage = VERIFY;
                 set("Проверка APK…", 100);
                 verify(app, apk, r);
+                stage = INSTALL;
                 set("Установка " + r.versionName + "…", 100);
                 install(app, apk);
             } catch (InterruptedIOException e) {
+                stage = PAUSED;
                 set("Загрузка приостановлена. Нажмите «Скачать», чтобы продолжить с того же места", -1);
             } catch (Exception e) {
+                stage = ERROR;
                 set("Ошибка: " + Qvk3Jobs.message(e), -1);
                 RuntimeFaults.record("qvk3.updates.install", e);
             } finally {
@@ -440,6 +450,7 @@ public final class Qvk3Updates {
                         if (have + n > size) throw new IOException("Файл больше заявленного");
                         f.write(buf, 0, n);
                         have += n;
+                        bytes = have;
                         int p = (int) (have * 100 / size);
                         if (p != lastP) {
                             lastP = p;
@@ -479,6 +490,7 @@ public final class Qvk3Updates {
                     if (have + n > size) throw new IOException("Файл больше заявленного");
                     out.write(buf, 0, n);
                     have += n;
+                    bytes = have;
                     int p = (int) (have * 100 / size);
                     if (p != lastP) {
                         lastP = p;
@@ -540,6 +552,7 @@ public final class Qvk3Updates {
 
     static void install(Context c, File apk) throws Exception {
         if (!c.getPackageManager().canRequestPackageInstalls()) {
+            stage = ERROR;
             set("Разрешите QVK устанавливать приложения: Настройки → «Установка неизвестных приложений» → QVK, затем нажмите «Установить»", -1);
             Intent i = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:" + c.getPackageName()))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -603,9 +616,11 @@ public final class Qvk3Updates {
                     break;
                 }
                 case PackageInstaller.STATUS_SUCCESS:
+                    stage = DONE;
                     set("Обновление установлено", -1);
                     break;
                 default:
+                    stage = ERROR;
                     String msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
                     set(st == PackageInstaller.STATUS_FAILURE_ABORTED ? "Установка отменена" :
                             st == PackageInstaller.STATUS_FAILURE_CONFLICT ? "Конфликт подписи: установите обновление, подписанное тем же ключом" :

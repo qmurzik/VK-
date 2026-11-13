@@ -106,16 +106,14 @@ public final class Qvk3UpdatePrompt implements Application.ActivityLifecycleCall
     }
 
     static void ask(Activity a, Qvk3UpdateManifest.Release r) {
-        String text = "Установлено: " + Qvk3Updates.installedName(a).replace("8.100-qvk-", "") + "\nНовая: " + r.versionName.replace("8.100-qvk-", "")
-                + (r.size > 0 ? " · " + (r.size >> 20) + " МБ" : "") + (r.notes.isEmpty() ? "" : "\n\n" + clip(r.notes, 900));
-        // main action filled, «Нет» tonal, «Не показывать» quiet at the bottom — not hit by accident
-        Qvk3Ui.dialog(a).setTitle("Доступно обновление QVK").setMessage(text)
-                .setPositiveButton("Обновить", (d, w) -> links(a, r))
-                .setNeutralButton("Не сейчас", (d, w) -> skipBar(a, r))
-                .setNegativeButton("Не показывать", (d, w) -> {
-                    prefs(a).edit().putBoolean(PREF, false).apply();
-                    Qvk3Ui.toast(a, "Больше не предлагать. Включить снова: Настройки QVK → Обновления");
-                }).show();
+        // «Орбита»: the full-screen update screen instead of a plain dialog
+        try {
+            Qvk3UpdateScreen.show(a, r);
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.updateScreen", t);
+            Qvk3Ui.dialog(a).setTitle("Доступно обновление QVK").setMessage("Новая версия: " + r.versionName)
+                    .setPositiveButton("Обновить", (d, w) -> links(a, r)).setNegativeButton("Не сейчас", null).show();
+        }
     }
 
     static String clip(String s, int max) {
@@ -129,11 +127,24 @@ public final class Qvk3UpdatePrompt implements Application.ActivityLifecycleCall
         for (int i = 0; i < r.urls.size(); i++) labels.add((i == 0 ? "Ссылка 1" : i == 1 ? "Зеркало" : "Зеркало " + i) + " · " + Qvk3Updates.host(r.urls.get(i)));
         Qvk3Ui.dialog(a).setTitle("QVK " + r.versionName).setItems(labels.toArray(new String[0]), (x, i) -> {
             if (i == 0) {
-                Qvk3InfoScreens.updates(a);
+                Qvk3UpdateScreen.show(a, r);
                 return;
             }
             try {
                 a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(r.urls.get(i - 1))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Throwable t) {
+                Qvk3Ui.toast(a, "Нет приложения, чтобы открыть ссылку");
+            }
+        }).setNegativeButton("Закрыть", null).show();
+    }
+
+    /** «Ссылки и зеркала» from the update screen: open a download link in the browser. */
+    static void mirrors(Activity a, Qvk3UpdateManifest.Release r) {
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < r.urls.size(); i++) labels.add((i == 0 ? "Ссылка 1" : i == 1 ? "Зеркало" : "Зеркало " + i) + " · " + Qvk3Updates.host(r.urls.get(i)));
+        Qvk3Ui.dialog(a).setTitle("QVK " + r.versionName).setItems(labels.toArray(new String[0]), (x, i) -> {
+            try {
+                a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(r.urls.get(i))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } catch (Throwable t) {
                 Qvk3Ui.toast(a, "Нет приложения, чтобы открыть ссылку");
             }
