@@ -102,6 +102,8 @@ public final class Qvk3SettingsActivity extends Activity {
         tt.setOrientation(LinearLayout.VERTICAL);
         tt.setPadding(dp(8), 0, 0, 0);
         title = Qvk3Ui.line(this, "Настройки", 24, p.text, true);
+        // IDEA-0036: VK's headers use a medium weight, not bold
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setAccessibilityHeading(true);
         subtitle = Qvk3Ui.line(this, version(), 13, p.text2, false);
@@ -501,6 +503,7 @@ public final class Qvk3SettingsActivity extends Activity {
         // a compact, readable header: 24sp on the home screen, 20sp inside — never a giant truncated title
         title.setTextSize(home ? 24 : 20);
         subtitle.setText(sub);
+        subtitle.setVisibility(sub == null || sub.length() == 0 ? View.GONE : View.VISIBLE);
         back.setVisibility(home ? View.GONE : View.VISIBLE);
         scroll.scrollTo(0, 0);
         int anim = pendingAnim;
@@ -549,19 +552,19 @@ public final class Qvk3SettingsActivity extends Activity {
     private void showHome() {
         section = -1;
         if (search.length() > 0) search.setText("");
-        begin("Настройки", version(), true);
+        begin("Настройки", "", true);   // IDEA-0036: the build number moved to the bottom of the screen
 
         // appearance hero: a gradient in the colours of the current style, its swatches and the three main actions
         Qvk3DesignTokens t = Qvk3Appearance.current(this);
         LinearLayout look = new LinearLayout(this);
         look.setOrientation(LinearLayout.VERTICAL);
         look.setPadding(dp(18), dp(18), dp(18), dp(16));
-        int a1 = t.accent, a2 = Qvk3Ui.deep(t.accent, 0.55f);
-        android.graphics.drawable.GradientDrawable hero = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[]{a1, a2});
+        // IDEA-0036: a calm card in the screen's colours with a thin accent outline instead of a bright gradient
+        android.graphics.drawable.GradientDrawable hero = new android.graphics.drawable.GradientDrawable();
+        hero.setColor(p.surface);
+        hero.setStroke(dp(1.5f), p.accent);
         hero.setCornerRadius(dp(24));
         look.setBackground(hero);
-        look.setElevation(dp(6));
         content.addView(look, Qvk3Ui.match());
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -571,7 +574,7 @@ public final class Qvk3SettingsActivity extends Activity {
             android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
             g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
             g.setColor(col);
-            g.setStroke(dp(2), 0xCCFFFFFF);
+            g.setStroke(dp(2), p.surface);
             dot.setBackground(g);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
             lp.leftMargin = sw.getChildCount() == 0 ? 0 : -dp(9);
@@ -581,8 +584,8 @@ public final class Qvk3SettingsActivity extends Activity {
         LinearLayout lt = new LinearLayout(this);
         lt.setOrientation(LinearLayout.VERTICAL);
         lt.setPadding(dp(14), 0, 0, 0);
-        lt.addView(Qvk3Ui.text(this, "Оформление", 13, 0xCCFFFFFF, false));
-        lt.addView(Qvk3Ui.line(this, Qvk3Appearance.currentTitle(this), 20, Color.WHITE, true));
+        lt.addView(Qvk3Ui.text(this, "Оформление", 13, p.text2, false));
+        lt.addView(Qvk3Ui.line(this, Qvk3Appearance.currentTitle(this), 20, p.text, true));
         top.addView(lt, Qvk3Ui.weight(1));
         look.addView(top);
         LinearLayout chips = new LinearLayout(this);
@@ -651,6 +654,12 @@ public final class Qvk3SettingsActivity extends Activity {
         hint.setGravity(Gravity.CENTER);
         hint.setPadding(dp(16), dp(18), dp(16), 0);
         content.addView(hint);
+        // IDEA-0036: the build, small and centred at the very bottom (as Telegram does)
+        TextView build = Qvk3Ui.text(this, version(), 13, p.text2, false);
+        build.setGravity(Gravity.CENTER);
+        build.setAlpha(0.8f);
+        build.setPadding(dp(16), dp(28), dp(16), dp(12));
+        content.addView(build);
     }
 
     static String plural(int n, String one, String few, String many) {
@@ -674,12 +683,12 @@ public final class Qvk3SettingsActivity extends Activity {
     }
 
     private TextView heroChip(String label, boolean primary, Runnable r) {
-        TextView b = Qvk3Ui.text(this, label, 14, primary ? Qvk3Ui.deep(Qvk3Appearance.current(this).accent, 0.45f) : Color.WHITE, true);
+        TextView b = Qvk3Ui.text(this, label, 14, primary ? Color.WHITE : p.text, true);
         b.setGravity(Gravity.CENTER);
         b.setSingleLine(true);
         b.setPadding(dp(8), dp(10), dp(8), dp(10));
         b.setMinHeight(dp(44));
-        b.setBackground(Qvk3Ui.ripple(this, primary ? Color.WHITE : 0x33FFFFFF, 0x33000000, dp(14)));
+        b.setBackground(Qvk3Ui.ripple(this, primary ? p.accent : p.surface2, 0x33000000, dp(14)));
         b.setOnClickListener(v -> r.run());
         Qvk3Motion.press(b);
         return b;
@@ -692,8 +701,11 @@ public final class Qvk3SettingsActivity extends Activity {
         t.setPadding(dp(14), dp(14), dp(12), dp(14));
         t.setBackground(Qvk3Ui.ripple(this, p.surface, p.dark ? 0x22FFFFFF : 0x14000000, dp(20)));
         t.setMinimumHeight(dp(124));
-        View icon = Qvk3Ui.tile(this, Qvk3SettingsIndex.SECTION_ICONS[s], Qvk3SettingsIndex.SECTION_COLORS[s], 40);
-        t.addView(icon);
+        // IDEA-0036: line icons in the accent colour, like VK's own menus, instead of coloured squares
+        android.widget.ImageView icon = new android.widget.ImageView(this);
+        icon.setImageDrawable(Qvk3Icons.of(Qvk3SettingsIndex.SECTION_ICONS[s], p.accent));
+        icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        t.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView name = Qvk3Ui.text(this, Qvk3SettingsIndex.SECTIONS[s], 16, p.text, true);
         name.setPadding(0, dp(12), 0, dp(2));
         name.setMaxLines(1);
