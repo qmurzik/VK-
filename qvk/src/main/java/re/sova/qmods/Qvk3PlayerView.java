@@ -769,9 +769,9 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     @Override
     public void onState(Qvk3MusicEngine e) {
         Qvk3Track t = e.current();
-        title.setText(t == null ? "Ничего не играет" : t.title);
-        artist.setText(t == null ? "" : t.artist);
-        sub.setText(t == null ? "QVK Music" : (t.album.isEmpty() ? "QVK Music" : t.album));
+        Qvk3Ui.setTextIfChanged(title, t == null ? "Ничего не играет" : t.title);
+        Qvk3Ui.setTextIfChanged(artist, t == null ? "" : t.artist);
+        Qvk3Ui.setTextIfChanged(sub, t == null ? "QVK Music" : (t.album.isEmpty() ? "QVK Music" : t.album));
         boolean playing = e.isPlaying();
         breathe(playing);
         if (ambient != null && (ambientPlaying == null || ambientPlaying != playing)) {
@@ -788,7 +788,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         Qvk3Ui.setIcon(repeat, rep == Qvk3Queue.REPEAT_ONE ? Qvk3Icons.REPEAT_ONE : Qvk3Icons.REPEAT, rep == Qvk3Queue.REPEAT_OFF ? fg : accentOn());
         repeat.setAlpha(rep == Qvk3Queue.REPEAT_OFF ? 0.55f : 1f);
         repeat.setContentDescription(rep == Qvk3Queue.REPEAT_ONE ? "Повтор трека" : rep == Qvk3Queue.REPEAT_ALL ? "Повтор очереди" : "Повтор выключен");
-        speedLabel.setText(e.speed() == 1f ? "1×" : (e.speed() + "×").replace(".0×", "×"));
+        Qvk3Ui.setTextIfChanged(speedLabel, e.speed() == 1f ? "1×" : (e.speed() + "×").replace(".0×", "×"));
         StringBuilder s = new StringBuilder();
         if (e.state() == Qvk3MusicEngine.ERROR) s.append(e.error());
         else if (e.state() == Qvk3MusicEngine.BUFFERING) s.append("Загрузка…");
@@ -797,7 +797,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         if (e.sleepRemaining() > 0) s.append(s.length() > 0 ? " · " : "").append("Сон через ").append(Qvk3Track.time(e.sleepRemaining()));
         else if (e.sleepAfterTrack()) s.append(s.length() > 0 ? " · " : "").append("Сон после трека");
         if (t != null && !t.local.isEmpty()) s.append(s.length() > 0 ? " · " : "").append("Сохранён на устройстве");
-        info.setText(s);
+        Qvk3Ui.setTextIfChanged(info, s);
         info.setVisibility(s.length() == 0 ? GONE : VISIBLE);
         info.setTextColor(e.state() == Qvk3MusicEngine.ERROR ? 0xFFFF6B6B : fg2);
         if (!userSeeking) {

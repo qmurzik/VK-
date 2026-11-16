@@ -235,11 +235,11 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
             detach();
             return;
         }
-        title.setText(t.title);
-        artist.setText(e.state() == Qvk3MusicEngine.ERROR ? e.error() : t.artist);
+        Qvk3Ui.setTextIfChanged(title, t.title);
+        Qvk3Ui.setTextIfChanged(artist, e.state() == Qvk3MusicEngine.ERROR ? e.error() : t.artist);
         boolean playing = e.isPlaying();
         Qvk3Ui.setIcon(play, playing ? Qvk3Icons.PAUSE : Qvk3Icons.PLAY, Color.WHITE);
-        play.setContentDescription(playing ? "Пауза" : "Играть");
+        if (!(playing ? "Пауза" : "Играть").equals(String.valueOf(play.getContentDescription()))) play.setContentDescription(playing ? "Пауза" : "Играть");
         if (!t.key().equals(coverFor)) {
             coverFor = t.key();
             cover.setImageBitmap(null);

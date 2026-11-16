@@ -213,7 +213,31 @@ public final class Qvk3Ui {
     }
 
     public static void setIcon(android.widget.ImageView v, String name, int color) {
-        v.setImageDrawable(Qvk3Icons.of(name, color));
+        // BUG-0082: called 4× a second by music listeners — a new drawable each time re-laid out VK's screen
+        String key = name + "#" + color;
+        Object tag = v.getTag(ICON_TAG);
+        if (tag instanceof Object[] && key.equals(((Object[]) tag)[0]) && v.getDrawable() == ((Object[]) tag)[1]) return;
+        android.graphics.drawable.Drawable d = Qvk3Icons.of(name, color);
+        v.setImageDrawable(d);
+        v.setTag(ICON_TAG, new Object[]{key, v.getDrawable()});
+    }
+
+    private static final int ICON_TAG = 0x7fff3a01;
+
+    /**
+     * BUG-0082: TextView.setText with the same text still requests a layout of the whole VK screen (and a QVK 2 UI
+     * pass over it). Only touch the view when the text really changes.
+     */
+    static void setTextIfChanged(android.widget.TextView v, CharSequence t) {
+        if (v == null) return;
+        CharSequence cur = v.getText();
+        String now = t == null ? "" : t.toString();
+        if (cur != null && cur.toString().equals(now)) return;
+        v.setText(t);
+    }
+
+    static void setColorIfChanged(android.widget.TextView v, int c) {
+        if (v != null && v.getCurrentTextColor() != c) v.setTextColor(c);
     }
 
     /** Slim rounded progress track with a small round thumb. */

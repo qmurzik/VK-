@@ -1591,9 +1591,9 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         if (t != null && imeShown) nowButton.set(e.duration() > 0 ? e.position() / (float) e.duration() : 0f, e.isPlaying());
         if (t == null) return;
         miniProgress.setProgress(e.duration() > 0 ? (int) (e.position() * 1000 / e.duration()) : 0);
-        miniTitle.setText(t.title);
-        miniArtist.setText(e.state() == Qvk3MusicEngine.ERROR ? e.error() : t.artist);
-        miniArtist.setTextColor(e.state() == Qvk3MusicEngine.ERROR ? 0xFFFF6B6B : 0xB3FFFFFF);
+        Qvk3Ui.setTextIfChanged(miniTitle, t.title);
+        Qvk3Ui.setTextIfChanged(miniArtist, e.state() == Qvk3MusicEngine.ERROR ? e.error() : t.artist);
+        Qvk3Ui.setColorIfChanged(miniArtist, e.state() == Qvk3MusicEngine.ERROR ? 0xFFFF6B6B : 0xB3FFFFFF);
         boolean playing = e.isPlaying();
         Qvk3Ui.setIcon(miniPlay, playing ? Qvk3Icons.PAUSE : Qvk3Icons.PLAY, Color.WHITE);
         miniPlay.setContentDescription(playing ? "Пауза" : "Играть");
