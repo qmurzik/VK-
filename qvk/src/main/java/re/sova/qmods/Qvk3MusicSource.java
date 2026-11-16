@@ -171,6 +171,34 @@ public final class Qvk3MusicSource {
                 Integer.toString(offset), "auto_complete", "1", "performer_only", artistOnly ? "1" : "0")));
     }
 
+    /** BUG-0079: the artist's albums — VK id from a track's main_artists, then audio.getAlbumsByArtist. */
+    public static List<Playlist> artistAlbums(String name) throws Exception {
+        JSONObject r = response("audio.search", args("q", name, "count", "5", "performer_only", "1"));
+        JSONArray items = r.optJSONArray("items");
+        String artistId = null;
+        if (items != null) for (int i = 0; i < items.length() && artistId == null; i++) {
+            JSONArray ma = items.optJSONObject(i) == null ? null : items.optJSONObject(i).optJSONArray("main_artists");
+            if (ma == null) continue;
+            for (int k = 0; k < ma.length(); k++) {
+                JSONObject a = ma.optJSONObject(k);
+                if (a != null && a.optString("name").equalsIgnoreCase(name.trim()) && !a.optString("id").isEmpty()) {
+                    artistId = a.optString("id");
+                    break;
+                }
+            }
+            if (artistId == null && ma.length() > 0 && ma.optJSONObject(0) != null) artistId = ma.optJSONObject(0).optString("id", null);
+        }
+        List<Playlist> out = new ArrayList<>();
+        if (artistId == null || artistId.isEmpty()) return out;
+        JSONObject al = response("audio.getAlbumsByArtist", args("artist_id", artistId, "count", "30"));
+        JSONArray list = al.optJSONArray("items");
+        if (list != null) for (int i = 0; i < list.length(); i++) {
+            JSONObject o = list.optJSONObject(i);
+            if (o != null) out.add(new Playlist(o));
+        }
+        return out;
+    }
+
     /** Re-resolves stream URLs (they expire); returns tracks in the requested order, missing ones skipped. */
     public static List<Qvk3Track> byIds(List<Qvk3Track> tracks) throws Exception {
         StringBuilder ids = new StringBuilder();

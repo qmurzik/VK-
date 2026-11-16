@@ -30,6 +30,7 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
     private String coverFor = "";
 
     static synchronized void install(Application app) {
+        Qvk3Jobs.io(() -> Qvk3MusicService.vkResumption(app));   // BUG-0078
         if (instance != null) return;
         instance = new Qvk3MiniBar();
         app.registerActivityLifecycleCallbacks(instance);

@@ -66,6 +66,26 @@ public final class Qvk3MusicService extends Service implements Qvk3MusicEngine.L
     }
 
     /** Re-publishes the media session (e.g. after «+» in the player changed the «Моя музыка» state). */
+    /**
+     * BUG-0078: VK declares a MediaBrowserService for Android Auto, and Android uses it to bring back a «resumable»
+     * player card (VK's last track, 00:00, no × button) in the shade every time the app starts — even after the user
+     * swiped it away. With QVK Music in charge that card is a ghost, so the service is switched off; turning QVK Music
+     * off switches it back on.
+     */
+    static void vkResumption(Context c) {
+        try {
+            android.content.ComponentName cn = new android.content.ComponentName(c.getPackageName(),
+                    "com.vkontakte.android.auto.MusicAndroidAutoMediaService");
+            android.content.pm.PackageManager pm = c.getPackageManager();
+            int want = Qvk3MusicSettings.enabled(c) ? android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    : android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
+            if (pm.getComponentEnabledSetting(cn) != want)
+                pm.setComponentEnabledSetting(cn, want, android.content.pm.PackageManager.DONT_KILL_APP);
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.music.vkResumption", t);
+        }
+    }
+
     static void refresh() {
         Qvk3MusicService s = self;
         if (s == null) return;

@@ -1192,6 +1192,17 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     }
 
     /** Artist page: VK search limited to the performer (audio.search performer_only=1). */
+    /**
+     * BUG-0079: from the player. A «player only» window used to finish when the player closed, so the artist page
+     * opened on a screen that was going away — the player just collapsed. Now that window stays as the music screen.
+     */
+    void openArtistFromPlayer(String name) {
+        if (name == null || name.isEmpty()) return;
+        onPlayerClosed = null;
+        closePlayer();
+        openArtist(name);
+    }
+
     void openArtist(String name) {
         if (name == null || name.isEmpty()) return;
         push(() -> {
@@ -1200,6 +1211,21 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             feed.header.add(note("Треки исполнителя из каталога ВК", null));
             feed.render();
             feed.more();
+            final Feed mine = feed;
+            Qvk3Jobs.io(() -> {
+                try {
+                    List<Qvk3MusicSource.Playlist> albums = Qvk3MusicSource.artistAlbums(name);
+                    if (albums.isEmpty()) return;
+                    Qvk3Jobs.main(() -> {
+                        if (feed != mine) return;
+                        mine.header.add(0, header("Альбомы"));
+                        mine.header.add(1, cards(albums));
+                        mine.header.add(2, header("Треки"));
+                        mine.render();
+                    });
+                } catch (Exception ignored) {   // albums are a bonus; the tracks are already there
+                }
+            });
         });
     }
 

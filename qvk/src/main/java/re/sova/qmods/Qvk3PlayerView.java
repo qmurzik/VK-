@@ -358,10 +358,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         artist = Qvk3Ui.line(a, "", 16, fg2, false);
         artist.setOnClickListener(v -> {
             Qvk3Track t = engine.current();
-            if (t != null && !t.artist.isEmpty() && Qvk3MusicScreen.of(a) != null) {
-                if (onClose != null) onClose.run();
-                Qvk3MusicScreen.of(a).openArtist(t.artist);
-            }
+            if (t != null && !t.artist.isEmpty() && Qvk3MusicScreen.of(a) != null) Qvk3MusicScreen.of(a).openArtistFromPlayer(t.artist);
         });
         texts.addView(title, Qvk3Ui.match());
         texts.addView(artist, Qvk3Ui.match());
@@ -698,10 +695,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
                     Qvk3MusicSettingsScreen.playerLook(a, this::rebuild);
                     break;
                 case 3:
-                    if (t != null && Qvk3MusicScreen.of(a) != null) {
-                        if (onClose != null) onClose.run();
-                        Qvk3MusicScreen.of(a).openArtist(t.artist);
-                    }
+                    if (t != null && Qvk3MusicScreen.of(a) != null) Qvk3MusicScreen.of(a).openArtistFromPlayer(t.artist);
                     break;
                 default:
                     if (t != null) {

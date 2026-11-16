@@ -291,8 +291,22 @@ public final class Qvk3FeedNow implements Application.ActivityLifecycleCallbacks
         float x = hx + left - b.getWidth() - b.getLeft(), y = hy + (head.getHeight() - b.getHeight()) / 2f - b.getTop();
         if (b.getTranslationX() != x) b.setTranslationX(x);
         if (b.getTranslationY() != y) b.setTranslationY(y);
-        float alpha = head.isShown() ? Math.max(0f, Math.min(1f, head.getAlpha())) : 0f;
+        // BUG-0080: a header in search mode is an input field across the whole width — step aside
+        boolean search = searching(head, 0);
+        float alpha = head.isShown() && !search ? Math.max(0f, Math.min(1f, head.getAlpha())) : 0f;
         if (b.getAlpha() != alpha) b.setAlpha(alpha);
+        b.setClickable(alpha > 0.5f);
+        b.setLongClickable(alpha > 0.5f);
+    }
+
+    private static boolean searching(View v, int depth) {
+        if (v.getVisibility() != View.VISIBLE || depth > 6) return false;
+        if (v instanceof android.widget.EditText) return v.getWidth() > 0;
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) if (searching(g.getChildAt(i), depth + 1)) return true;
+        }
+        return false;
     }
 
     @Override
