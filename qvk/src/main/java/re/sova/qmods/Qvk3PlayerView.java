@@ -477,7 +477,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         upNext = Qvk3Ui.line(a, "", 13, fg2, false);
         upNext.setGravity(Gravity.CENTER);
         upNext.setPadding(dp(24), 0, dp(24), dp(6));
-        upNext.setOnClickListener(v -> Qvk3QueueDialog.show(a));
+        upNext.setOnClickListener(v -> openQueuePanel());   // IDEA-0030
         if (!land) col.addView(upNext, Qvk3Ui.match());
 
         // secondary actions
@@ -490,11 +490,15 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         gestures = new android.view.GestureDetector(a, new android.view.GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
-                if (e1 == null || e2 == null) return false;
+                if (e1 == null || e2 == null || queuePanel != null) return false;   // the queue panel handles its own
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
                 boolean lyricsScrollable = lyricsMode && lyricsList != null && lyricsList.getVisibility() == VISIBLE && lyricsList.canScrollVertically(-1);
                 if (dy > dp(70) && Math.abs(dy) > Math.abs(dx) * 1.6f && vy > 700 && e1.getY() < getHeight() * 0.72f && !lyricsScrollable) {
                     if (onClose != null) onClose.run(); // swipe down collapses the player
+                    return true;
+                }
+                if (dy < -dp(70) && Math.abs(dy) > Math.abs(dx) * 1.6f && vy < -700 && !lyricsMode && queuePanel == null) {
+                    openQueuePanel();   // IDEA-0030: pull up → the queue slides in
                     return true;
                 }
                 return false; // sideways on the cover: the cover's own drag handles it (follows the finger)
@@ -620,6 +624,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
      */
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (queuePanel != null) return super.dispatchTouchEvent(ev);   // IDEA-0030: the panel owns the touches
         if (gestures != null && gestures.onTouchEvent(ev) && ev.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
             downValid = false;
             cancelChildren(ev);
@@ -1252,7 +1257,20 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         }
     }
 
+    private Qvk3QueuePanel queuePanel;
+
+    void openQueuePanel() {
+        if (queuePanel != null) return;
+        performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+        queuePanel = new Qvk3QueuePanel(a, 0xF2141519, Color.WHITE, 0xB3FFFFFF, accentOn(), () -> queuePanel = null);
+        queuePanel.open(this);
+    }
+
     public boolean back() {
+        if (queuePanel != null) {
+            queuePanel.close();
+            return true;
+        }
         if (lyricsMode) {
             showLyrics(false);
             return true;
