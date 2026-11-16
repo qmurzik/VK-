@@ -229,9 +229,12 @@ final class Qvk3ImStore {
                 Qvk3Jobs.main(() -> {
                     people.putAll(Qvk3ImModel.people(r));
                     List<Qvk3ImModel.Message> page = Qvk3ImModel.history(r);
+                    int had = messages(peer).size();
                     List<Qvk3ImModel.Message> merged = Qvk3ImModel.merge(messages(peer), page);
                     history.put(peer, merged);
-                    if (older && page.size() < 50) historyComplete.add(peer);
+                    // BUG-0084: VK returns fewer than 50 when messages in the range were deleted — only an empty page
+                    // (or one that adds nothing) means the beginning of the chat; «< 50» stopped big chats at ~50.
+                    if (older && (page.isEmpty() || merged.size() <= had)) historyComplete.add(peer);
                     resolveAuthors(peer, page);
                     JSONObject convs = r.optJSONArray("conversations") == null ? null : r.optJSONArray("conversations").optJSONObject(0);
                     if (convs != null) {
@@ -298,7 +301,7 @@ final class Qvk3ImStore {
 
     private static void collectAuthors(Qvk3ImModel.Message m, Set<Long> out, int depth) {
         if (m == null || depth > 4) return;
-        if (depth > 0) out.add(m.from);
+        if (m.from != 0) out.add(m.from);   // senders too: big chats leave some out of «profiles» (red «?» avatars)
         for (Qvk3ImModel.Message f : m.forwards) collectAuthors(f, out, depth + 1);
         if (m.reply != null) collectAuthors(m.reply, out, depth + 1);
     }
@@ -328,6 +331,7 @@ final class Qvk3ImStore {
             }
         }
         sort();
+        for (Long p : peers) resolveAuthors(p, msgs);
         for (Long p : peers) notifyChanged(p);
         notifyChanged(0);
     }

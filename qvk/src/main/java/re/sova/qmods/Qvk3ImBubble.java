@@ -76,7 +76,10 @@ final class Qvk3ImBubble {
             Qvk3ImModel.Person p = host.people().get(m.from);
             TextView name = Qvk3Ui.line(a, p == null ? "" : p.name, 14, Qvk3ImUi.AVATAR_COLORS[Math.abs((p == null ? "" : p.name).hashCode()) % Qvk3ImUi.AVATAR_COLORS.length], true);
             name.setPadding(dp(12), dp(7), dp(12), 0);
-            if (p != null) b.addView(name, new LinearLayout.LayoutParams(-2, -2));
+            if (p != null) {
+                name.setOnClickListener(v -> Qvk3ImUi.openProfile(a, m.from));   // BUG-0085
+                b.addView(name, new LinearLayout.LayoutParams(-2, -2));
+            }
         }
         if (m.reply != null) b.addView(quote(m.reply, out), margins(dp(10), dp(8), dp(10), 0));
         content(b, m, out, text, text2, 0);
@@ -123,6 +126,7 @@ final class Qvk3ImBubble {
         LinearLayout head = new LinearLayout(a);
         head.setGravity(Gravity.CENTER_VERTICAL);
         TextView name = Qvk3Ui.line(a, p == null ? "Пересланное сообщение" : p.name, 14, out ? Qvk3DesignTokens.ensureContrast(look.accent, look.outBubble, 3.0) : look.accent, true);
+        if (f.from != 0) name.setOnClickListener(v -> Qvk3ImUi.openProfile(a, f.from));
         head.addView(name, new LinearLayout.LayoutParams(-2, -2));
         if (f.date > 0) head.addView(Qvk3Ui.text(a, "  " + Qvk3ImUi.listTime(f.date), 12, text2, false));
         box.addView(head, new LinearLayout.LayoutParams(-2, -2));

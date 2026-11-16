@@ -75,7 +75,9 @@ public final class Qvk3VkDialogMenu {
             fh.set(popup, entries);
             fj.set(popup, allowed);
             synchronized (HOSTS) {
-                HOSTS.put(dialog, new Host(context));
+                Context host = context instanceof android.app.Activity ? context : ProfileActions.activity(context);
+                if (host == null) host = activity();
+                HOSTS.put(dialog, new Host(host != null ? host : context));
             }
         } catch (Throwable t) {
             RuntimeFaults.record("dialog.menu.vk", t);
@@ -90,11 +92,68 @@ public final class Qvk3VkDialogMenu {
             synchronized (HOSTS) {
                 host = HOSTS.get(dialog);
             }
-            if (host != null) DialogActions.click(host, dialog, ((Mark) action).item);
+            Mark mark = (Mark) action;
+            if (mark.a == HIDE_ID) {   // BUG-0077: hide directly and redraw VK's list right away
+                hide(host == null ? null : host.e, dialog);
+                return true;
+            }
+            if (host != null) DialogActions.click(host, dialog, mark.item);
         } catch (Throwable t) {
             RuntimeFaults.record("dialog.menu.vk", t);
         }
         return true;
+    }
+
+    private static final int HIDE_ID = 0x71503601;
+
+    private static void hide(Context c, Object dialog) throws Exception {
+        long peer = DialogActions.peer(dialog);
+        if (peer == 0) return;
+        boolean wasHidden = HiddenDialogs.contains(peer);
+        HiddenDialogs.toggle(peer);
+        redraw();
+        Context ctx = c != null ? c : activity();
+        if (ctx != null) Qvk3Ui.toast(ctx, wasHidden ? "Диалог снова виден"
+                : "Диалог скрыт. Показать скрытые: удерживайте заголовок «Чаты» или «Сообщения»");
+    }
+
+    /** Re-submits every VK chat list's last full list so the hidden filter applies now, not on the next update. */
+    @SuppressWarnings("unchecked")
+    static void redraw() {
+        try {
+            Field f = HiddenDialogs.class.getDeclaredField("adapters");
+            f.setAccessible(true);
+            Map<Object, Object> map = (Map<Object, Object>) f.get(null);
+            List<Map.Entry<Object, Object>> all;
+            synchronized (map) {
+                all = new ArrayList<>(map.entrySet());
+            }
+            for (Map.Entry<Object, Object> e : all) {
+                Object adapter = e.getKey(), snap = e.getValue();
+                if (adapter == null || snap == null) continue;
+                Field orig = snap.getClass().getDeclaredField("original");
+                orig.setAccessible(true);
+                Object list = orig.get(snap);
+                if (!(list instanceof List)) continue;
+                java.lang.reflect.Method set = adapter.getClass().getMethod("setItems", List.class);
+                Runnable r = () -> {
+                    try {
+                        set.invoke(adapter, new ArrayList<>((List<?>) list));
+                    } catch (Throwable t) {
+                        RuntimeFaults.record("dialog.menu.vk.redraw", t);
+                    }
+                };
+                if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) r.run();
+                else new android.os.Handler(android.os.Looper.getMainLooper()).post(r);
+            }
+        } catch (Throwable t) {
+            RuntimeFaults.record("dialog.menu.vk.redraw", t);
+        }
+    }
+
+    static android.app.Activity activity() {
+        java.lang.ref.WeakReference<android.app.Activity> w = RuntimeBridge.lastNative;
+        return w == null ? null : w.get();
     }
 
     /** VK's own entries carry the tint the popup was built with; reuse it so our icons match. */

@@ -231,6 +231,12 @@ final class Qvk3ImUi {
         }
     }
 
+    /** VK's own profile / community screen (BUG-0085). */
+    static void openProfile(android.app.Activity a, long id) {
+        if (id == 0) return;
+        openLink(a, id > 0 ? "https://vk.com/id" + id : "https://vk.com/club" + (-id));
+    }
+
     static String size(long bytes) {
         if (bytes < 1024) return bytes + " Б";
         if (bytes < 1024 * 1024) return (bytes / 1024) + " КБ";

@@ -225,7 +225,7 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
                 long now = System.currentTimeMillis();
                 if (e.length() > 0 && now - lastTyping > 5000) {
                     lastTyping = now;
-                    Qvk3Jobs.io(() -> Qvk3ImApi.typing(peer)); // NetworkBridge drops it when «непечаталка» is on
+                    if (!noTyping(peer)) Qvk3Jobs.io(() -> Qvk3ImApi.typing(peer)); // «Непечаталка»
                 }
             }
         });
@@ -336,9 +336,28 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
 
     private long lastMarked;
 
+    /** QVK 2's «Нечиталка» scopes (global / личные / сообщества / беседы / per chat). */
+    static boolean noRead(long peer) {
+        try {
+            return RuntimeBridge.scope("dnr", peer);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** QVK 2's «Непечаталка» scopes. */
+    static boolean noTyping(long peer) {
+        try {
+            return RuntimeBridge.scope("dnt", peer);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private void markRead() {
         Qvk3ImModel.Conversation c = store.conversation(peer);
         if (c == null || c.unread == 0 || c.last == null || c.last.cmid == lastMarked) return;
+        if (noRead(peer)) return;   // BUG-0081: «Нечиталка» — opening a chat must not mark it read
         lastMarked = c.last.cmid;
         long cmid = c.last.cmid;
         Qvk3Jobs.io(() -> {
@@ -1086,6 +1105,7 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
                     Qvk3ImModel.Person who = store.people.get(m.from);
                     Qvk3ImUi.avatar(av, who == null ? "" : who.photo, who == null ? "" : who.name, 32);
                 }
+                if (r.last && m.from != 0) av.setOnClickListener(v -> Qvk3ImUi.openProfile(a, m.from));   // BUG-0085
                 LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(dp(32), dp(32));
                 al.rightMargin = dp(6);
                 row.addView(av, al);
@@ -1104,6 +1124,15 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
             row.addView(col);
             b.setOnClickListener(v -> tapMessage(m));
             b.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                longPress(m);
+                return true;
+            });
+            // BUG-0084: the whole row, not only the bubble, selects / opens the menu
+            row.setOnClickListener(v -> {
+                if (!selected.isEmpty()) toggleSelect(m);
+            });
+            row.setOnLongClickListener(v -> {
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
                 longPress(m);
                 return true;

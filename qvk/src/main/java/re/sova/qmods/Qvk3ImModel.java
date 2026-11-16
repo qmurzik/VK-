@@ -188,9 +188,12 @@ public final class Qvk3ImModel {
             }
             case "sticker": {
                 JSONObject p = bestSize(o.optJSONArray("images"), 352);
+                if (p == null) p = bestSize(o.optJSONArray("images_with_background"), 352);
                 x.preview = sizeUrl(p);
                 x.width = x.height = 160;
                 x.id = o.optLong("sticker_id");
+                // BUG-0084: newer answers often carry no image list — VK serves every sticker by id
+                if (x.preview.isEmpty() && x.id > 0) x.preview = "https://vk.com/sticker/1-" + x.id + "-256";
                 break;
             }
             case "audio_message": {
