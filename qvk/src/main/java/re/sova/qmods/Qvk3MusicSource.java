@@ -171,6 +171,25 @@ public final class Qvk3MusicSource {
                 Integer.toString(offset), "auto_complete", "1", "performer_only", artistOnly ? "1" : "0")));
     }
 
+    /** IDEA-0034: a new VK playlist with these tracks (audio.createPlaylist + audio.addToPlaylist). */
+    public static void createPlaylist(String title, List<Qvk3Track> tracks) throws Exception {
+        long me = account();
+        if (me <= 0) throw new IOException("Войдите в аккаунт ВК");
+        JSONObject r = response("audio.createPlaylist", args("owner_id", Long.toString(me), "title", title));
+        long id = r.optLong("id");
+        if (id == 0) throw new IOException("ВК не вернул номер плейлиста");
+        for (int i = 0; i < tracks.size(); i += 100) {
+            StringBuilder ids = new StringBuilder();
+            for (int k = i; k < Math.min(tracks.size(), i + 100); k++) {
+                Qvk3Track t = tracks.get(k);
+                if (t.id == 0) continue;
+                if (ids.length() > 0) ids.append(',');
+                ids.append(t.ownerId).append('_').append(t.id);
+            }
+            if (ids.length() > 0) response("audio.addToPlaylist", args("owner_id", Long.toString(me), "playlist_id", Long.toString(id), "audio_ids", ids.toString()));
+        }
+    }
+
     /** BUG-0079: the artist's albums — VK id from a track's main_artists, then audio.getAlbumsByArtist. */
     public static List<Playlist> artistAlbums(String name) throws Exception {
         JSONObject r = response("audio.search", args("q", name, "count", "5", "performer_only", "1"));

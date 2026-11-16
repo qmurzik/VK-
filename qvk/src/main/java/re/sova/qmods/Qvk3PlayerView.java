@@ -502,6 +502,7 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
         });
         if (lyricsMode) showLyrics(true);
         onState(engine);
+        landBars();
     }
 
     // ------------------------------------------------------------------ editable action row (IDEA-0004)
@@ -763,7 +764,57 @@ public final class Qvk3PlayerView extends FrameLayout implements Qvk3MusicEngine
     @Override
     protected void onDetachedFromWindow() {
         engine.removeListener(this);
+        showSystemBars(true);
         super.onDetachedFromWindow();
+    }
+
+    @Override
+    protected void onVisibilityChanged(View changed, int visibility) {
+        super.onVisibilityChanged(changed, visibility);
+        if (changed == this) landBars();
+    }
+
+    /**
+     * IDEA-0034: in landscape the player takes the whole screen — the status bar hides (a short look, not minutes),
+     * and a small clock stays in the top-left corner instead.
+     */
+    private void landBars() {
+        boolean full = land && getVisibility() == VISIBLE;
+        showSystemBars(!full);
+        if (full) {
+            android.widget.TextClock clock = new android.widget.TextClock(a);
+            clock.setFormat24Hour("HH:mm");
+            clock.setFormat12Hour("h:mm");
+            clock.setTextSize(14);
+            clock.setTextColor(0xCCFFFFFF);
+            clock.setShadowLayer(dp(3), 0, 0, 0x66000000);
+            LayoutParams cl = new LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
+            cl.leftMargin = dp(16);
+            cl.topMargin = dp(8);
+            addView(clock, cl);
+        }
+    }
+
+    private void showSystemBars(boolean show) {
+        try {
+            android.view.Window w = a.getWindow();
+            if (w == null) return;
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                android.view.WindowInsetsController c = w.getInsetsController();
+                if (c == null) return;
+                if (show) c.show(android.view.WindowInsets.Type.statusBars());
+                else {
+                    c.hide(android.view.WindowInsets.Type.statusBars());
+                    c.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } else {
+                int f = w.getDecorView().getSystemUiVisibility();
+                f = show ? f & ~View.SYSTEM_UI_FLAG_FULLSCREEN : f | View.SYSTEM_UI_FLAG_FULLSCREEN;
+                w.getDecorView().setSystemUiVisibility(f);
+            }
+        } catch (Throwable t) {
+            RuntimeFaults.record("qvk3.player.bars", t);
+        }
     }
 
     @Override

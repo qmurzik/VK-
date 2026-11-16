@@ -66,6 +66,26 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     private View searchRow;
     private android.widget.ProgressBar miniProgress;
     private final Deque<Runnable> back = new ArrayDeque<>();
+
+    // IDEA-0034: selection mode (long press), swipe-to-remove in «Моя музыка», pull to refresh, remembered tabs
+    final java.util.LinkedHashMap<String, Qvk3Track> picked = new java.util.LinkedHashMap<>();
+    private LinearLayout headerBar, selBar;
+    private TextView selCount;
+    private String revealKey = "";
+    private android.widget.ProgressBar pullSpin;
+
+    private static final class TabState {
+        List<Row> rows;
+        Feed feed;
+        Runnable screen;
+        CharSequence title;
+        int pos, top;
+        long at;
+    }
+
+    private final java.util.Map<Integer, TabState> tabStates = new java.util.HashMap<>();
+    /** How long a tab may be shown from memory: «Главная» and playlists change rarely (IDEA-0034). */
+    private static final long[] TAB_TTL = {10 * 60_000L, 30 * 60_000L, 10 * 60_000L, 0, 0, 10 * 60_000L};
     private Runnable current;
     private Feed feed;
     private String miniCoverFor = "";
@@ -216,13 +236,20 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         final TextView title = Qvk3Ui.line(a, "", 16, p.text, false);
         final TextView sub = Qvk3Ui.line(a, "", 13, p.text2, false);
         final TextView right = Qvk3Ui.text(a, "", 13, p.text2, false);
+        final ImageView mark = new ImageView(a);
+        final ImageView remove = new ImageView(a);
         String boundCover;
+        Row bound;
 
         ItemHolder() {
             row.setGravity(Gravity.CENTER_VERTICAL);
             int pad = Qvk3Ui.dp(row.getContext(), 16);
             row.setPadding(pad, Qvk3Ui.dp(row.getContext(), 6), pad, Qvk3Ui.dp(row.getContext(), 6));
             row.setMinimumHeight(Qvk3Ui.dp(row.getContext(), 60));
+            LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 24), Qvk3Ui.dp(a, 24));
+            ml.rightMargin = Qvk3Ui.dp(a, 12);
+            mark.setVisibility(View.GONE);
+            row.addView(mark, ml);
             row.addView(cover);
             LinearLayout texts = new LinearLayout(row.getContext());
             texts.setOrientation(LinearLayout.VERTICAL);
@@ -231,10 +258,44 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
             texts.addView(sub);
             row.addView(texts, Qvk3Ui.weight(1));
             row.addView(right);
+            // IDEA-0034: the red «×» a left swipe reveals in «Моя музыка»
+            remove.setImageDrawable(Qvk3Icons.of(Qvk3Icons.CLOSE, Color.WHITE));
+            int rp = Qvk3Ui.dp(a, 8);
+            remove.setPadding(rp, rp, rp, rp);
+            remove.setBackground(Qvk3Ui.rounded(0xFFE64646, Qvk3Ui.dp(a, 18)));
+            remove.setContentDescription("Удалить из «Моей музыки»");
+            remove.setVisibility(View.GONE);
+            remove.setOnClickListener(v -> {
+                if (bound == null || bound.track == null) return;
+                revealKey = "";
+                List<Qvk3Track> one = new ArrayList<>();
+                one.add(bound.track);
+                removeFromMine(one);
+                rows.notifyDataSetChanged();
+            });
+            LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(Qvk3Ui.dp(a, 36), Qvk3Ui.dp(a, 36));
+            rl.leftMargin = Qvk3Ui.dp(a, 10);
+            row.addView(remove, rl);
             row.setTag(a);
         }
 
         void bind(Row r) {
+            bound = r;
+            boolean selecting = !picked.isEmpty() && r.track != null;
+            mark.setVisibility(selecting ? View.VISIBLE : View.GONE);
+            if (selecting) {
+                boolean on = picked.containsKey(r.track.key());
+                android.graphics.drawable.GradientDrawable c = new android.graphics.drawable.GradientDrawable();
+                c.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                if (on) c.setColor(p.accent);
+                else c.setStroke(Qvk3Ui.dp(a, 2), p.text2);
+                mark.setBackground(c);
+                mark.setImageDrawable(on ? Qvk3Icons.of(Qvk3Icons.CHECK, Color.WHITE) : null);
+                int mp = Qvk3Ui.dp(a, 4);
+                mark.setPadding(mp, mp, mp, mp);
+            }
+            boolean reveal = r.track != null && !revealKey.isEmpty() && revealKey.equals(r.track.key());
+            remove.setVisibility(reveal ? View.VISIBLE : View.GONE);
             Qvk3Track playing = engine.current();
             boolean now = r.track != null && playing != null && playing.key().equals(r.track.key());
             title.setText(r.title);
@@ -493,6 +554,15 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
 
     /** Returns true when the back press was consumed (player closed / inner screen popped). */
     public boolean handleBack() {
+        if (!picked.isEmpty()) {   // IDEA-0034: «Назад» ends the selection first
+            clearPicked();
+            return true;
+        }
+        if (!revealKey.isEmpty()) {
+            revealKey = "";
+            rows.notifyDataSetChanged();
+            return true;
+        }
         if (tileGrid != null && tileGrid.editing() && tileGrid.isAttachedToWindow()) {
             tileGrid.stopEdit();   // IDEA-0022: «Назад» ends the rearranging first
             return true;
@@ -553,6 +623,18 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         }));
         header.addView(Qvk3Ui.icon(a, Qvk3Icons.TUNE, p.text, 48, 22, "Настройки QVK Music", v -> Qvk3MusicSettingsScreen.show(a)));
         col.addView(header, Qvk3Ui.match());
+        headerBar = header;
+        // IDEA-0034: while tracks are selected the header shows «Выделено: N» and the actions menu
+        selBar = new LinearLayout(a);
+        selBar.setGravity(Gravity.CENTER_VERTICAL);
+        selBar.setPadding(Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4), Qvk3Ui.dp(a, 4), 0);
+        selBar.addView(Qvk3Ui.icon(a, Qvk3Icons.CLOSE, p.text, 48, 22, "Снять выделение", v -> clearPicked()));
+        selCount = Qvk3Ui.line(a, "", 20, p.text, true);
+        selCount.setPadding(Qvk3Ui.dp(a, 6), 0, 0, 0);
+        selBar.addView(selCount, Qvk3Ui.weight(1));
+        selBar.addView(Qvk3Ui.icon(a, Qvk3Icons.MORE, p.text, 48, 22, "Действия с выделенными", v -> pickedMenu()));
+        selBar.setVisibility(View.GONE);
+        col.addView(selBar, Qvk3Ui.match());
 
         search = new EditText(a);
         search.setHint("Поиск музыки");
@@ -628,10 +710,25 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         list.setAdapter(rows);
         list.setOnItemClickListener((parent, view, i, id) -> {
             Object o = parent.getItemAtPosition(i);
+            if (!revealKey.isEmpty()) {   // a tap anywhere hides the swipe «×»
+                revealKey = "";
+                rows.notifyDataSetChanged();
+                return;
+            }
+            if (o instanceof Row && !picked.isEmpty() && ((Row) o).track != null) {
+                togglePicked(((Row) o).track);
+                return;
+            }
             if (o instanceof Row && ((Row) o).click != null) ((Row) o).click.run();
         });
         list.setOnItemLongClickListener((parent, view, i, id) -> {
             Object o = parent.getItemAtPosition(i);
+            if (o instanceof Row && ((Row) o).track != null && ((Row) o).longClick != null) {
+                // IDEA-0034: long press starts selecting (the old menu is «⋮» with one track selected)
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                togglePicked(((Row) o).track);
+                return true;
+            }
             if (!(o instanceof Row) || ((Row) o).longClick == null) return false;
             ((Row) o).longClick.run();
             return true;
@@ -640,8 +737,20 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         android.view.GestureDetector swipe = new android.view.GestureDetector(a, new android.view.GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
-                if (e1 == null || !back.isEmpty()) return false;
+                if (e1 == null) return false;
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
+                if (tab == 1 && picked.isEmpty() && dx < -Qvk3Ui.dp(a, 48) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    // IDEA-0034: swipe a track to the left — a red «×» removes it from «Моя музыка»
+                    int pos = list.pointToPosition((int) e1.getX(), (int) e1.getY());
+                    Object o = pos == ListView.INVALID_POSITION ? null : list.getItemAtPosition(pos);
+                    if (o instanceof Row && ((Row) o).track != null) {
+                        revealKey = ((Row) o).track.key();
+                        rows.notifyDataSetChanged();
+                        list.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                        return true;
+                    }
+                }
+                if (!back.isEmpty()) return false;
                 if (Math.abs(dx) < Qvk3Ui.dp(a, 90) || Math.abs(dx) < Math.abs(dy) * 2 || Math.abs(vx) < 700) return false;
                 int next = tab + (dx < 0 ? 1 : -1);
                 if (next < 0 || next >= TABS.length) return false;
@@ -653,15 +762,48 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 return true;
             }
         });
+        final float[] pullFrom = {-1};
         list.setOnTouchListener((v, e) -> {
             swipe.onTouchEvent(e);
+            // IDEA-0034: pull down at the top of a list to load it again from VK
+            boolean atTop = list.getFirstVisiblePosition() == 0 && (list.getChildCount() == 0 || list.getChildAt(0).getTop() >= 0);
+            switch (e.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    pullFrom[0] = atTop ? e.getRawY() : -1;
+                    break;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    if (pullFrom[0] < 0 && atTop) pullFrom[0] = e.getRawY();
+                    if (pullFrom[0] >= 0 && pullSpin != null) {
+                        float d = Math.max(0, e.getRawY() - pullFrom[0]);
+                        pullSpin.setVisibility(d > Qvk3Ui.dp(a, 24) ? View.VISIBLE : View.GONE);
+                        pullSpin.setAlpha(Math.min(1f, d / Qvk3Ui.dp(a, 96)));
+                    }
+                    break;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    if (pullFrom[0] >= 0 && e.getRawY() - pullFrom[0] > Qvk3Ui.dp(a, 96) && e.getActionMasked() == android.view.MotionEvent.ACTION_UP) refresh();
+                    else if (pullSpin != null) pullSpin.setVisibility(View.GONE);
+                    pullFrom[0] = -1;
+                    break;
+                default:
+                    break;
+            }
             return false; // the list keeps scrolling and taps as before
         });
         if (embedded) {
             list.setClipToPadding(false);
             list.setPadding(0, 0, 0, Qvk3Ui.dp(a, 8)); // room for the floating mini-player and VK's bottom bar
         }
-        col.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
+        FrameLayout listBox = new FrameLayout(a);
+        listBox.addView(list, new FrameLayout.LayoutParams(-1, -1));
+        pullSpin = new android.widget.ProgressBar(a);
+        pullSpin.setIndeterminate(true);
+        pullSpin.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(p.accent));
+        pullSpin.setVisibility(View.GONE);
+        FrameLayout.LayoutParams sl = new FrameLayout.LayoutParams(Qvk3Ui.dp(a, 32), Qvk3Ui.dp(a, 32), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        sl.topMargin = Qvk3Ui.dp(a, 10);
+        listBox.addView(pullSpin, sl);
+        col.addView(listBox, new LinearLayout.LayoutParams(-1, 0, 1));
 
         LinearLayout miniWrap = new LinearLayout(a);
         miniWrap.setOrientation(LinearLayout.VERTICAL);
@@ -724,7 +866,11 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
     }
 
     void selectTab(int i) {
+        saveTabState();
+        clearPicked();
+        revealKey = "";
         tab = Math.max(0, Math.min(TABS.length - 1, i));
+        if (restoreTabState()) return;
         highlightTab();
         searchRow.setVisibility(tab == 3 || tab == 1 ? View.VISIBLE : View.GONE);
         switch (tab) {
@@ -885,6 +1031,198 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         }
         hs.addView(g);
         return hs;
+    }
+
+    // ------------------------------------------------------------------ IDEA-0034
+
+    /** Remembers the shown section (rows, paging, scroll) so coming back is instant and keeps the place. */
+    private void saveTabState() {
+        if (!back.isEmpty() || current == null || rows == null || tab == 3 || tab == 4) return;
+        TabState st = new TabState();
+        st.rows = new ArrayList<>(rows.items);
+        st.feed = feed;
+        st.screen = current;
+        st.title = screenTitle.getText();
+        st.pos = list.getFirstVisiblePosition();
+        View top = list.getChildAt(0);
+        st.top = top == null ? 0 : top.getTop();
+        st.at = android.os.SystemClock.elapsedRealtime();
+        tabStates.put(tab, st);
+    }
+
+    private boolean restoreTabState() {
+        TabState st = tabStates.get(tab);
+        if (st == null || tab >= TAB_TTL.length || TAB_TTL[tab] == 0 || android.os.SystemClock.elapsedRealtime() - st.at > TAB_TTL[tab]) {
+            tabStates.remove(tab);
+            return false;
+        }
+        highlightTab();
+        searchRow.setVisibility(tab == 3 || tab == 1 ? View.VISIBLE : View.GONE);
+        back.clear();
+        current = st.screen;
+        feed = st.feed;
+        screenTitle.setText(st.title);
+        rows.set(st.rows);
+        list.setSelectionFromTop(st.pos, st.top);
+        if (tab == 1 && feed != null) checkNewInMine(feed);
+        return true;
+    }
+
+    /** «Моя музыка» from memory: look at the first page only and put newly added tracks on top. */
+    private void checkNewInMine(Feed f) {
+        Qvk3Jobs.io(() -> {
+            try {
+                Qvk3MusicSource.Page<Qvk3Track> first = Qvk3MusicSource.myTracks(0);
+                Qvk3Jobs.main(() -> {
+                    if (feed != f || f.items.isEmpty()) return;
+                    java.util.Set<String> have = new java.util.HashSet<>();
+                    for (Qvk3Track t : f.items) have.add(t.key());
+                    List<Qvk3Track> fresh = new ArrayList<>();
+                    for (Qvk3Track t : first.items) {
+                        if (have.contains(t.key())) break;   // reached what we already show
+                        fresh.add(t);
+                    }
+                    if (fresh.isEmpty()) return;
+                    f.items.addAll(0, fresh);
+                    if (f.total >= 0) f.total += fresh.size();
+                    f.render();
+                });
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    /** Pull to refresh: forget the cached section and load it again. */
+    private void refresh() {
+        tabStates.remove(tab);
+        if (pullSpin != null) {
+            pullSpin.setVisibility(View.VISIBLE);
+            pullSpin.postDelayed(() -> pullSpin.setVisibility(View.GONE), 900);
+        }
+        if (current != null) go(current);
+    }
+
+    void togglePicked(Qvk3Track t) {
+        if (t == null) return;
+        if (picked.remove(t.key()) == null) picked.put(t.key(), t);
+        updatePicked();
+    }
+
+    void clearPicked() {
+        if (picked.isEmpty()) return;
+        picked.clear();
+        updatePicked();
+    }
+
+    private void updatePicked() {
+        boolean on = !picked.isEmpty();
+        if (selBar != null) {
+            selBar.setVisibility(on ? View.VISIBLE : View.GONE);
+            headerBar.setVisibility(on ? View.GONE : View.VISIBLE);
+            selCount.setText("Выделено: " + picked.size());
+        }
+        rows.notifyDataSetChanged();
+    }
+
+    /** «⋮» while selecting: actions for the selected tracks, in the order they were selected. */
+    private void pickedMenu() {
+        final List<Qvk3Track> sel = new ArrayList<>(picked.values());
+        if (sel.isEmpty()) return;
+        List<String> labels = new ArrayList<>();
+        List<Runnable> acts = new ArrayList<>();
+        labels.add("Играть следующими");
+        acts.add(() -> engine.editQueue(() -> {
+            for (int i = sel.size() - 1; i >= 0; i--) engine.queue().addNext(sel.get(i));
+        }));
+        labels.add("Добавить в конец очереди");
+        acts.add(() -> engine.editQueue(() -> {
+            for (Qvk3Track t : sel) engine.queue().addLast(t);
+        }));
+        labels.add("Создать плейлист…");
+        acts.add(() -> createPlaylist(sel));
+        labels.add("Скачать");
+        acts.add(() -> Qvk3Ui.toast(a, Qvk3MusicDownloads.enqueue(a, sel)));
+        labels.add("Поделиться списком");
+        acts.add(() -> {
+            StringBuilder b = new StringBuilder();
+            for (Qvk3Track t : sel) b.append(t.label()).append('\n');
+            try {
+                a.startActivity(android.content.Intent.createChooser(new android.content.Intent(android.content.Intent.ACTION_SEND)
+                        .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, b.toString().trim()), "Поделиться"));
+            } catch (Exception e) {
+                Qvk3Ui.toast(a, "Некуда поделиться");
+            }
+        });
+        if (tab == 1) {
+            labels.add("Удалить из «Моей музыки»");
+            acts.add(() -> removeFromMine(sel));
+        }
+        if (sel.size() == 1) {
+            Qvk3Track t = sel.get(0);
+            labels.add("Все треки исполнителя");
+            acts.add(() -> openArtist(t.artist));
+            labels.add("Скопировать название");
+            acts.add(() -> {
+                android.content.ClipboardManager cm = a.getSystemService(android.content.ClipboardManager.class);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Трек", t.label()));
+                Qvk3Ui.toast(a, "Скопировано");
+            });
+        }
+        Qvk3Ui.dialog(a).setTitle("Выделено: " + sel.size()).setItems(labels.toArray(new String[0]), (d, w) -> {
+            acts.get(w).run();
+            clearPicked();
+        }).show();
+    }
+
+    private void createPlaylist(List<Qvk3Track> sel) {
+        EditText name = new EditText(a);
+        name.setHint("Название плейлиста");
+        name.setSingleLine(true);
+        Qvk3Ui.dialog(a).setTitle("Новый плейлист").setView(name).setPositiveButton("Создать", (d, w) -> {
+            String title = name.getText().toString().trim();
+            if (title.isEmpty()) title = "Мой плейлист";
+            final String t = title;
+            Qvk3Jobs.io(() -> {
+                String msg;
+                try {
+                    Qvk3MusicSource.createPlaylist(t, sel);
+                    msg = "Плейлист «" + t + "» создан: " + sel.size() + " треков";
+                    tabStates.remove(2);
+                } catch (Exception e) {
+                    msg = "Не удалось создать плейлист: " + Qvk3Jobs.message(e);
+                }
+                final String m = msg;
+                Qvk3Jobs.main(() -> Qvk3Ui.toast(a, m));
+            });
+        }).setNegativeButton("Отмена", null).show();
+    }
+
+    private void removeFromMine(List<Qvk3Track> sel) {
+        Qvk3Ui.dialog(a).setTitle("Удалить " + Qvk3SettingsActivity.plural(sel.size(), "трек", "трека", "треков") + " из «Моей музыки»?")
+                .setPositiveButton("Удалить", (d, w) -> Qvk3Jobs.io(() -> {
+                    int ok = 0;
+                    String err = null;
+                    for (Qvk3Track t : sel) {
+                        try {
+                            Qvk3MusicSource.removeFromMine(t.ownerId + "_" + t.id);
+                            ok++;
+                        } catch (Exception e) {
+                            err = Qvk3Jobs.message(e);
+                        }
+                    }
+                    final int done = ok;
+                    final String fe = err;
+                    Qvk3Jobs.main(() -> {
+                        if (feed != null) {
+                            java.util.Set<String> gone = new java.util.HashSet<>();
+                            for (Qvk3Track t : sel) gone.add(t.key());
+                            java.util.Iterator<Qvk3Track> it = feed.items.iterator();
+                            while (it.hasNext()) if (gone.contains(it.next().key())) it.remove();
+                            feed.render();
+                        }
+                        Qvk3Ui.toast(a, fe == null ? "Удалено: " + done : "Удалено: " + done + ". " + fe);
+                    });
+                })).setNegativeButton("Отмена", null).show();
     }
 
     Row trackRow(List<Qvk3Track> context, int index) {
