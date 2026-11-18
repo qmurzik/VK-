@@ -150,6 +150,10 @@ public final class Qvk3PortalWatch implements Application.ActivityLifecycleCallb
             }
             final String n = notes;
             final org.json.JSONArray v = verify;
+            if (Qvk3WhatsNew.has(ver)) {   // QVK 3.1: the full «Что нового» screen
+                Qvk3Jobs.main(() -> Qvk3WhatsNew.show(a, v));
+                return;
+            }
             if (n.isEmpty() && v.length() == 0) return;
             Qvk3Jobs.main(() -> showWhatsNew(a, n, v));
         });

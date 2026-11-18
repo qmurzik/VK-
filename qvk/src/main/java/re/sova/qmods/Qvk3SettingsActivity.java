@@ -301,6 +301,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:channel", "Канал обновлений", "Альфа — все сборки, стабильная — только проверенные", 8, "Обновления");
         idx.addScreen("qvk3:updates", "Проверить обновления", "Загрузка с докачкой, проверка подписи", 8, "Обновления");
         idx.addScreen("qvk3:updateSources", "Серверы обновлений", "Свои адреса, зеркала и ключи подписи", 8, "Обновления");
+        idx.addScreen("qvk3:whatsNew", "Что нового в QVK 3.1", "Моя волна, очередь перетаскиванием, отложенные и удалённые сообщения, шрифт", 8, "О QVK");
         idx.addScreen("qvk3:about", "О QVK 3.0", "Версия, база VK 8.100, миграция", 8, "О QVK");
         idx.addScreen("qvk3:shell", "Открыть оболочку QVK", "Чаты и музыка в стиле iOS", 1, "Оболочка QVK");
         idx.addScreen("qvk3:shellToggle", "Запускать оболочку QVK при старте", "Экспериментально: вместо главного экрана ВКонтакте. По умолчанию выключено", 1, "Оболочка QVK");
@@ -889,6 +890,9 @@ public final class Qvk3SettingsActivity extends Activity {
                 break;
             case "weather":
                 Qvk3SplashWeather.settings(this);
+                break;
+            case "whatsNew":
+                Qvk3WhatsNew.show(this, null);
                 break;
             case "font":
                 Qvk3Fonts.choose(this, this::recreate);   // QVK 3.1: redraw the centre in the new font
