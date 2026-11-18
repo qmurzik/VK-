@@ -289,6 +289,7 @@ public final class Qvk3SettingsActivity extends Activity {
         idx.addScreen("qvk3:photoAlbum", "Скачать фотоальбом", "Весь альбом в галерею: оригинал или поменьше, своя папка, прогресс в уведомлении", 5, "Видео, клипы и фото");
         idx.addScreen("qvk3:weather", "Погода на экране запуска", "Температура под логотипом QVK; дождь и снег — подписью", 0, "Анимации и запуск");
         idx.addScreen("qvk3:dayNight", "Светлая и тёмная тема", "Режим (как в системе, по времени) и цвета каждой темы", 0, "Темы и цвета");
+        idx.addScreen("qvk3:font", "Шрифт QVK", "Inter, Noto, Open Sans, моноширинный — для настроек, музыки и мессенджера QVK", 0, "Темы и цвета");
         idx.addScreen("qvk3:report", "Сообщить о проблеме", "Баг или идея на портал бета-теста — с журналом, снимком экрана и версией", 7, "Портал бета-теста");
         idx.addScreen("qvk3:myTickets", "Мои обращения", "Статусы, ответы команды, проверка исправлений", 7, "Портал бета-теста");
         idx.addScreen("qvk3:ideas", "Идеи тестировщиков", "Голосуйте за идеи других: «Хочу это» поднимает идею выше", 7, "Портал бета-теста");
@@ -887,6 +888,9 @@ public final class Qvk3SettingsActivity extends Activity {
                 break;
             case "weather":
                 Qvk3SplashWeather.settings(this);
+                break;
+            case "font":
+                Qvk3Fonts.choose(this, this::recreate);   // QVK 3.1: redraw the centre in the new font
                 break;
             case "photoAlbum":
                 Qvk3PhotoAlbums.open(this);   // IDEA-0025

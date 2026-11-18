@@ -96,7 +96,8 @@ public final class Qvk3Ui {
         t.setText(s);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
-        if (bold) t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        Typeface tf = Qvk3Fonts.typeface(c, bold);   // QVK 3.1: the chosen QVK font (system: medium for bold)
+        if (tf != null) t.setTypeface(tf);
         return t;
     }
 
