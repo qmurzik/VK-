@@ -36,6 +36,7 @@ final class Qvk3QueuePanel extends FrameLayout implements Qvk3MusicEngine.Listen
     private final Runnable onClosed;
     private String coverFor = "";
     private boolean dragging;
+    private int dragFrom = -1, dragAt = -1;
 
     Qvk3QueuePanel(Activity a, int bg, int fg, int fg2, int accent, Runnable onClosed) {
         super(a);
@@ -123,13 +124,52 @@ final class Qvk3QueuePanel extends FrameLayout implements Qvk3MusicEngine.Listen
         times.addView(dur);
         col.addView(times, Qvk3Ui.match());
 
-        TextView up = Qvk3Ui.text(a, "Очередь", 13, fg2, true);
+        TextView up = Qvk3Ui.text(a, "Очередь · удерживайте трек, чтобы перетащить", 13, fg2, true);
         up.setPadding(dp(20), dp(6), dp(20), dp(4));
         col.addView(up);
         list = new ListView(a);
         list.setDivider(null);
         list.setAdapter(adapter);
-        list.setOnItemClickListener((parent, view, i, id) -> engine.playIndex(i));
+        list.setOnItemClickListener((parent, view, i, id) -> {
+            if (dragAt < 0) engine.playIndex(i);
+        });
+        // QVK 3.1: hold a track and drag it to a new place in the queue
+        list.setOnItemLongClickListener((parent, view, i, id) -> {
+            dragFrom = dragAt = i;
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            adapter.notifyDataSetChanged();
+            return true;
+        });
+        list.setOnTouchListener((v, e) -> {
+            if (dragAt < 0) return false;
+            int act = e.getActionMasked();
+            if (act == MotionEvent.ACTION_MOVE) {
+                int to = list.pointToPosition((int) e.getX(), (int) e.getY());
+                if (to != ListView.INVALID_POSITION && to != dragAt) {
+                    Qvk3Track t = adapter.items.remove(dragAt);
+                    adapter.items.add(to, t);
+                    if (adapter.cur == dragAt) adapter.cur = to;
+                    else if (dragAt < adapter.cur && to >= adapter.cur) adapter.cur--;
+                    else if (dragAt > adapter.cur && to <= adapter.cur) adapter.cur++;
+                    dragAt = to;
+                    adapter.notifyDataSetChanged();
+                    list.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                }
+                // near the edges the list scrolls by itself
+                int edge = dp(56);
+                if (e.getY() < edge) list.smoothScrollBy(-dp(24), 40);
+                else if (e.getY() > list.getHeight() - edge) list.smoothScrollBy(dp(24), 40);
+                return true;
+            }
+            if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) {
+                final int from = dragFrom, to = dragAt;
+                dragFrom = dragAt = -1;
+                adapter.notifyDataSetChanged();
+                if (from >= 0 && to >= 0 && from != to) engine.editQueue(() -> engine.queue().move(from, to));
+                return true;
+            }
+            return true;
+        });
         col.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
 
         // pull the top part down → close
@@ -205,11 +245,17 @@ final class Qvk3QueuePanel extends FrameLayout implements Qvk3MusicEngine.Listen
         Qvk3Ui.setTextIfChanged(dur, Qvk3Track.time(e.duration()));
         List<Qvk3Track> q = e.queue().items();
         int cur = e.queue().currentIndex();
-        if (adapter.cur != cur || adapter.items.size() != q.size()) {
+        if (dragAt < 0 && (adapter.cur != cur || adapter.items.size() != q.size() || !sameOrder(adapter.items, q))) {
             adapter.items = new ArrayList<>(q);
             adapter.cur = cur;
             adapter.notifyDataSetChanged();
         }
+    }
+
+    private static boolean sameOrder(List<Qvk3Track> a, List<Qvk3Track> b) {
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) if (a.get(i) != b.get(i)) return false;
+        return true;
     }
 
     private final class Adapter extends BaseAdapter {
@@ -267,7 +313,9 @@ final class Qvk3QueuePanel extends FrameLayout implements Qvk3MusicEngine.Listen
             t.setTextColor(now ? accent : fg);
             s.setText(tr.artist);
             d.setText(Qvk3Track.time(tr.duration * 1000L));
-            row.setBackgroundColor(now ? (accent & 0x00FFFFFF) | 0x1F000000 : Color.TRANSPARENT);
+            boolean held = i == dragAt;
+            row.setBackgroundColor(held ? (accent & 0x00FFFFFF) | 0x40000000 : now ? (accent & 0x00FFFFFF) | 0x1F000000 : Color.TRANSPARENT);
+            row.setElevation(held ? dp(6) : 0);
             return row;
         }
     }
