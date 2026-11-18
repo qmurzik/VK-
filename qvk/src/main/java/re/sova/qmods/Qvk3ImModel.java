@@ -312,6 +312,10 @@ public final class Qvk3ImModel {
     public static final class Message {
         public long id, cmid, peer, from, date, updateTime;
         public boolean out, important, pinned;
+        /** QVK 3.1: deleted for everyone by the sender, kept here because «Сохранять удалённые» is on. */
+        public boolean deletedForAll;
+        /** The VK object this message was parsed from (kept deleted messages are stored as it is). */
+        public JSONObject raw;
         public String text = "";
         public final List<Attachment> attachments = new ArrayList<>();
         public final List<Message> forwards = new ArrayList<>();
@@ -349,6 +353,7 @@ public final class Qvk3ImModel {
         if (o == null) return null;
         o = unwrap(o);
         Message m = new Message();
+        m.raw = o;
         m.id = o.optLong("id");
         m.cmid = o.optLong("conversation_message_id");
         m.peer = o.optLong("peer_id");

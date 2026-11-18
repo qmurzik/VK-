@@ -196,6 +196,8 @@ final class Qvk3ImStore {
                     people.putAll(Qvk3ImModel.people(cached));
                     l.addAll(Qvk3ImModel.history(cached));
                 }
+                List<Qvk3ImModel.Message> keptHere = keptFor(peer);
+                if (!keptHere.isEmpty()) l = Qvk3ImModel.merge(l, keptHere);
             } catch (Exception ignored) {
             }
             history.put(peer, l);
@@ -337,9 +339,70 @@ final class Qvk3ImStore {
     }
 
     void removeMessages(long peer, Set<Long> cmids) {
+        removeMessages(peer, cmids, false);
+    }
+
+    /**
+     * forAll: the sender deleted them for everyone. With «Сохранять удалённые» (QVK 3.1, off by default) incoming
+     * messages stay in the chat marked «удалено»; your own messages and «удалить у себя» always disappear.
+     */
+    void removeMessages(long peer, Set<Long> cmids, boolean forAll) {
         List<Qvk3ImModel.Message> l = history.get(peer);
-        if (l != null) for (int i = l.size() - 1; i >= 0; i--) if (cmids.contains(l.get(i).cmid)) l.remove(i);
+        boolean keep = forAll && keepDeleted(app);
+        if (l != null) for (int i = l.size() - 1; i >= 0; i--) {
+            Qvk3ImModel.Message m = l.get(i);
+            if (!cmids.contains(m.cmid)) continue;
+            if (keep && !m.out && m.raw != null) {
+                m.deletedForAll = true;
+                keepMessage(peer, m);
+            } else {
+                l.remove(i);
+            }
+        }
         notifyChanged(peer);
+    }
+
+    static final String KEEP_DELETED = "qvk3_im_keep_deleted";
+
+    static boolean keepDeleted(Context c) {
+        return Qvk3MusicSettings.prefs(c).getBoolean(KEEP_DELETED, false);
+    }
+
+    private JSONObject kept;
+
+    private JSONObject kept() {
+        if (kept == null) {
+            kept = readCache("kept");
+            if (kept == null) kept = new JSONObject();
+        }
+        return kept;
+    }
+
+    private void keepMessage(long peer, Qvk3ImModel.Message m) {
+        try {
+            JSONObject k = kept();
+            org.json.JSONArray a = k.optJSONArray(Long.toString(peer));
+            if (a == null) k.put(Long.toString(peer), a = new org.json.JSONArray());
+            for (int i = 0; i < a.length(); i++) if (a.optJSONObject(i) != null && a.optJSONObject(i).optLong("id") == m.id) return;
+            a.put(m.raw);
+            while (a.length() > 300) a.remove(0);   // a chat keeps its last 300 deleted messages
+            writeCache("kept", k);
+        } catch (Exception e) {
+            RuntimeFaults.record("qvk3.im.kept", e);
+        }
+    }
+
+    /** Kept deleted messages of this chat, as messages marked deletedForAll. */
+    private List<Qvk3ImModel.Message> keptFor(long peer) {
+        List<Qvk3ImModel.Message> out = new ArrayList<>();
+        org.json.JSONArray a = kept().optJSONArray(Long.toString(peer));
+        if (a != null) for (int i = 0; i < a.length(); i++) {
+            Qvk3ImModel.Message m = Qvk3ImModel.message(a.optJSONObject(i));
+            if (m == null) continue;
+            m.deletedForAll = true;
+            out.add(m);
+        }
+        return out;
     }
 
     void read(long peer, long cmid, boolean outgoing) {

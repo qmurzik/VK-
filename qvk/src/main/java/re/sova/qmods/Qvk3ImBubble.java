@@ -168,10 +168,10 @@ final class Qvk3ImBubble {
             star.setImageDrawable(Qvk3Icons.of(Qvk3Icons.STAR, text2));
             f.addView(star, new LinearLayout.LayoutParams(dp(12), dp(12)));
         }
-        String s = (m.edited() ? "изм. " : "") + (m.date > 0 ? Qvk3ImUi.clock(m.date) : "");
+        String s = (m.deletedForAll ? "удалено · " : "") + (m.edited() ? "изм. " : "") + (m.date > 0 ? Qvk3ImUi.clock(m.date) : "");
         if (m.local == 1) s = "отправка…";
         if (m.local == 2) s = "не отправлено · нажмите";
-        TextView t = Qvk3Ui.text(a, s, 11, m.local == 2 ? 0xFFE64646 : text2, false);
+        TextView t = Qvk3Ui.text(a, s, 11, m.local == 2 || m.deletedForAll ? 0xFFE64646 : text2, false);
         f.addView(t);
         if (m.out && m.local == 0) {
             ImageView tick = new ImageView(a);

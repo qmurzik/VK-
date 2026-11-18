@@ -113,7 +113,7 @@ final class Qvk3ImLongPoll {
 
     private void handle(JSONArray updates, long oldTs) throws Exception {
         boolean needHistory = false;
-        Map<Long, Set<Long>> deleted = new HashMap<>();
+        Map<Long, Set<Long>> deleted = new HashMap<>(), deletedForAll = new HashMap<>();
         for (int i = 0; i < updates.length(); i++) {
             JSONArray u = updates.optJSONArray(i);
             if (u == null || u.length() == 0) continue;
@@ -128,8 +128,9 @@ final class Qvk3ImLongPoll {
                     long flags = u.optLong(2);
                     if ((flags & 128) != 0 || (flags & 131072) != 0) {
                         long peer = u.optLong(3);
-                        Set<Long> s = deleted.get(peer);
-                        if (s == null) deleted.put(peer, s = new HashSet<>());
+                        Map<Long, Set<Long>> into = (flags & 131072) != 0 ? deletedForAll : deleted;   // 131072: for everyone
+                        Set<Long> s = into.get(peer);
+                        if (s == null) into.put(peer, s = new HashSet<>());
                         s.add(u.optLong(1));
                     } else needHistory = true;
                     break;
@@ -167,7 +168,12 @@ final class Qvk3ImLongPoll {
         for (Map.Entry<Long, Set<Long>> e : deleted.entrySet()) {
             long peer = e.getKey();
             Set<Long> s = e.getValue();
-            Qvk3Jobs.main(() -> Qvk3ImStore.get(app).removeMessages(peer, s));
+            Qvk3Jobs.main(() -> Qvk3ImStore.get(app).removeMessages(peer, s, false));
+        }
+        for (Map.Entry<Long, Set<Long>> e : deletedForAll.entrySet()) {
+            long peer = e.getKey();
+            Set<Long> s = e.getValue();
+            Qvk3Jobs.main(() -> Qvk3ImStore.get(app).removeMessages(peer, s, true));
         }
         if (needHistory) catchUp(oldTs);
     }
