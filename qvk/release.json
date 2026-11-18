@@ -1,5 +1,5 @@
 {
   "comment": "Версия собираемого APK. versionCode должен быть больше, чем у базовой сборки, иначе Android не установит обновление поверх.",
-  "versionCode": 23846,
-  "versionName": "8.100-qvk-3.0.0"
+  "versionCode": 23847,
+  "versionName": "8.100-qvk-3.1.0"
 }
