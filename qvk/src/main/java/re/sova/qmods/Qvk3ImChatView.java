@@ -234,6 +234,11 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
         composer.addView(input, il);
         composer.addView(Qvk3Ui.icon(a, Qvk3Icons.GRID, p.text2, 44, 22, "Стикеры", v -> Qvk3ImStickers.open(this)));
         send = Qvk3Ui.icon(a, Qvk3Icons.SEND, p.accent, 44, 24, "Отправить", v -> send());
+        // QVK 3.1: hold «Отправить» to send the text later
+        send.setOnLongClickListener(v -> {
+            scheduleSend();
+            return true;
+        });
         composer.addView(send);
         addView(composer, Qvk3Ui.match());
         cantWrite = Qvk3Ui.text(a, "", 14, p.text2, false);
@@ -946,6 +951,50 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
 
     // ------------------------------------------------------------------ chat menu
 
+    private void scheduleSend() {
+        String text = input.getText().toString().trim();
+        if (text.isEmpty()) {
+            Qvk3Ui.toast(a, "Напишите текст — отложить можно текстовое сообщение");
+            return;
+        }
+        if (!pendingAttachments.isEmpty() || !forwarding.isEmpty()) {
+            Qvk3Ui.toast(a, "Отложить можно только текст, без вложений и пересылки");
+            return;
+        }
+        a.findViewById(android.R.id.content).performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        Qvk3ImScheduled.pick(a, at -> {
+            Qvk3ImModel.Conversation c = store.conversation(peer);
+            Qvk3ImScheduled.add(a, peer, c == null ? "" : c.title, text, at);
+            input.setText("");
+            Qvk3ImDrafts.save(a, peer, "");
+            Qvk3Ui.toast(a, "Отправится " + Qvk3ImScheduled.when(at) + ". Телефон должен быть включён и в сети");
+        });
+    }
+
+    private void showScheduled() {
+        List<Qvk3ImScheduled.Item> later = Qvk3ImScheduled.forPeer(a, peer);
+        if (later.isEmpty()) return;
+        String[] labels = new String[later.size()];
+        for (int i = 0; i < later.size(); i++) {
+            Qvk3ImScheduled.Item it = later.get(i);
+            labels[i] = Qvk3ImScheduled.when(it.at) + "\n" + (it.text.length() > 80 ? it.text.substring(0, 80) + "…" : it.text);
+        }
+        Qvk3Ui.dialog(a).setTitle("Отложенные сообщения").setItems(labels, (d, w) -> {
+            Qvk3ImScheduled.Item it = later.get(w);
+            Qvk3Ui.dialog(a).setTitle(Qvk3ImScheduled.when(it.at)).setMessage(it.text)
+                    .setPositiveButton("Отправить сейчас", (d2, w2) -> {
+                        Qvk3ImScheduled.cancel(a, it.id);
+                        input.setText(it.text);
+                        send();
+                    })
+                    .setNeutralButton("Отменить отправку", (d2, w2) -> {
+                        Qvk3ImScheduled.cancel(a, it.id);
+                        Qvk3Ui.toast(a, "Отложенное сообщение удалено");
+                    })
+                    .setNegativeButton("Закрыть", null).show();
+        }).show();
+    }
+
     private void menu() {
         Qvk3ImModel.Conversation c = store.conversation(peer);
         List<String> items = new ArrayList<>();
@@ -963,6 +1012,11 @@ final class Qvk3ImChatView extends LinearLayout implements Qvk3ImStore.Listener,
                     changed(peer);
                 }));
             }
+        }
+        List<Qvk3ImScheduled.Item> later = Qvk3ImScheduled.forPeer(a, peer);
+        if (!later.isEmpty()) {
+            items.add("Отложенные сообщения (" + later.size() + ")\nПосмотреть, отправить сейчас или отменить");
+            acts.add(this::showScheduled);
         }
         items.add("Информация о чате\nУчастники, вложения, ссылка-приглашение");
         acts.add(() -> Qvk3ImInfo.show(a, peer, this::searchInChat));

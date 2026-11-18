@@ -31,6 +31,7 @@ public final class Qvk3MiniBar implements Application.ActivityLifecycleCallbacks
 
     static synchronized void install(Application app) {
         Qvk3Jobs.io(() -> Qvk3MusicService.vkResumption(app));   // BUG-0078
+        Qvk3Jobs.io(() -> Qvk3ImScheduled.arm(app));   // QVK 3.1: scheduled messages survive a restart
         if (instance != null) return;
         instance = new Qvk3MiniBar();
         app.registerActivityLifecycleCallbacks(instance);

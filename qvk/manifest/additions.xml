@@ -32,3 +32,10 @@
     android:theme="@android:style/Theme.DeviceDefault.NoActionBar" android:windowSoftInputMode="adjustResize" />
 <activity android:name="re.sova.qmods.Qvk3ImPickActivity" android:exported="false"
     android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" />
+<!-- QVK 3.1: scheduled messages of the QVK messenger (alarm + re-arm after reboot / update). -->
+<receiver android:name="re.sova.qmods.Qvk3ImScheduledReceiver" android:exported="false">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+    </intent-filter>
+</receiver>
