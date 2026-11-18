@@ -1330,6 +1330,11 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
                 if (tab != 0 || !back.isEmpty()) return;
                 // BUG-0010: like VK's music home — tracks as sideways grids (2 rows, «Популярное» 4), playlists as big
                 // covers in a row; a section title opens the whole list.
+                // QVK 3.1: «Моя волна» — an endless stream that refills itself
+                Row wave = new Row(Row.ITEM, "Моя волна", Qvk3Wave.playing(a) ? "Играет · бесконечный поток по вашему вкусу"
+                        : "Бесконечный поток по вашему вкусу", "", null, null, false, this::startWave, null);
+                wave.tile(Qvk3Icons.PULSE, 0xFF7F5BFF, 0xFFFF4E8A);
+                r.add(wave);
                 if (!recent.isEmpty()) {
                     r.add(header("Недавно прослушанное", () -> push(() -> showTrackList("Недавно прослушанное", recent))));
                     r.add(shelf(recent, 2));
@@ -1434,6 +1439,7 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         t.add(new Qvk3TileGrid.Tile("history", "История", Qvk3Icons.UNDO, 0xFF11998E, 0xFF38EF7D, () -> Qvk3QueueDialog.history(a, p)));
         t.add(new Qvk3TileGrid.Tile("files", "Файлы", Qvk3Icons.FOLDER, 0xFFF7971E, 0xFFFFC837, () -> push(() -> showCachedList("local", "Файлы на устройстве"))));
         t.add(new Qvk3TileGrid.Tile("shuffle", "Перемешать всё", Qvk3Icons.SHUFFLE, 0xFF2193B0, 0xFF6DD5ED, this::shuffleAll));
+        t.add(new Qvk3TileGrid.Tile("wave", "Моя волна", Qvk3Icons.PULSE, 0xFF7F5BFF, 0xFFFF4E8A, this::startWave));
         t.add(new Qvk3TileGrid.Tile("downloads", "Загрузки", Qvk3Icons.DOWNLOAD, 0xFF4776E6, 0xFF8E54E9, () -> selectTab(4)));
         tileGrid = new Qvk3TileGrid(a, t);
         Row g = new Row(Row.SHELF, "", "", "", null, null, false, null, null);
@@ -1443,6 +1449,14 @@ public final class Qvk3MusicScreen extends FrameLayout implements Qvk3MusicEngin
         feed = new Feed("my", head, Qvk3MusicSource::myTracks);
         feed.render();
         feed.more();
+    }
+
+    private void startWave() {
+        Qvk3Ui.toast(a, "Настраиваем волну…");
+        Qvk3Wave.get(a).start(err -> {
+            if (err != null) Qvk3Ui.toast(a, "Волна не запустилась: " + err);
+            else openPlayer();
+        });
     }
 
     private void shuffleAll() {

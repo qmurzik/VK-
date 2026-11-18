@@ -162,6 +162,13 @@ public final class Qvk3MusicSource {
         return tracks(response("audio.getRecommendations", args("count", Integer.toString(count), "shuffle", "1"))).items;
     }
 
+    /** QVK 3.1 «Моя волна»: tracks VK considers similar to this one. */
+    public static List<Qvk3Track> similar(Qvk3Track t, int count) throws Exception {
+        if (t == null || t.id == 0) return new ArrayList<>();
+        return tracks(response("audio.getRecommendations", args("target_audio", t.ownerId + "_" + t.id,
+                "count", Integer.toString(count), "shuffle", "1"))).items;
+    }
+
     public static List<Qvk3Track> popular(int count) throws Exception {
         return tracks(response("audio.getPopular", args("count", Integer.toString(count)))).items;
     }
